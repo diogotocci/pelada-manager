@@ -35,13 +35,13 @@
       "id": 6,
       "name": "Lukas",
       "rating": 3.5,
-      "active": true
+      "active": false
     },
     {
       "id": 7,
       "name": "Rodrigo Segreto",
       "rating": 3.5,
-      "active": true
+      "active": false
     },
     {
       "id": 8,
