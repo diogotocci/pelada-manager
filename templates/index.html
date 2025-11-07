@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <title>Pelada Balanceada</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Font & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap"
+    rel="stylesheet"
+  >
+  <link
+  rel="stylesheet"
+  href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css"
+  />
+
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+  <div class="app-container">
+    <header class="app-header">
+      <div>
+        <h1>Pelada Balanceada</h1>
+        <p>Fumageiros - Presidente: Alan.</p>
+      </div>
+
+      <div class="header-actions">
+        <button id="toggle-theme-btn" class="icon-button" aria-label="Alternar tema">
+          <i class="fa-solid fa-moon"></i>
+        </button>
+        <button id="compare-btn" class="secondary-button">
+            <i class="fa-solid fa-table"></i>
+            Comparar jogadores
+        </button>
+        <button id="draw-teams-btn" class="primary-button">
+          <i class="fa-solid fa-shuffle"></i>
+          Sortear times
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <section class="card">
+        <div class="card-header">
+          <h2>Jogadores</h2>
+          <span id="player-count" class="muted-text"></span>
+        </div>
+        <div id="players-list" class="players-list">
+          <!-- Populado via JS -->
+        </div>
+      </section>
+
+      <section id="teams-section" class="card hidden">
+        <div class="card-header">
+          <h2>Times sorteados</h2>
+          <button id="redraw-btn" class="secondary-button">
+            <i class="fa-solid fa-rotate-right"></i>
+            Sortear novamente
+          </button>
+        </div>
+        <div id="teams-result">
+          <!-- Times sorteados (tabelas) -->
+        </div>
+      </section>
+    </main>
+
+    <!-- Floating Action Button -->
+    <button id="fab-add-player" class="fab-button" aria-label="Adicionar jogador">
+      <i class="fa-solid fa-plus"></i>
+    </button>
+  </div>
+
+  <!-- Modal: Player form -->
+  <div id="player-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <h3 id="player-modal-title">Novo jogador</h3>
+      <form id="player-form">
+        <input type="hidden" id="player-id">
+
+        <label class="form-label" for="player-name">Nome</label>
+        <input id="player-name" class="form-input" type="text" required />
+
+        <label class="form-label">Nível (estrelas)</label>
+        <div id="star-widget" class="star-widget" data-rating="0">
+          <!-- Estrelas populadas via JS -->
+        </div>
+        <input type="hidden" id="player-rating" value="0">
+
+        <div class="modal-actions">
+          <button type="button" class="secondary-button" id="cancel-player-btn">
+            Cancelar
+          </button>
+          <button type="submit" class="primary-button">
+            Salvar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Password gate -->
+    <div id="auth-modal" class="modal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content small">
+            <h3>Acesso</h3>
+            <p class="muted-text">Digite a senha para usar o aplicativo.</p>
+
+            <label class="form-label" for="auth-password">Senha</label>
+            <input id="auth-password" class="form-input" type="password" />
+
+            <p id="auth-error" class="muted-text" style="color:#f87171; display:none;">
+            Senha inválida.
+            </p>
+
+            <div class="modal-actions">
+            <button type="button" class="primary-button" id="auth-submit-btn">
+                Entrar
+            </button>
+            </div>
+        </div>
+    </div>
+
+
+  <!-- Modal: Compare players -->
+    <div id="compare-modal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content small">
+            <h3>Comparar jogadores</h3>
+
+            <div id="compare-content">
+            <!-- Tabela gerada via JS -->
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="secondary-button" id="close-compare-btn">
+                    Fechar
+                </button>
+            </div>
+        </div>
+    </div>
+
+  <!-- Modal: Confirm delete -->
+  <div id="confirm-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content small">
+      <h3>Remover jogador</h3>
+      <p>Tem certeza que deseja remover este jogador?</p>
+      <div class="modal-actions">
+        <button type="button" class="secondary-button" id="cancel-delete-btn">
+          Cancelar
+        </button>
+        <button type="button" class="danger-button" id="confirm-delete-btn">
+          Remover
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Draw teams -->
+  <div id="draw-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content small">
+      <h3>Sortear times</h3>
+      <label class="form-label" for="team-size-input">
+        Quantos jogadores por time?
+      </label>
+      <input id="team-size-input" class="form-input" type="number" min="1" value="5">
+
+      <div class="modal-actions">
+        <button type="button" class="secondary-button" id="cancel-draw-btn">
+          Cancelar
+        </button>
+        <button type="button" class="primary-button" id="confirm-draw-btn">
+          Sortear
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

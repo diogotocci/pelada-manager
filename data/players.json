@@ -1,0 +1,77 @@
+{
+  "last_id": 13,
+  "players": [
+    {
+      "id": 1,
+      "name": "Diogo Tocci",
+      "rating": 4.0,
+      "active": true
+    },
+    {
+      "id": 2,
+      "name": "Igor",
+      "rating": 4.0,
+      "active": true
+    },
+    {
+      "id": 3,
+      "name": "Antonio",
+      "rating": 4.5,
+      "active": true
+    },
+    {
+      "id": 4,
+      "name": "Felipe",
+      "rating": 4.5,
+      "active": true
+    },
+    {
+      "id": 5,
+      "name": "Vitor",
+      "rating": 3.0,
+      "active": true
+    },
+    {
+      "id": 6,
+      "name": "Lukas",
+      "rating": 3.5,
+      "active": false
+    },
+    {
+      "id": 7,
+      "name": "Rodrigo Segreto",
+      "rating": 3.5,
+      "active": false
+    },
+    {
+      "id": 8,
+      "name": "Marcelo Gorgulho",
+      "rating": 3.5,
+      "active": true
+    },
+    {
+      "id": 9,
+      "name": "Daniel Gustavo",
+      "rating": 3.5,
+      "active": true
+    },
+    {
+      "id": 10,
+      "name": "Alan",
+      "rating": 4.5,
+      "active": true
+    },
+    {
+      "id": 11,
+      "name": "Gabriel",
+      "rating": 4.5,
+      "active": true
+    },
+    {
+      "id": 13,
+      "name": "Davi",
+      "rating": 3.0,
+      "active": true
+    }
+  ]
+}
