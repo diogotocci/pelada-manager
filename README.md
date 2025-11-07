@@ -1,1 +1,1 @@
-# pelada-balanceada
+# pelada-manager
