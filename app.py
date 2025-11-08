@@ -5,6 +5,8 @@ import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PASSWORD_FILE = os.path.join(BASE_DIR, "password.txt")
+APP_VERSION = os.getenv("APP_VERSION", "0.0.2")
+
 
 app = Flask(__name__)
 
@@ -14,7 +16,7 @@ player_storage = PlayerStorage("data/players.json")
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", app_version=APP_VERSION)
 
 
 @app.route("/api/players", methods=["GET"])

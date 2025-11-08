@@ -442,6 +442,15 @@ body {
   display: none;
 }
 
+.app-footer {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  padding: 12px 0;
+}
+
+
 /* Responsividade */
 
 @media (max-width: 640px) {

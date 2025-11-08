@@ -1,20 +1,20 @@
+import random
 from typing import List, Dict
-import math
 
 from models import Player
 
 
 def balance_teams(players: List[Player], team_size: int) -> List[Dict]:
     """
-    Create balanced teams using a greedy algorithm with fixed capacities:
-    - Calculate how many full teams (with team_size players) we can have.
-    - If there is a remainder, create one extra smaller team.
-    - Sort players by rating (descending).
-    - Assign each player to the team with the lowest total rating
-      that still has available slots.
-    This ensures distributions like:
-      17 players, team_size=5 -> 5, 5, 5, 2
-    instead of 5, 4, 4, 4.
+    Build balanced teams using a greedy algorithm with a bit of randomness:
+    - Calculate how many teams we need. Most teams have `team_size` players;
+      the last one may have fewer (remainder).
+    - Sort players by rating (descending), but break ties randomly so that
+      each draw can be slightly different.
+    - Assign each player to the team with the lowest total rating that still
+      has available slots.
+    - Then perform a few random swaps of players with similar ratings
+      (difference <= 0.5) to add variation while keeping balance.
     """
     if team_size <= 0:
         raise ValueError("team_size must be > 0")
@@ -23,51 +23,75 @@ def balance_teams(players: List[Player], team_size: int) -> List[Dict]:
     if total_players == 0:
         return []
 
-    # How many full teams with "team_size" players
+    # How many full teams and remainder
     full_teams = total_players // team_size
     remainder = total_players % team_size
-
-    # If team_size > total_players, we will have:
-    # full_teams = 0 and remainder = total_players -> 1 team with all players
     team_count = full_teams + (1 if remainder > 0 else 0)
 
+    # Create teams with capacities
     teams = []
     for i in range(team_count):
         if i < full_teams:
             capacity = team_size
         else:
-            # Last team with the remaining players (if any)
             capacity = remainder if remainder > 0 else team_size
 
-        teams.append(
-            {
-                "players": [],
-                "total_rating": 0.0,
-                "capacity": capacity,
-            }
-        )
+        teams.append({"players": [], "total_rating": 0.0, "capacity": capacity})
 
-    # Sort players by rating high to low
-    sorted_players = sorted(players, key=lambda p: p.rating, reverse=True)
+    # Sort players by rating DESC, tie-broken randomly to vary each draw
+    sorted_players = sorted(
+        players,
+        key=lambda p: (-p.rating, random.random()),
+    )
 
+    # Greedy assignment: stronger players first, always to the "weakest" team
     for player in sorted_players:
-        # Teams that still have room (respecting their individual capacities)
-        candidate_teams = [
-            t for t in teams if len(t["players"]) < t["capacity"]
-        ]
-
+        candidate_teams = [t for t in teams if len(t["players"]) < t["capacity"]]
         if not candidate_teams:
-            # Edge case: no team has capacity left, just drop into last team
-            # (should not really happen with the math above)
-            last_team = teams[-1]
-            last_team["players"].append(player)
-            last_team["total_rating"] += player.rating
+            # Fallback: if capacities are somehow all full, just drop into last team
+            target = teams[-1]
+        else:
+            target = min(candidate_teams, key=lambda t: t["total_rating"])
+
+        target["players"].append(player)
+        target["total_rating"] += player.rating
+
+    # Add a bit of randomness by swapping similar-rating players between teams
+    _apply_small_random_swaps(teams, max_swaps=5)
+
+    return teams
+
+
+def _apply_small_random_swaps(teams: List[Dict], max_swaps: int = 5) -> None:
+    """
+    Perform a few random swaps between teams using index-based swapping,
+    only when the players have the same rating or differ by at most 0.5.
+    This keeps teams balanced but changes compositions between draws.
+    """
+    if len(teams) < 2:
+        return
+
+    for _ in range(max_swaps):
+        # Pick two different teams at random
+        team_indices = list(range(len(teams)))
+        random.shuffle(team_indices)
+        t1_idx, t2_idx = team_indices[0], team_indices[1]
+        t1, t2 = teams[t1_idx], teams[t2_idx]
+
+        if not t1["players"] or not t2["players"]:
             continue
 
-        # Pick the team with the lowest total rating among those with available slots
-        best_team = min(candidate_teams, key=lambda t: t["total_rating"])
-        best_team["players"].append(player)
-        best_team["total_rating"] += player.rating
+        # Pick random players by index
+        i = random.randrange(len(t1["players"]))
+        j = random.randrange(len(t2["players"]))
+        p1 = t1["players"][i]
+        p2 = t2["players"][j]
 
-    # We don't need to return capacity to the caller, but it's harmless if kept.
-    return teams
+        # Swap only if ratings are "close enough"
+        if abs(p1.rating - p2.rating) <= 0.5:
+            # Swap in place using indices (no list.remove, so no ValueError)
+            t1["players"][i], t2["players"][j] = p2, p1
+
+            # Recalculate total ratings
+            t1["total_rating"] = sum(p.rating for p in t1["players"])
+            t2["total_rating"] = sum(p.rating for p in t2["players"])

@@ -1,29 +1,30 @@
-// Simple state in frontend
+// ----------------------
+// Global state
+// ----------------------
 let players = [];
 let currentEditingId = null;
 let deleteTargetId = null;
 let lastTeamSize = 5;
 let isAuthenticated = false;
 
-// Elements
+// ----------------------
+// DOM elements
+// ----------------------
+
+// Main sections
 const playersListEl = document.getElementById("players-list");
 const playerCountEl = document.getElementById("player-count");
 const teamsSectionEl = document.getElementById("teams-section");
 const teamsResultEl = document.getElementById("teams-result");
-
-
-// Auth modal elements
-const authModalEl = document.getElementById("auth-modal");
-const authPasswordInput = document.getElementById("auth-password");
-const authSubmitBtn = document.getElementById("auth-submit-btn");
-const authErrorEl = document.getElementById("auth-error");
-
 
 // Modals
 const playerModalEl = document.getElementById("player-modal");
 const confirmModalEl = document.getElementById("confirm-modal");
 const drawModalEl = document.getElementById("draw-modal");
 const compareModalEl = document.getElementById("compare-modal");
+const authModalEl = document.getElementById("auth-modal");
+
+// Compare modal content
 const compareContentEl = document.getElementById("compare-content");
 const closeCompareBtn = document.getElementById("close-compare-btn");
 
@@ -52,7 +53,14 @@ const drawTeamsBtn = document.getElementById("draw-teams-btn");
 const redrawBtn = document.getElementById("redraw-btn");
 const compareBtn = document.getElementById("compare-btn");
 
+// Auth modal elements
+const authPasswordInput = document.getElementById("auth-password");
+const authSubmitBtn = document.getElementById("auth-submit-btn");
+const authErrorEl = document.getElementById("auth-error");
+
+// ----------------------
 // Theme handling
+// ----------------------
 function loadTheme() {
   const saved = localStorage.getItem("pelada-theme") || "dark";
   document.documentElement.setAttribute("data-theme", saved);
@@ -60,7 +68,10 @@ function loadTheme() {
 }
 
 function updateThemeIcon(theme) {
+  if (!toggleThemeBtn) return;
   const icon = toggleThemeBtn.querySelector("i");
+  if (!icon) return;
+
   if (theme === "light") {
     icon.classList.remove("fa-moon");
     icon.classList.add("fa-sun");
@@ -70,25 +81,34 @@ function updateThemeIcon(theme) {
   }
 }
 
-toggleThemeBtn.addEventListener("click", () => {
-  const current = document.documentElement.getAttribute("data-theme") || "dark";
-  const next = current === "dark" ? "light" : "dark";
-  document.documentElement.setAttribute("data-theme", next);
-  localStorage.setItem("pelada-theme", next);
-  updateThemeIcon(next);
-});
+if (toggleThemeBtn) {
+  toggleThemeBtn.addEventListener("click", () => {
+    const current = document.documentElement.getAttribute("data-theme") || "dark";
+    const next = current === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    localStorage.setItem("pelada-theme", next);
+    updateThemeIcon(next);
+  });
+}
 
+// ----------------------
 // Modal helpers
+// ----------------------
 function openModal(el) {
+  if (!el) return;
   el.classList.remove("hidden");
 }
 
 function closeModal(el) {
+  if (!el) return;
   el.classList.add("hidden");
 }
 
+// ----------------------
 // Star widget (0.5 steps)
+// ----------------------
 function renderStarWidget(element, rating) {
+  if (!element) return;
   element.innerHTML = "";
   const currentRating = rating ?? 0;
   element.dataset.rating = currentRating.toString();
@@ -114,17 +134,12 @@ function renderStarWidget(element, rating) {
   }
 }
 
-
-
 function updateStarWidgetFromClick(element, clickedIndex) {
+  if (!element) return;
   const current = parseFloat(element.dataset.rating || "0");
   const i = clickedIndex;
 
   let newRating;
-  // Toggle logic:
-  // - if current < i - 0.5 => set to i - 0.5
-  // - else if current < i => set to i
-  // - else => set to i - 0.5 (decrease)
   if (current < i - 0.5) {
     newRating = i - 0.5;
   } else if (current < i) {
@@ -133,27 +148,31 @@ function updateStarWidgetFromClick(element, clickedIndex) {
     newRating = i - 0.5;
   }
 
-  // Clamp 0-5
   if (newRating < 0) newRating = 0;
   if (newRating > 5) newRating = 5;
 
   element.dataset.rating = newRating.toString();
   renderStarWidget(element, newRating);
-  playerRatingInput.value = newRating.toString();
+  if (playerRatingInput) {
+    playerRatingInput.value = newRating.toString();
+  }
 }
 
-// Event delegation for star widget
-starWidgetEl.addEventListener("click", (e) => {
-  const target = e.target;
-  const starEl =
-    target.classList.contains("star") ? target : target.parentElement;
-  if (!starEl || !starEl.dataset.index) return;
+if (starWidgetEl) {
+  starWidgetEl.addEventListener("click", (e) => {
+    const target = e.target;
+    const starEl =
+      target.classList.contains("star") ? target : target.parentElement;
+    if (!starEl || !starEl.dataset.index) return;
 
-  const index = parseInt(starEl.dataset.index, 10);
-  updateStarWidgetFromClick(starWidgetEl, index);
-});
+    const index = parseInt(starEl.dataset.index, 10);
+    updateStarWidgetFromClick(starWidgetEl, index);
+  });
+}
 
-// API helpers
+// ----------------------
+// API helper
+// ----------------------
 async function fetchJSON(url, options = {}) {
   const res = await fetch(url, {
     headers: { "Content-Type": "application/json" },
@@ -168,6 +187,9 @@ async function fetchJSON(url, options = {}) {
   return res.json();
 }
 
+// ----------------------
+// Load & render players
+// ----------------------
 async function loadPlayers() {
   try {
     const data = await fetchJSON("/api/players");
@@ -178,7 +200,23 @@ async function loadPlayers() {
   }
 }
 
+function buildStarsHTML(rating) {
+  let html = "";
+  for (let i = 1; i <= 5; i++) {
+    if (rating >= i) {
+      html += '<i class="fa-solid fa-star"></i>';
+    } else if (rating >= i - 0.5) {
+      html += '<i class="fa-regular fa-star-half-stroke"></i>';
+    } else {
+      html += '<i class="fa-regular fa-star"></i>';
+    }
+  }
+  return html;
+}
+
 function renderPlayers() {
+  if (!playersListEl || !playerCountEl) return;
+
   playersListEl.innerHTML = "";
 
   const total = players.length;
@@ -189,10 +227,8 @@ function renderPlayers() {
     return;
   }
 
-  // Ex.: "10 jogador(es) · 8 selecionado(s)"
   playerCountEl.textContent = `${total} jogador(es) · ${activeCount} selecionado(s)`;
 
-  // ✅ Ordenar alfabeticamente por nome
   const sortedPlayers = [...players].sort((a, b) =>
     a.name.localeCompare(b.name, "pt-BR")
   );
@@ -224,7 +260,6 @@ function renderPlayers() {
     const actions = document.createElement("div");
     actions.className = "player-actions";
 
-    // Active switch
     const switchLabel = document.createElement("label");
     switchLabel.className = "switch";
 
@@ -239,12 +274,10 @@ function renderPlayers() {
     switchLabel.appendChild(switchInput);
     switchLabel.appendChild(slider);
 
-    // Edit button
     const editBtn = document.createElement("button");
     editBtn.className = "btn-icon edit-player";
     editBtn.innerHTML = '<i class="fa-solid fa-pen"></i>';
 
-    // Delete button
     const deleteBtn = document.createElement("button");
     deleteBtn.className = "btn-icon delete-player";
     deleteBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
@@ -260,24 +293,13 @@ function renderPlayers() {
   });
 }
 
-function buildStarsHTML(rating) {
-  let html = "";
-  for (let i = 1; i <= 5; i++) {
-    if (rating >= i) {
-      html += '<i class="fa-solid fa-star"></i>';
-    } else if (rating >= i - 0.5) {
-      html += '<i class="fa-regular fa-star-half-stroke"></i>';
-    } else {
-      html += '<i class="fa-regular fa-star"></i>';
-    }
-  }
-  return html;
-}
-
-// ADD / EDIT player
-
+// ----------------------
+// Add / edit player
+// ----------------------
 function openNewPlayerModal() {
   currentEditingId = null;
+  if (!playerModalTitleEl || !playerIdInput || !playerNameInput || !playerRatingInput) return;
+
   playerModalTitleEl.textContent = "Novo jogador";
   playerIdInput.value = "";
   playerNameInput.value = "";
@@ -289,6 +311,8 @@ function openNewPlayerModal() {
 
 function openEditPlayerModal(player) {
   currentEditingId = player.id;
+  if (!playerModalTitleEl || !playerIdInput || !playerNameInput || !playerRatingInput) return;
+
   playerModalTitleEl.textContent = "Editar jogador";
   playerIdInput.value = player.id;
   playerNameInput.value = player.name;
@@ -298,120 +322,132 @@ function openEditPlayerModal(player) {
   playerNameInput.focus();
 }
 
-playerFormEl.addEventListener("submit", async (e) => {
-  e.preventDefault();
+if (playerFormEl) {
+  playerFormEl.addEventListener("submit", async (e) => {
+    e.preventDefault();
 
-  const name = playerNameInput.value.trim();
-  const rating = parseFloat(playerRatingInput.value || "0");
+    const name = playerNameInput.value.trim();
+    const rating = parseFloat(playerRatingInput.value || "0");
 
-  if (!name) {
-    alert("Nome não pode ser vazio.");
-    return;
-  }
-
-  try {
-    if (currentEditingId == null) {
-      // create
-      const newPlayer = await fetchJSON("/api/players", {
-        method: "POST",
-        body: JSON.stringify({ name, rating }),
-      });
-      players.push(newPlayer);
-    } else {
-      // update
-      const updated = await fetchJSON(`/api/players/${currentEditingId}`, {
-        method: "PUT",
-        body: JSON.stringify({ name, rating }),
-      });
-      players = players.map((p) => (p.id === updated.id ? updated : p));
+    if (!name) {
+      alert("Nome não pode ser vazio.");
+      return;
     }
 
-    renderPlayers();
-    closeModal(playerModalEl);
-  } catch (err) {
-    console.error(err);
-    alert("Erro ao salvar jogador.");
-  }
-});
-
-cancelPlayerBtn.addEventListener("click", () => {
-  closeModal(playerModalEl);
-});
-
-// Players list actions
-
-playersListEl.addEventListener("click", async (e) => {
-  const target = e.target;
-  const row = target.closest(".player-row");
-  if (!row) return;
-  const id = parseInt(row.dataset.id, 10);
-
-  // Toggle active checkbox
-  if (target.classList.contains("toggle-active")) {
     try {
-      const updated = await fetchJSON(`/api/players/${id}/toggle-active`, {
-        method: "PATCH",
+      if (currentEditingId == null) {
+        const newPlayer = await fetchJSON("/api/players", {
+          method: "POST",
+          body: JSON.stringify({ name, rating }),
+        });
+        players.push(newPlayer);
+      } else {
+        const updated = await fetchJSON(`/api/players/${currentEditingId}`, {
+          method: "PUT",
+          body: JSON.stringify({ name, rating }),
+        });
+        players = players.map((p) => (p.id === updated.id ? updated : p));
+      }
+
+      renderPlayers();
+      closeModal(playerModalEl);
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao salvar jogador.");
+    }
+  });
+}
+
+if (cancelPlayerBtn) {
+  cancelPlayerBtn.addEventListener("click", () => {
+    closeModal(playerModalEl);
+  });
+}
+
+// ----------------------
+// Player list actions
+// ----------------------
+if (playersListEl) {
+  playersListEl.addEventListener("click", async (e) => {
+    const target = e.target;
+    const row = target.closest(".player-row");
+    if (!row) return;
+    const id = parseInt(row.dataset.id, 10);
+
+    // Toggle active (only if the checkbox itself was clicked)
+    if (target.classList.contains("toggle-active")) {
+      try {
+        const updated = await fetchJSON(`/api/players/${id}/toggle-active`, {
+          method: "PATCH",
+        });
+        players = players.map((p) => (p.id === updated.id ? updated : p));
+        renderPlayers();
+      } catch (err) {
+        console.error(err);
+        alert("Erro ao atualizar jogador.");
+      }
+      return;
+    }
+
+    // Edit button
+    if (target.closest(".edit-player")) {
+      const player = players.find((p) => p.id === id);
+      if (player) {
+        openEditPlayerModal(player);
+      }
+      return;
+    }
+
+    // Delete button
+    if (target.closest(".delete-player")) {
+      deleteTargetId = id;
+      openModal(confirmModalEl);
+      return;
+    }
+  });
+}
+
+// ----------------------
+// Confirm delete modal
+// ----------------------
+if (cancelDeleteBtn) {
+  cancelDeleteBtn.addEventListener("click", () => {
+    deleteTargetId = null;
+    closeModal(confirmModalEl);
+  });
+}
+
+if (confirmDeleteBtn) {
+  confirmDeleteBtn.addEventListener("click", async () => {
+    if (deleteTargetId == null) return;
+
+    try {
+      await fetchJSON(`/api/players/${deleteTargetId}`, {
+        method: "DELETE",
       });
-      players = players.map((p) => (p.id === updated.id ? updated : p));
+      players = players.filter((p) => p.id !== deleteTargetId);
       renderPlayers();
     } catch (err) {
       console.error(err);
-      alert("Erro ao atualizar jogador.");
+      alert("Erro ao remover jogador.");
+    } finally {
+      deleteTargetId = null;
+      closeModal(confirmModalEl);
     }
-    return;
-  }
-  
+  });
+}
 
-  // Edit button
-  if (target.closest(".edit-player")) {
-    const player = players.find((p) => p.id === id);
-    if (player) {
-      openEditPlayerModal(player);
-    }
-    return;
-  }
-
-  // Delete button
-  if (target.closest(".delete-player")) {
-    deleteTargetId = id;
-    openModal(confirmModalEl);
-    return;
-  }
-});
-
-// Confirm delete modal
-
-cancelDeleteBtn.addEventListener("click", () => {
-  deleteTargetId = null;
-  closeModal(confirmModalEl);
-});
-
-confirmDeleteBtn.addEventListener("click", async () => {
-  if (deleteTargetId == null) return;
-
-  try {
-    await fetchJSON(`/api/players/${deleteTargetId}`, {
-      method: "DELETE",
-    });
-    players = players.filter((p) => p.id !== deleteTargetId);
-    renderPlayers();
-  } catch (err) {
-    console.error(err);
-    alert("Erro ao remover jogador.");
-  } finally {
-    deleteTargetId = null;
-    closeModal(confirmModalEl);
-  }
-});
-
+// ----------------------
 // Draw teams
-
+// ----------------------
 function openDrawModal() {
   if (!players.some((p) => p.active)) {
     alert("Nenhum jogador ativo para sortear.");
     return;
   }
-  teamSizeInput.value = lastTeamSize.toString();
+  if (teamSizeInput) {
+    teamSizeInput.value = lastTeamSize.toString();
+  }
   openModal(drawModalEl);
 }
 
@@ -424,14 +460,17 @@ async function performDraw(teamSize) {
 
     lastTeamSize = teamSize;
     renderTeams(data.teams);
-    teamsSectionEl.classList.remove("hidden");
+    if (teamsSectionEl) {
+      teamsSectionEl.classList.remove("hidden");
+    }
 
-    // depois de renderizar, rola a página até a seção de times
     setTimeout(() => {
-      teamsSectionEl.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
+      if (teamsSectionEl) {
+        teamsSectionEl.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }
     }, 50);
   } catch (err) {
     console.error(err);
@@ -439,11 +478,20 @@ async function performDraw(teamSize) {
   }
 }
 
+function getTeamLabel(teamIndex) {
+  if (teamIndex === 1) return "Azul";
+  if (teamIndex === 2) return "Amarelo";
+  return "de fora";
+}
 
 function renderTeams(teams) {
+  if (!teamsResultEl) return;
   teamsResultEl.innerHTML = "";
 
-  teams.forEach((team) => {
+  teams.forEach((team, index) => {
+    const teamNumber = index + 1;
+    const label = getTeamLabel(teamNumber);
+
     const card = document.createElement("div");
     card.className = "team-card";
 
@@ -451,7 +499,7 @@ function renderTeams(teams) {
     header.className = "team-header";
 
     const nameSpan = document.createElement("span");
-    nameSpan.textContent = team.name;
+    nameSpan.textContent = `${team.name} - ${label}`;
 
     const ratingSpan = document.createElement("span");
     ratingSpan.className = "team-rating";
@@ -467,14 +515,12 @@ function renderTeams(teams) {
     thead.innerHTML = `
       <tr>
         <th>Jogador</th>
-        <th>Estrelas</th>
       </tr>
     `;
     table.appendChild(thead);
 
     const tbody = document.createElement("tbody");
 
-    // Order players by rating desc
     const sortedPlayers = [...team.players].sort(
       (a, b) => b.rating - a.rating
     );
@@ -482,14 +528,10 @@ function renderTeams(teams) {
     sortedPlayers.forEach((p) => {
       const tr = document.createElement("tr");
       const nameTd = document.createElement("td");
-      const ratingTd = document.createElement("td");
 
       nameTd.textContent = p.name;
-      ratingTd.textContent = `${p.rating.toFixed(1)} ★`;
 
       tr.appendChild(nameTd);
-      tr.appendChild(ratingTd);
-
       tbody.appendChild(tr);
     });
 
@@ -502,7 +544,51 @@ function renderTeams(teams) {
   });
 }
 
+if (cancelDrawBtn) {
+  cancelDrawBtn.addEventListener("click", () => {
+    closeModal(drawModalEl);
+  });
+}
+
+if (confirmDrawBtn) {
+  confirmDrawBtn.addEventListener("click", () => {
+    const size = parseInt(teamSizeInput.value || "0", 10);
+    if (!size || size <= 0) {
+      alert("Informe um número válido de jogadores por time.");
+      return;
+    }
+    closeModal(drawModalEl);
+    performDraw(size);
+  });
+}
+
+if (drawTeamsBtn) {
+  drawTeamsBtn.addEventListener("click", openDrawModal);
+}
+
+// "Sortear novamente" – usa mesmo teamSize se já existir, senão abre modal
+if (redrawBtn) {
+  redrawBtn.addEventListener("click", () => {
+    if (!players.some((p) => p.active)) {
+      alert("Nenhum jogador ativo para sortear.");
+      return;
+    }
+
+    if (!lastTeamSize || lastTeamSize <= 0) {
+      openDrawModal();
+      return;
+    }
+
+    performDraw(lastTeamSize);
+  });
+}
+
+// ----------------------
+// Compare players
+// ----------------------
 function renderCompareTable() {
+  if (!compareContentEl) return;
+
   compareContentEl.innerHTML = "";
 
   if (players.length === 0) {
@@ -511,17 +597,15 @@ function renderCompareTable() {
     return;
   }
 
-  // Agrupar por rating (string com 1 casa decimal)
   const groups = {};
   players.forEach((p) => {
-    const key = p.rating.toFixed(1); // ex: "4.5"
+    const key = p.rating.toFixed(1);
     if (!groups[key]) {
       groups[key] = [];
     }
     groups[key].push(p);
   });
 
-  // Ordenar ratings desc (5.0 -> 0.0)
   const sortedRatings = Object.keys(groups)
     .map((r) => parseFloat(r))
     .sort((a, b) => b - a);
@@ -544,7 +628,6 @@ function renderCompareTable() {
     const key = rating.toFixed(1);
     const playersInGroup = groups[key];
 
-    // Ordena alfabeticamente os nomes
     const names = playersInGroup
       .map((p) => p.name)
       .sort((a, b) => a.localeCompare(b, "pt-BR"));
@@ -565,42 +648,26 @@ function renderCompareTable() {
   compareContentEl.appendChild(table);
 }
 
-// Abrir modal de comparação
-compareBtn.addEventListener("click", () => {
-  if (players.length === 0) {
-    alert("Nenhum jogador cadastrado para comparar.");
-    return;
-  }
-  renderCompareTable();
-  openModal(compareModalEl);
-});
+if (compareBtn) {
+  compareBtn.addEventListener("click", () => {
+    if (players.length === 0) {
+      alert("Nenhum jogador cadastrado para comparar.");
+      return;
+    }
+    renderCompareTable();
+    openModal(compareModalEl);
+  });
+}
 
-// Fechar modal de comparação
-closeCompareBtn.addEventListener("click", () => {
-  closeModal(compareModalEl);
-});
+if (closeCompareBtn) {
+  closeCompareBtn.addEventListener("click", () => {
+    closeModal(compareModalEl);
+  });
+}
 
-
-cancelDrawBtn.addEventListener("click", () => {
-  closeModal(drawModalEl);
-});
-
-confirmDrawBtn.addEventListener("click", () => {
-  const size = parseInt(teamSizeInput.value || "0", 10);
-  if (!size || size <= 0) {
-    alert("Informe um número válido de jogadores por time.");
-    return;
-  }
-  closeModal(drawModalEl);
-  performDraw(size);
-});
-
-drawTeamsBtn.addEventListener("click", openDrawModal);
-redrawBtn.addEventListener("click", () => openDrawModal());
-
-// FAB
-fabAddPlayerBtn.addEventListener("click", openNewPlayerModal);
-
+// ----------------------
+// Auth (password gate)
+// ----------------------
 async function checkPassword(password) {
   const res = await fetch("/api/check-password", {
     method: "POST",
@@ -609,7 +676,6 @@ async function checkPassword(password) {
   });
 
   if (!res.ok) {
-    // 401 ou outros erros = senha inválida
     return false;
   }
 
@@ -635,7 +701,6 @@ async function handleAuth() {
       return;
     }
 
-    // Senha correta: esconde erro, marca autenticado, fecha modal e carrega jogadores
     authErrorEl.style.display = "none";
     isAuthenticated = true;
     closeModal(authModalEl);
@@ -647,25 +712,35 @@ async function handleAuth() {
   }
 }
 
-authSubmitBtn.addEventListener("click", () => {
-  handleAuth();
-});
-
-authPasswordInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
+if (authSubmitBtn) {
+  authSubmitBtn.addEventListener("click", () => {
     handleAuth();
-  }
-});
+  });
+}
 
+if (authPasswordInput) {
+  authPasswordInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      handleAuth();
+    }
+  });
+}
+
+// ----------------------
+// FAB (add player)
+// ----------------------
+if (fabAddPlayerBtn) {
+  fabAddPlayerBtn.addEventListener("click", openNewPlayerModal);
+}
+
+// ----------------------
 // Init
+// ----------------------
 document.addEventListener("DOMContentLoaded", () => {
   loadTheme();
   renderStarWidget(starWidgetEl, 0);
 
-  // Do not load players before auth
-  // Just focus the password field when page is ready
   if (authPasswordInput) {
     authPasswordInput.focus();
   }
 });
-
