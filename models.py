@@ -1,22 +1,23 @@
-from dataclasses import dataclass, asdict
-from typing import Dict
+from dataclasses import dataclass
 
 
 @dataclass
 class Player:
-    """
-    Domain model for a player.
-    """
     id: int
     name: str
-    rating: float  # 0.0 to 5.0 in 0.5 steps
-    active: bool = True  # whether player participates in draw
+    rating: float
+    active: bool = True
 
-    def to_dict(self) -> Dict:
-        return asdict(self)
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "rating": self.rating,
+            "active": self.active,
+        }
 
     @staticmethod
-    def from_dict(data: Dict) -> "Player":
+    def from_dict(data):
         return Player(
             id=int(data["id"]),
             name=data["name"],
