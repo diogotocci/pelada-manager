@@ -1,34 +1,22 @@
-// ----------------------
-// Global state
-// ----------------------
 let players = [];
+let pendingRequests = [];
 let currentEditingId = null;
 let deleteTargetId = null;
 let lastTeamSize = 5;
 let isAuthenticated = false;
 
-// ----------------------
-// DOM elements
-// ----------------------
-
-// Main sections
 const playersListEl = document.getElementById("players-list");
 const playerCountEl = document.getElementById("player-count");
 const teamsSectionEl = document.getElementById("teams-section");
 const teamsResultEl = document.getElementById("teams-result");
 
-// Modals
 const playerModalEl = document.getElementById("player-modal");
 const confirmModalEl = document.getElementById("confirm-modal");
 const drawModalEl = document.getElementById("draw-modal");
 const compareModalEl = document.getElementById("compare-modal");
+const approvalModalEl = document.getElementById("approval-modal");
 const authModalEl = document.getElementById("auth-modal");
 
-// Compare modal content
-const compareContentEl = document.getElementById("compare-content");
-const closeCompareBtn = document.getElementById("close-compare-btn");
-
-// Player modal elements
 const playerModalTitleEl = document.getElementById("player-modal-title");
 const playerFormEl = document.getElementById("player-form");
 const playerIdInput = document.getElementById("player-id");
@@ -36,31 +24,33 @@ const playerNameInput = document.getElementById("player-name");
 const playerRatingInput = document.getElementById("player-rating");
 const starWidgetEl = document.getElementById("star-widget");
 const cancelPlayerBtn = document.getElementById("cancel-player-btn");
+const editApprovalNoteEl = document.getElementById("edit-approval-note");
 
-// Confirm delete modal elements
 const cancelDeleteBtn = document.getElementById("cancel-delete-btn");
 const confirmDeleteBtn = document.getElementById("confirm-delete-btn");
 
-// Draw modal elements
 const teamSizeInput = document.getElementById("team-size-input");
 const cancelDrawBtn = document.getElementById("cancel-draw-btn");
 const confirmDrawBtn = document.getElementById("confirm-draw-btn");
 
-// Buttons
 const fabAddPlayerBtn = document.getElementById("fab-add-player");
+const fabApprovalBtn = document.getElementById("fab-approval");
 const toggleThemeBtn = document.getElementById("toggle-theme-btn");
 const drawTeamsBtn = document.getElementById("draw-teams-btn");
 const redrawBtn = document.getElementById("redraw-btn");
 const compareBtn = document.getElementById("compare-btn");
+const clearAllBtn = document.getElementById("clear-all-btn");
 
-// Auth modal elements
+const compareContentEl = document.getElementById("compare-content");
+const closeCompareBtn = document.getElementById("close-compare-btn");
+
+const approvalListEl = document.getElementById("approval-list");
+const closeApprovalBtn = document.getElementById("close-approval-btn");
+
 const authPasswordInput = document.getElementById("auth-password");
 const authSubmitBtn = document.getElementById("auth-submit-btn");
 const authErrorEl = document.getElementById("auth-error");
 
-// ----------------------
-// Theme handling
-// ----------------------
 function loadTheme() {
   const saved = localStorage.getItem("pelada-theme") || "dark";
   document.documentElement.setAttribute("data-theme", saved);
@@ -69,6 +59,7 @@ function loadTheme() {
 
 function updateThemeIcon(theme) {
   if (!toggleThemeBtn) return;
+
   const icon = toggleThemeBtn.querySelector("i");
   if (!icon) return;
 
@@ -81,19 +72,6 @@ function updateThemeIcon(theme) {
   }
 }
 
-if (toggleThemeBtn) {
-  toggleThemeBtn.addEventListener("click", () => {
-    const current = document.documentElement.getAttribute("data-theme") || "dark";
-    const next = current === "dark" ? "light" : "dark";
-    document.documentElement.setAttribute("data-theme", next);
-    localStorage.setItem("pelada-theme", next);
-    updateThemeIcon(next);
-  });
-}
-
-// ----------------------
-// Modal helpers
-// ----------------------
 function openModal(el) {
   if (!el) return;
   el.classList.remove("hidden");
@@ -104,11 +82,23 @@ function closeModal(el) {
   el.classList.add("hidden");
 }
 
-// ----------------------
-// Star widget (0.5 steps)
-// ----------------------
+async function fetchJSON(url, options = {}) {
+  const res = await fetch(url, {
+    headers: { "Content-Type": "application/json" },
+    ...options,
+  });
+
+  if (!res.ok) {
+    const msg = await res.text();
+    throw new Error(msg || "Unexpected error");
+  }
+
+  return res.json();
+}
+
 function renderStarWidget(element, rating) {
   if (!element) return;
+
   element.innerHTML = "";
   const currentRating = rating ?? 0;
   element.dataset.rating = currentRating.toString();
@@ -119,14 +109,13 @@ function renderStarWidget(element, rating) {
     starEl.dataset.index = i.toString();
 
     const icon = document.createElement("i");
-    const value = currentRating;
 
-    if (value >= i) {
-      icon.className = "fa-solid fa-star"; // full
-    } else if (value >= i - 0.5) {
-      icon.className = "fa-regular fa-star-half-stroke"; // half
+    if (currentRating >= i) {
+      icon.className = "fa-solid fa-star";
+    } else if (currentRating >= i - 0.5) {
+      icon.className = "fa-regular fa-star-half-stroke";
     } else {
-      icon.className = "fa-regular fa-star"; // empty
+      icon.className = "fa-regular fa-star";
     }
 
     starEl.appendChild(icon);
@@ -136,10 +125,12 @@ function renderStarWidget(element, rating) {
 
 function updateStarWidgetFromClick(element, clickedIndex) {
   if (!element) return;
+
   const current = parseFloat(element.dataset.rating || "0");
   const i = clickedIndex;
 
   let newRating;
+
   if (current < i - 0.5) {
     newRating = i - 0.5;
   } else if (current < i) {
@@ -153,55 +144,12 @@ function updateStarWidgetFromClick(element, clickedIndex) {
 
   element.dataset.rating = newRating.toString();
   renderStarWidget(element, newRating);
-  if (playerRatingInput) {
-    playerRatingInput.value = newRating.toString();
-  }
-}
-
-if (starWidgetEl) {
-  starWidgetEl.addEventListener("click", (e) => {
-    const target = e.target;
-    const starEl =
-      target.classList.contains("star") ? target : target.parentElement;
-    if (!starEl || !starEl.dataset.index) return;
-
-    const index = parseInt(starEl.dataset.index, 10);
-    updateStarWidgetFromClick(starWidgetEl, index);
-  });
-}
-
-// ----------------------
-// API helper
-// ----------------------
-async function fetchJSON(url, options = {}) {
-  const res = await fetch(url, {
-    headers: { "Content-Type": "application/json" },
-    ...options,
-  });
-
-  if (!res.ok) {
-    const msg = (await res.text()) || "Erro inesperado";
-    throw new Error(msg);
-  }
-
-  return res.json();
-}
-
-// ----------------------
-// Load & render players
-// ----------------------
-async function loadPlayers() {
-  try {
-    const data = await fetchJSON("/api/players");
-    players = data;
-    renderPlayers();
-  } catch (err) {
-    console.error("Failed to load players:", err);
-  }
+  playerRatingInput.value = newRating.toString();
 }
 
 function buildStarsHTML(rating) {
   let html = "";
+
   for (let i = 1; i <= 5; i++) {
     if (rating >= i) {
       html += '<i class="fa-solid fa-star"></i>';
@@ -211,12 +159,43 @@ function buildStarsHTML(rating) {
       html += '<i class="fa-regular fa-star"></i>';
     }
   }
+
   return html;
 }
 
-function renderPlayers() {
-  if (!playersListEl || !playerCountEl) return;
+async function loadPlayers() {
+  try {
+    players = await fetchJSON("/api/players");
+    renderPlayers();
+  } catch (err) {
+    console.error("Failed to load players:", err);
+  }
+}
 
+async function loadPendingRequests() {
+  try {
+    pendingRequests = await fetchJSON("/api/pending-requests");
+    updateApprovalBadge();
+  } catch (err) {
+    console.error("Failed to load pending requests:", err);
+  }
+}
+
+function updateApprovalBadge() {
+  if (!fabApprovalBtn) return;
+
+  const existingBadge = fabApprovalBtn.querySelector(".fab-badge");
+  if (existingBadge) existingBadge.remove();
+
+  if (pendingRequests.length > 0) {
+    const badge = document.createElement("span");
+    badge.className = "fab-badge";
+    badge.textContent = pendingRequests.length.toString();
+    fabApprovalBtn.appendChild(badge);
+  }
+}
+
+function renderPlayers() {
   playersListEl.innerHTML = "";
 
   const total = players.length;
@@ -293,17 +272,15 @@ function renderPlayers() {
   });
 }
 
-// ----------------------
-// Add / edit player
-// ----------------------
 function openNewPlayerModal() {
   currentEditingId = null;
-  if (!playerModalTitleEl || !playerIdInput || !playerNameInput || !playerRatingInput) return;
 
   playerModalTitleEl.textContent = "Novo jogador";
   playerIdInput.value = "";
   playerNameInput.value = "";
   playerRatingInput.value = "0";
+  editApprovalNoteEl.classList.add("hidden-text");
+
   renderStarWidget(starWidgetEl, 0);
   openModal(playerModalEl);
   playerNameInput.focus();
@@ -311,143 +288,149 @@ function openNewPlayerModal() {
 
 function openEditPlayerModal(player) {
   currentEditingId = player.id;
-  if (!playerModalTitleEl || !playerIdInput || !playerNameInput || !playerRatingInput) return;
 
   playerModalTitleEl.textContent = "Editar jogador";
   playerIdInput.value = player.id;
   playerNameInput.value = player.name;
   playerRatingInput.value = player.rating.toString();
+  editApprovalNoteEl.classList.remove("hidden-text");
+
   renderStarWidget(starWidgetEl, player.rating);
   openModal(playerModalEl);
   playerNameInput.focus();
 }
 
-if (playerFormEl) {
-  playerFormEl.addEventListener("submit", async (e) => {
-    e.preventDefault();
+async function handlePlayerSubmit(e) {
+  e.preventDefault();
 
-    const name = playerNameInput.value.trim();
-    const rating = parseFloat(playerRatingInput.value || "0");
+  const name = playerNameInput.value.trim();
+  const rating = parseFloat(playerRatingInput.value || "0");
 
-    if (!name) {
-      alert("Nome não pode ser vazio.");
-      return;
-    }
+  if (!name) {
+    alert("Nome não pode ser vazio.");
+    return;
+  }
 
-    try {
-      if (currentEditingId == null) {
-        const newPlayer = await fetchJSON("/api/players", {
-          method: "POST",
-          body: JSON.stringify({ name, rating }),
-        });
-        players.push(newPlayer);
-      } else {
-        const updated = await fetchJSON(`/api/players/${currentEditingId}`, {
-          method: "PUT",
-          body: JSON.stringify({ name, rating }),
-        });
-        players = players.map((p) => (p.id === updated.id ? updated : p));
-      }
+  try {
+    if (currentEditingId == null) {
+      const newPlayer = await fetchJSON("/api/players", {
+        method: "POST",
+        body: JSON.stringify({ name, rating }),
+      });
 
+      players.push(newPlayer);
       renderPlayers();
       closeModal(playerModalEl);
-    } catch (err) {
-      console.error(err);
-      alert("Erro ao salvar jogador.");
+      return;
     }
-  });
-}
 
-if (cancelPlayerBtn) {
-  cancelPlayerBtn.addEventListener("click", () => {
+    const currentPlayer = players.find((p) => p.id === currentEditingId);
+    if (!currentPlayer) {
+      alert("Jogador não encontrado.");
+      return;
+    }
+
+    await fetchJSON(`/api/players/${currentEditingId}/change-request`, {
+      method: "POST",
+      body: JSON.stringify({
+        name,
+        rating,
+      }),
+    });
+
     closeModal(playerModalEl);
-  });
+    await loadPendingRequests();
+
+    alert("Alteração enviada para aprovação.");
+  } catch (err) {
+    console.error(err);
+    alert("Erro ao salvar jogador.");
+  }
 }
 
-// ----------------------
-// Player list actions
-// ----------------------
-if (playersListEl) {
-  playersListEl.addEventListener("click", async (e) => {
-    const target = e.target;
-    const row = target.closest(".player-row");
-    if (!row) return;
-    const id = parseInt(row.dataset.id, 10);
+async function handlePlayerListClick(e) {
+  const target = e.target;
+  const row = target.closest(".player-row");
+  if (!row) return;
 
-    // Toggle active (only if the checkbox itself was clicked)
-    if (target.classList.contains("toggle-active")) {
-      try {
-        const updated = await fetchJSON(`/api/players/${id}/toggle-active`, {
-          method: "PATCH",
-        });
-        players = players.map((p) => (p.id === updated.id ? updated : p));
-        renderPlayers();
-      } catch (err) {
-        console.error(err);
-        alert("Erro ao atualizar jogador.");
-      }
-      return;
-    }
+  const id = parseInt(row.dataset.id, 10);
 
-    // Edit button
-    if (target.closest(".edit-player")) {
-      const player = players.find((p) => p.id === id);
-      if (player) {
-        openEditPlayerModal(player);
-      }
-      return;
-    }
-
-    // Delete button
-    if (target.closest(".delete-player")) {
-      deleteTargetId = id;
-      openModal(confirmModalEl);
-      return;
-    }
-  });
-}
-
-// ----------------------
-// Confirm delete modal
-// ----------------------
-if (cancelDeleteBtn) {
-  cancelDeleteBtn.addEventListener("click", () => {
-    deleteTargetId = null;
-    closeModal(confirmModalEl);
-  });
-}
-
-if (confirmDeleteBtn) {
-  confirmDeleteBtn.addEventListener("click", async () => {
-    if (deleteTargetId == null) return;
-
+  if (target.classList.contains("toggle-active")) {
     try {
-      await fetchJSON(`/api/players/${deleteTargetId}`, {
-        method: "DELETE",
+      const updated = await fetchJSON(`/api/players/${id}/toggle-active`, {
+        method: "PATCH",
       });
-      players = players.filter((p) => p.id !== deleteTargetId);
+
+      players = players.map((p) => (p.id === updated.id ? updated : p));
       renderPlayers();
     } catch (err) {
       console.error(err);
-      alert("Erro ao remover jogador.");
-    } finally {
-      deleteTargetId = null;
-      closeModal(confirmModalEl);
+      alert("Erro ao atualizar jogador.");
     }
-  });
+
+    return;
+  }
+
+  if (target.closest(".edit-player")) {
+    const player = players.find((p) => p.id === id);
+    if (player) openEditPlayerModal(player);
+    return;
+  }
+
+  if (target.closest(".delete-player")) {
+    deleteTargetId = id;
+    openModal(confirmModalEl);
+  }
 }
 
-// ----------------------
-// Draw teams
-// ----------------------
+async function deletePlayer() {
+  if (deleteTargetId == null) return;
+
+  try {
+    await fetchJSON(`/api/players/${deleteTargetId}`, {
+      method: "DELETE",
+    });
+
+    players = players.filter((p) => p.id !== deleteTargetId);
+    renderPlayers();
+  } catch (err) {
+    console.error(err);
+    alert("Erro ao remover jogador.");
+  } finally {
+    deleteTargetId = null;
+    closeModal(confirmModalEl);
+  }
+}
+
+async function clearAllPlayers() {
+  if (!players.some((p) => p.active)) {
+    alert("Nenhum jogador está selecionado.");
+    return;
+  }
+
+  const confirmed = confirm("Deseja desmarcar todos os jogadores?");
+  if (!confirmed) return;
+
+  try {
+    await fetchJSON("/api/players/deactivate-all", {
+      method: "PATCH",
+    });
+
+    players = players.map((p) => ({ ...p, active: false }));
+    renderPlayers();
+  } catch (err) {
+    console.error(err);
+    alert("Erro ao desmarcar jogadores.");
+  }
+}
+
 function openDrawModal() {
   if (!players.some((p) => p.active)) {
     alert("Nenhum jogador ativo para sortear.");
     return;
   }
-  if (teamSizeInput) {
-    teamSizeInput.value = lastTeamSize.toString();
-  }
+
+  teamSizeInput.value = lastTeamSize.toString();
   openModal(drawModalEl);
 }
 
@@ -460,17 +443,13 @@ async function performDraw(teamSize) {
 
     lastTeamSize = teamSize;
     renderTeams(data.teams);
-    if (teamsSectionEl) {
-      teamsSectionEl.classList.remove("hidden");
-    }
+    teamsSectionEl.classList.remove("hidden");
 
     setTimeout(() => {
-      if (teamsSectionEl) {
-        teamsSectionEl.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-      }
+      teamsSectionEl.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
     }, 50);
   } catch (err) {
     console.error(err);
@@ -485,7 +464,6 @@ function getTeamLabel(teamIndex) {
 }
 
 function renderTeams(teams) {
-  if (!teamsResultEl) return;
   teamsResultEl.innerHTML = "";
 
   teams.forEach((team, index) => {
@@ -517,6 +495,7 @@ function renderTeams(teams) {
         <th>Jogador</th>
       </tr>
     `;
+
     table.appendChild(thead);
 
     const tbody = document.createElement("tbody");
@@ -536,59 +515,13 @@ function renderTeams(teams) {
     });
 
     table.appendChild(tbody);
-
     card.appendChild(header);
     card.appendChild(table);
-
     teamsResultEl.appendChild(card);
   });
 }
 
-if (cancelDrawBtn) {
-  cancelDrawBtn.addEventListener("click", () => {
-    closeModal(drawModalEl);
-  });
-}
-
-if (confirmDrawBtn) {
-  confirmDrawBtn.addEventListener("click", () => {
-    const size = parseInt(teamSizeInput.value || "0", 10);
-    if (!size || size <= 0) {
-      alert("Informe um número válido de jogadores por time.");
-      return;
-    }
-    closeModal(drawModalEl);
-    performDraw(size);
-  });
-}
-
-if (drawTeamsBtn) {
-  drawTeamsBtn.addEventListener("click", openDrawModal);
-}
-
-// "Sortear novamente" – usa mesmo teamSize se já existir, senão abre modal
-if (redrawBtn) {
-  redrawBtn.addEventListener("click", () => {
-    if (!players.some((p) => p.active)) {
-      alert("Nenhum jogador ativo para sortear.");
-      return;
-    }
-
-    if (!lastTeamSize || lastTeamSize <= 0) {
-      openDrawModal();
-      return;
-    }
-
-    performDraw(lastTeamSize);
-  });
-}
-
-// ----------------------
-// Compare players
-// ----------------------
 function renderCompareTable() {
-  if (!compareContentEl) return;
-
   compareContentEl.innerHTML = "";
 
   if (players.length === 0) {
@@ -598,11 +531,10 @@ function renderCompareTable() {
   }
 
   const groups = {};
+
   players.forEach((p) => {
     const key = p.rating.toFixed(1);
-    if (!groups[key]) {
-      groups[key] = [];
-    }
+    if (!groups[key]) groups[key] = [];
     groups[key].push(p);
   });
 
@@ -620,15 +552,15 @@ function renderCompareTable() {
       <th>Jogadores</th>
     </tr>
   `;
+
   table.appendChild(thead);
 
   const tbody = document.createElement("tbody");
 
   sortedRatings.forEach((rating) => {
     const key = rating.toFixed(1);
-    const playersInGroup = groups[key];
 
-    const names = playersInGroup
+    const names = groups[key]
       .map((p) => p.name)
       .sort((a, b) => a.localeCompare(b, "pt-BR"));
 
@@ -648,26 +580,79 @@ function renderCompareTable() {
   compareContentEl.appendChild(table);
 }
 
-if (compareBtn) {
-  compareBtn.addEventListener("click", () => {
-    if (players.length === 0) {
-      alert("Nenhum jogador cadastrado para comparar.");
-      return;
+async function openApprovalModal() {
+  await loadPendingRequests();
+  approvalListEl.innerHTML = "";
+
+  if (pendingRequests.length === 0) {
+    approvalListEl.innerHTML =
+      '<p class="muted-text">Nenhuma aprovação pendente.</p>';
+    openModal(approvalModalEl);
+    return;
+  }
+
+  pendingRequests.forEach((request) => {
+    const card = document.createElement("div");
+    card.className = "approval-card";
+
+    const currentRating = Number(request.current_rating).toFixed(1);
+    const requestedRating = Number(request.requested_rating).toFixed(1);
+
+    card.innerHTML = `
+      <div class="approval-main">
+        <strong>${request.player_name}</strong>
+        <span>Atual: ${currentRating} ★</span>
+        <span>Proposto: ${requestedRating} ★</span>
+      </div>
+
+      <div class="approval-actions">
+        <button class="primary-button approve-request" data-id="${request.id}">
+          Aprovar
+        </button>
+        <button class="danger-button reject-request" data-id="${request.id}">
+          Rejeitar
+        </button>
+      </div>
+    `;
+
+    approvalListEl.appendChild(card);
+  });
+
+  openModal(approvalModalEl);
+}
+
+async function handleApprovalClick(e) {
+  const approveButton = e.target.closest(".approve-request");
+  const rejectButton = e.target.closest(".reject-request");
+
+  if (!approveButton && !rejectButton) return;
+
+  const requestId = parseInt(
+    (approveButton || rejectButton).dataset.id,
+    10
+  );
+
+  try {
+    if (approveButton) {
+      await fetchJSON(`/api/change-requests/${requestId}/approve`, {
+        method: "POST",
+      });
     }
-    renderCompareTable();
-    openModal(compareModalEl);
-  });
+
+    if (rejectButton) {
+      await fetchJSON(`/api/change-requests/${requestId}/reject`, {
+        method: "POST",
+      });
+    }
+
+    await loadPlayers();
+    await openApprovalModal();
+  } catch (err) {
+    console.error(err);
+    alert("Erro ao processar aprovação.");
+  }
 }
 
-if (closeCompareBtn) {
-  closeCompareBtn.addEventListener("click", () => {
-    closeModal(compareModalEl);
-  });
-}
-
-// ----------------------
-// Auth (password gate)
-// ----------------------
 async function checkPassword(password) {
   const res = await fetch("/api/check-password", {
     method: "POST",
@@ -675,9 +660,7 @@ async function checkPassword(password) {
     body: JSON.stringify({ password }),
   });
 
-  if (!res.ok) {
-    return false;
-  }
+  if (!res.ok) return false;
 
   const data = await res.json();
   return data.valid === true;
@@ -688,54 +671,159 @@ async function handleAuth() {
 
   if (!pwd) {
     authErrorEl.textContent = "Senha obrigatória.";
-    authErrorEl.style.display = "block";
+    authErrorEl.classList.remove("hidden-text");
     return;
   }
 
   try {
     const ok = await checkPassword(pwd);
+
     if (!ok) {
       authErrorEl.textContent = "Senha inválida.";
-      authErrorEl.style.display = "block";
+      authErrorEl.classList.remove("hidden-text");
       authPasswordInput.select();
       return;
     }
 
-    authErrorEl.style.display = "none";
+    authErrorEl.classList.add("hidden-text");
     isAuthenticated = true;
     closeModal(authModalEl);
-    loadPlayers();
+
+    await loadPlayers();
+    await loadPendingRequests();
   } catch (err) {
     console.error(err);
     authErrorEl.textContent = "Erro ao validar senha.";
-    authErrorEl.style.display = "block";
+    authErrorEl.classList.remove("hidden-text");
   }
 }
 
-if (authSubmitBtn) {
-  authSubmitBtn.addEventListener("click", () => {
-    handleAuth();
+if (toggleThemeBtn) {
+  toggleThemeBtn.addEventListener("click", () => {
+    const current = document.documentElement.getAttribute("data-theme") || "dark";
+    const next = current === "dark" ? "light" : "dark";
+
+    document.documentElement.setAttribute("data-theme", next);
+    localStorage.setItem("pelada-theme", next);
+    updateThemeIcon(next);
   });
 }
 
-if (authPasswordInput) {
-  authPasswordInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      handleAuth();
+if (starWidgetEl) {
+  starWidgetEl.addEventListener("click", (e) => {
+    const target = e.target;
+    const starEl =
+      target.classList.contains("star") ? target : target.parentElement;
+
+    if (!starEl || !starEl.dataset.index) return;
+
+    const index = parseInt(starEl.dataset.index, 10);
+    updateStarWidgetFromClick(starWidgetEl, index);
+  });
+}
+
+if (playerFormEl) {
+  playerFormEl.addEventListener("submit", handlePlayerSubmit);
+}
+
+if (cancelPlayerBtn) {
+  cancelPlayerBtn.addEventListener("click", () => closeModal(playerModalEl));
+}
+
+if (playersListEl) {
+  playersListEl.addEventListener("click", handlePlayerListClick);
+}
+
+if (cancelDeleteBtn) {
+  cancelDeleteBtn.addEventListener("click", () => {
+    deleteTargetId = null;
+    closeModal(confirmModalEl);
+  });
+}
+
+if (confirmDeleteBtn) {
+  confirmDeleteBtn.addEventListener("click", deletePlayer);
+}
+
+if (drawTeamsBtn) {
+  drawTeamsBtn.addEventListener("click", openDrawModal);
+}
+
+if (redrawBtn) {
+  redrawBtn.addEventListener("click", () => {
+    if (!players.some((p) => p.active)) {
+      alert("Nenhum jogador ativo para sortear.");
+      return;
     }
+
+    performDraw(lastTeamSize);
   });
 }
 
-// ----------------------
-// FAB (add player)
-// ----------------------
+if (cancelDrawBtn) {
+  cancelDrawBtn.addEventListener("click", () => closeModal(drawModalEl));
+}
+
+if (confirmDrawBtn) {
+  confirmDrawBtn.addEventListener("click", () => {
+    const size = parseInt(teamSizeInput.value || "0", 10);
+
+    if (!size || size <= 0) {
+      alert("Informe um número válido de jogadores por time.");
+      return;
+    }
+
+    closeModal(drawModalEl);
+    performDraw(size);
+  });
+}
+
+if (compareBtn) {
+  compareBtn.addEventListener("click", () => {
+    if (players.length === 0) {
+      alert("Nenhum jogador cadastrado para comparar.");
+      return;
+    }
+
+    renderCompareTable();
+    openModal(compareModalEl);
+  });
+}
+
+if (closeCompareBtn) {
+  closeCompareBtn.addEventListener("click", () => closeModal(compareModalEl));
+}
+
+if (clearAllBtn) {
+  clearAllBtn.addEventListener("click", clearAllPlayers);
+}
+
+if (fabApprovalBtn) {
+  fabApprovalBtn.addEventListener("click", openApprovalModal);
+}
+
+if (approvalListEl) {
+  approvalListEl.addEventListener("click", handleApprovalClick);
+}
+
+if (closeApprovalBtn) {
+  closeApprovalBtn.addEventListener("click", () => closeModal(approvalModalEl));
+}
+
 if (fabAddPlayerBtn) {
   fabAddPlayerBtn.addEventListener("click", openNewPlayerModal);
 }
 
-// ----------------------
-// Init
-// ----------------------
+if (authSubmitBtn) {
+  authSubmitBtn.addEventListener("click", handleAuth);
+}
+
+if (authPasswordInput) {
+  authPasswordInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") handleAuth();
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   loadTheme();
   renderStarWidget(starWidgetEl, 0);

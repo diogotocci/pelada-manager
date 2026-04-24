@@ -7,6 +7,7 @@
   --accent-soft: rgba(79, 70, 229, 0.12);
   --accent-strong: rgba(79, 70, 229, 0.3);
   --danger: #ef4444;
+  --success: #10b981;
   --text: #e5e7eb;
   --text-muted: #9ca3af;
   --shadow-soft: 0 18px 45px rgba(0, 0, 0, 0.5);
@@ -21,6 +22,7 @@
   --accent-soft: rgba(79, 70, 229, 0.08);
   --accent-strong: rgba(79, 70, 229, 0.2);
   --danger: #dc2626;
+  --success: #059669;
   --text: #111827;
   --text-muted: #6b7280;
   --shadow-soft: 0 18px 45px rgba(15, 23, 42, 0.15);
@@ -36,8 +38,7 @@ html,
 body {
   margin: 0;
   padding: 0;
-  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background-color: var(--bg);
   color: var(--text);
 }
@@ -49,10 +50,8 @@ body {
 .app-container {
   max-width: 960px;
   margin: 0 auto;
-  padding: 16px 16px 80px;
+  padding: 16px 16px 88px;
 }
-
-/* Header */
 
 .app-header {
   display: flex;
@@ -77,9 +76,8 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
-
-/* Cards */
 
 .card {
   background-color: var(--bg-card);
@@ -95,6 +93,7 @@ body {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
+  gap: 12px;
 }
 
 .card-header h2 {
@@ -107,7 +106,14 @@ body {
   font-size: 0.85rem;
 }
 
-/* Player list */
+.error-text {
+  color: #f87171;
+  font-size: 0.85rem;
+}
+
+.hidden-text {
+  display: none;
+}
 
 .players-list {
   display: flex;
@@ -148,7 +154,7 @@ body {
 
 .player-stars {
   font-size: 0.9rem;
-  color: #facc15; /* amarelo para estrelas */
+  color: #facc15;
 }
 
 .player-actions {
@@ -156,8 +162,6 @@ body {
   align-items: center;
   gap: 8px;
 }
-
-/* Buttons */
 
 .primary-button,
 .secondary-button,
@@ -171,8 +175,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  transition: background-color 0.15s ease, transform 0.08s ease,
-    box-shadow 0.15s ease, opacity 0.15s ease;
+  transition: background-color 0.15s ease, transform 0.08s ease, box-shadow 0.15s ease, opacity 0.15s ease;
 }
 
 .primary-button {
@@ -212,8 +215,6 @@ body {
   border-radius: 999px;
 }
 
-/* Small icon buttons */
-
 .btn-icon {
   border: none;
   background: transparent;
@@ -232,8 +233,6 @@ body {
   background-color: rgba(148, 163, 184, 0.16);
   color: var(--text);
 }
-
-/* Toggle switch */
 
 .switch {
   position: relative;
@@ -257,7 +256,7 @@ body {
   border-radius: 999px;
 }
 
-.slider:before {
+.slider::before {
   position: absolute;
   content: "";
   height: 18px;
@@ -273,11 +272,9 @@ body {
   background-color: var(--accent);
 }
 
-.switch input:checked + .slider:before {
+.switch input:checked + .slider::before {
   transform: translateX(18px);
 }
-
-/* FAB */
 
 .fab-button {
   position: fixed;
@@ -298,7 +295,27 @@ body {
   z-index: 30;
 }
 
-/* Forms */
+.secondary-fab {
+  bottom: 88px;
+  background: linear-gradient(135deg, var(--success), #34d399);
+}
+
+.fab-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  background-color: var(--danger);
+  color: #fff;
+  font-size: 0.72rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--bg);
+}
 
 .form-label {
   display: block;
@@ -323,8 +340,6 @@ body {
   box-shadow: 0 0 0 1px var(--accent-soft);
 }
 
-/* Modals */
-
 .modal {
   position: fixed;
   inset: 0;
@@ -332,6 +347,7 @@ body {
   align-items: center;
   justify-content: center;
   z-index: 40;
+  padding: 18px;
 }
 
 .modal.hidden {
@@ -351,9 +367,11 @@ body {
   padding: 18px 18px 16px;
   border: 1px solid var(--border-subtle);
   width: 100%;
-  max-width: 420px;
+  max-width: 520px;
   box-shadow: var(--shadow-soft);
   z-index: 50;
+  max-height: 88vh;
+  overflow-y: auto;
 }
 
 .modal-content.small {
@@ -368,16 +386,14 @@ body {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  margin-top: 6px;
+  margin-top: 12px;
 }
-
-/* Star widget */
 
 .star-widget {
   display: inline-flex;
   gap: 4px;
   font-size: 1.4rem;
-  color: #4b5563;
+  color: #facc15;
   margin-bottom: 6px;
   cursor: pointer;
 }
@@ -389,8 +405,6 @@ body {
 .star-widget .star i {
   pointer-events: none;
 }
-
-/* Teams tables */
 
 .team-card {
   background-color: var(--bg-elevated);
@@ -406,6 +420,7 @@ body {
   align-items: center;
   font-size: 0.9rem;
   margin-bottom: 6px;
+  gap: 12px;
 }
 
 .team-header span {
@@ -414,6 +429,7 @@ body {
 
 .team-header .team-rating {
   color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .team-table {
@@ -424,7 +440,7 @@ body {
 
 .team-table th,
 .team-table td {
-  padding: 4px 0;
+  padding: 6px 0;
 }
 
 .team-table th {
@@ -436,10 +452,37 @@ body {
   border-top: 1px solid rgba(148, 163, 184, 0.25);
 }
 
-/* Helpers */
+.approval-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 
-.hidden {
-  display: none;
+.approval-card {
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.approval-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.approval-main span {
+  color: var(--text-muted);
+  font-size: 0.86rem;
+}
+
+.approval-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .app-footer {
@@ -450,8 +493,19 @@ body {
   padding: 12px 0;
 }
 
+.footer-credit {
+  margin-top: 4px;
+  color: var(--text-muted);
+}
 
-/* Responsividade */
+.footer-credit strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.hidden {
+  display: none;
+}
 
 @media (max-width: 640px) {
   .app-header {
@@ -461,7 +515,12 @@ body {
 
   .header-actions {
     width: 100%;
-    justify-content: space-between;
+    justify-content: flex-start;
+  }
+
+  .header-actions button {
+    font-size: 0.82rem;
+    padding: 7px 11px;
   }
 
   .player-row {
@@ -472,6 +531,19 @@ body {
 
   .player-actions {
     width: 100%;
+    justify-content: flex-end;
+  }
+
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .approval-card {
+    flex-direction: column;
+  }
+
+  .approval-actions {
     justify-content: flex-end;
   }
 }
