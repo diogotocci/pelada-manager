@@ -1,0 +1,56 @@
+# -------------------------
+# Python
+# -------------------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+*.db
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# -------------------------
+# OS (Mac / Windows)
+# -------------------------
+.DS_Store
+Thumbs.db
+
+# -------------------------
+# Logs
+# -------------------------
+*.log
+
+# -------------------------
+# IDE / Editor
+# -------------------------
+.vscode/
+.idea/
+
+# -------------------------
+# Environment variables
+# -------------------------
+.env
+
+# -------------------------
+# Docker
+# -------------------------
+*.tar
+
+# -------------------------
+# Data (CRÍTICO 🚨)
+# -------------------------
+data/players.json
+data/*.backup.json
+
+# mantém apenas exemplo no repo
+!data/players.example.json
+
+# -------------------------
+# Cache / temp
+# -------------------------
+*.swp
+*.swo
