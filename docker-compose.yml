@@ -1,0 +1,18 @@
+version: "3.9"
+
+services:
+  pelada-manager:
+    container_name: pelada-manager
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      FLASK_APP: app.py
+      FLASK_RUN_HOST: 0.0.0.0
+      FLASK_ENV: production
+      PYTHONUNBUFFERED: "1"
+    restart: unless-stopped
