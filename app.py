@@ -8,7 +8,7 @@ app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PASSWORD_FILE = os.path.join(BASE_DIR, "password.txt")
-APP_VERSION = os.getenv("APP_VERSION", "0.3.0")
+APP_VERSION = os.getenv("APP_VERSION", "0.3.3")
 
 player_storage = PlayerStorage("data/players.json")
 
