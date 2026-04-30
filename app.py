@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, jsonify, request, abort
+from flask import Flask, render_template, jsonify, request, abort, send_file
 
 from storage.json_storage import PlayerStorage
 from services.team_balancer import balance_teams
@@ -8,7 +8,7 @@ app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PASSWORD_FILE = os.path.join(BASE_DIR, "password.txt")
-APP_VERSION = os.getenv("APP_VERSION", "0.3.3")
+APP_VERSION = os.getenv("APP_VERSION", "0.4.0")
 
 player_storage = PlayerStorage("data/players.json")
 
@@ -36,6 +36,21 @@ def check_password():
         return jsonify({"valid": True})
 
     return jsonify({"valid": False}), 401
+
+
+@app.route("/api/export-players", methods=["GET"])
+def export_players():
+    players_file = os.path.join(BASE_DIR, "data", "players.json")
+
+    if not os.path.exists(players_file):
+        abort(404, description="Players file not found")
+
+    return send_file(
+        players_file,
+        as_attachment=True,
+        download_name="players.json",
+        mimetype="application/json",
+    )
 
 
 @app.route("/api/players", methods=["GET"])
@@ -155,13 +170,7 @@ def draw_teams():
     if not data or "team_size" not in data:
         abort(400, description="Missing 'team_size' field")
 
-    try:
-        team_size = int(data["team_size"])
-    except ValueError:
-        abort(400, description="'team_size' must be an integer")
-
-    if team_size <= 0:
-        abort(400, description="'team_size' must be greater than 0")
+    team_size = int(data["team_size"])
 
     players = [p for p in player_storage.get_all_players() if p.active]
 

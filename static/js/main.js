@@ -51,6 +51,8 @@ const authPasswordInput = document.getElementById("auth-password");
 const authSubmitBtn = document.getElementById("auth-submit-btn");
 const authErrorEl = document.getElementById("auth-error");
 
+const exportJsonBtn = document.getElementById("export-json-btn");
+
 function loadTheme() {
   const saved = localStorage.getItem("pelada-theme") || "dark";
   document.documentElement.setAttribute("data-theme", saved);
@@ -821,6 +823,12 @@ if (authSubmitBtn) {
 if (authPasswordInput) {
   authPasswordInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") handleAuth();
+  });
+}
+
+if (exportJsonBtn) {
+  exportJsonBtn.addEventListener("click", () => {
+    window.location.href = "/api/export-players";
   });
 }
 
