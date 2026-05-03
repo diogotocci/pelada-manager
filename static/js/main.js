@@ -40,6 +40,7 @@ const drawTeamsBtn = document.getElementById("draw-teams-btn");
 const redrawBtn = document.getElementById("redraw-btn");
 const compareBtn = document.getElementById("compare-btn");
 const clearAllBtn = document.getElementById("clear-all-btn");
+const exportJsonBtn = document.getElementById("export-json-btn");
 
 const compareContentEl = document.getElementById("compare-content");
 const closeCompareBtn = document.getElementById("close-compare-btn");
@@ -50,8 +51,6 @@ const closeApprovalBtn = document.getElementById("close-approval-btn");
 const authPasswordInput = document.getElementById("auth-password");
 const authSubmitBtn = document.getElementById("auth-submit-btn");
 const authErrorEl = document.getElementById("auth-error");
-
-const exportJsonBtn = document.getElementById("export-json-btn");
 
 function loadTheme() {
   const saved = localStorage.getItem("pelada-theme") || "dark";
@@ -96,6 +95,51 @@ async function fetchJSON(url, options = {}) {
   }
 
   return res.json();
+}
+
+function getBackupFileName() {
+  const now = new Date();
+  const pad = (value) => value.toString().padStart(2, "0");
+
+  const year = now.getFullYear();
+  const month = pad(now.getMonth() + 1);
+  const day = pad(now.getDate());
+  const hour = pad(now.getHours());
+  const minute = pad(now.getMinutes());
+
+  return `players-${year}-${month}-${day}-${hour}${minute}.json`;
+}
+
+async function exportPlayersJson() {
+  try {
+    const response = await fetch("/api/export-players", {
+      method: "GET",
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to export players JSON");
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = getBackupFileName();
+    link.style.display = "none";
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    window.URL.revokeObjectURL(url);
+
+    alert("Arquivo baixado com sucesso.");
+  } catch (err) {
+    console.error(err);
+    alert("Erro ao baixar o JSON.");
+  }
 }
 
 function renderStarWidget(element, rating) {
@@ -800,6 +844,10 @@ if (clearAllBtn) {
   clearAllBtn.addEventListener("click", clearAllPlayers);
 }
 
+if (exportJsonBtn) {
+  exportJsonBtn.addEventListener("click", exportPlayersJson);
+}
+
 if (fabApprovalBtn) {
   fabApprovalBtn.addEventListener("click", openApprovalModal);
 }
@@ -823,12 +871,6 @@ if (authSubmitBtn) {
 if (authPasswordInput) {
   authPasswordInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") handleAuth();
-  });
-}
-
-if (exportJsonBtn) {
-  exportJsonBtn.addEventListener("click", () => {
-    window.location.href = "/api/export-players";
   });
 }
 
