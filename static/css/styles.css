@@ -506,13 +506,26 @@ body {
 }
 
 .footer-credit {
-  margin-top: 4px;
+  margin-top: 6px;
   color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .footer-credit strong {
   color: var(--text);
   font-weight: 600;
+}
+
+.footer-flamengo-shield {
+  width: 20px;
+  height: auto;
+  display: inline-block;
+  vertical-align: middle;
+  border-radius: 3px;
 }
 
 .hidden {
