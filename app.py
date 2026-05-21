@@ -7,8 +7,7 @@ from services.team_balancer import balance_teams
 app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-PASSWORD_FILE = os.path.join(BASE_DIR, "password.txt")
-APP_VERSION = os.getenv("APP_VERSION", "0.4.0")
+APP_VERSION = os.getenv("APP_VERSION", "0.1.0")
 
 player_storage = PlayerStorage("data/players.json")
 
@@ -16,26 +15,6 @@ player_storage = PlayerStorage("data/players.json")
 @app.route("/")
 def index():
     return render_template("index.html", app_version=APP_VERSION)
-
-
-@app.route("/api/check-password", methods=["POST"])
-def check_password():
-    data = request.get_json() or {}
-    supplied = (data.get("password") or "").strip()
-
-    if not supplied:
-        abort(400, description="Password is required")
-
-    try:
-        with open(PASSWORD_FILE, "r", encoding="utf-8") as f:
-            real = f.read().strip()
-    except FileNotFoundError:
-        abort(500, description="Password file not found on server")
-
-    if supplied == real:
-        return jsonify({"valid": True})
-
-    return jsonify({"valid": False}), 401
 
 
 @app.route("/api/export-players", methods=["GET"])
@@ -79,6 +58,39 @@ def create_player():
     return jsonify(player.to_dict()), 201
 
 
+@app.route("/api/players/<int:player_id>", methods=["PUT"])
+def update_player(player_id):
+    data = request.get_json()
+
+    if not data:
+        abort(400, description="Missing body")
+
+    name = (data.get("name") or "").strip()
+    rating = data.get("rating")
+
+    if not name:
+        abort(400, description="Name cannot be empty")
+
+    if rating is None:
+        abort(400, description="Rating is required")
+
+    rating = float(rating)
+
+    if rating < 0 or rating > 5:
+        abort(400, description="Rating must be between 0 and 5")
+
+    updated_player = player_storage.update_player(
+        player_id=player_id,
+        name=name,
+        rating=rating,
+    )
+
+    if not updated_player:
+        abort(404, description="Player not found")
+
+    return jsonify(updated_player.to_dict())
+
+
 @app.route("/api/players/<int:player_id>", methods=["DELETE"])
 def delete_player(player_id):
     success = player_storage.delete_player(player_id)
@@ -105,64 +117,6 @@ def deactivate_all_players():
     return jsonify({"status": "ok"})
 
 
-@app.route("/api/players/<int:player_id>/change-request", methods=["POST"])
-def create_change_request(player_id):
-    data = request.get_json()
-
-    if not data:
-        abort(400, description="Missing body")
-
-    name = (data.get("name") or "").strip()
-    rating = data.get("rating")
-
-    if not name:
-        abort(400, description="Name cannot be empty")
-
-    if rating is None:
-        abort(400, description="Rating is required")
-
-    rating = float(rating)
-
-    if rating < 0 or rating > 5:
-        abort(400, description="Rating must be between 0 and 5")
-
-    request_item = player_storage.create_change_request(
-        player_id=player_id,
-        requested_name=name,
-        requested_rating=rating,
-    )
-
-    if not request_item:
-        abort(404, description="Player not found")
-
-    return jsonify(request_item), 201
-
-
-@app.route("/api/pending-requests", methods=["GET"])
-def list_pending_requests():
-    return jsonify(player_storage.get_pending_change_requests())
-
-
-@app.route("/api/change-requests/<int:request_id>/approve", methods=["POST"])
-def approve_change_request(request_id):
-    success = player_storage.approve_change_request(request_id)
-
-    if not success:
-        abort(404, description="Change request not found")
-
-    return jsonify({"status": "approved"})
-
-
-@app.route("/api/change-requests/<int:request_id>/reject", methods=["POST"])
-def reject_change_request(request_id):
-    success = player_storage.reject_change_request(request_id)
-
-    if not success:
-        abort(404, description="Change request not found")
-
-    return jsonify({"status": "rejected"})
-
-
 @app.route("/api/draw-teams", methods=["POST"])
 def draw_teams():
     data = request.get_json()
@@ -170,7 +124,13 @@ def draw_teams():
     if not data or "team_size" not in data:
         abort(400, description="Missing 'team_size' field")
 
-    team_size = int(data["team_size"])
+    try:
+        team_size = int(data["team_size"])
+    except ValueError:
+        abort(400, description="'team_size' must be an integer")
+
+    if team_size <= 0:
+        abort(400, description="'team_size' must be greater than 0")
 
     players = [p for p in player_storage.get_all_players() if p.active]
 
