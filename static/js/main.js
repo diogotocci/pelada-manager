@@ -502,8 +502,9 @@ function renderTeams(teams) {
 
     const tbody = document.createElement("tbody");
 
-    const sortedPlayers = [...team.players].sort(
-      (a, b) => b.rating - a.rating
+    // Agora ordena os jogadores do time por ordem alfabética
+    const sortedPlayers = [...team.players].sort((a, b) =>
+      a.name.localeCompare(b.name, "pt-BR")
     );
 
     sortedPlayers.forEach((p) => {
