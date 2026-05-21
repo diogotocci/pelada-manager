@@ -469,12 +469,19 @@ function getTeamLabel(teamIndex) {
   return "de fora";
 }
 
+function getTeamBibClass(teamIndex) {
+  if (teamIndex === 1) return "bib-blue";
+  if (teamIndex === 2) return "bib-yellow";
+  return "";
+}
+
 function renderTeams(teams) {
   teamsResultEl.innerHTML = "";
 
   teams.forEach((team, index) => {
     const teamNumber = index + 1;
     const label = getTeamLabel(teamNumber);
+    const bibClass = getTeamBibClass(teamNumber);
 
     const card = document.createElement("div");
     card.className = "team-card";
@@ -482,14 +489,26 @@ function renderTeams(teams) {
     const header = document.createElement("div");
     header.className = "team-header";
 
+    const titleWrap = document.createElement("div");
+    titleWrap.className = "team-title-wrap";
+
     const nameSpan = document.createElement("span");
     nameSpan.textContent = `${team.name} - ${label}`;
+
+    titleWrap.appendChild(nameSpan);
+
+    if (bibClass) {
+      const bibIcon = document.createElement("span");
+      bibIcon.className = `bib-icon ${bibClass}`;
+      bibIcon.setAttribute("aria-hidden", "true");
+      titleWrap.appendChild(bibIcon);
+    }
 
     const ratingSpan = document.createElement("span");
     ratingSpan.className = "team-rating";
     ratingSpan.textContent = `Total: ${team.total_rating.toFixed(1)} ★`;
 
-    header.appendChild(nameSpan);
+    header.appendChild(titleWrap);
     header.appendChild(ratingSpan);
 
     const table = document.createElement("table");
