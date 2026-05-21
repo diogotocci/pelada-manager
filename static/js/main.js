@@ -39,6 +39,13 @@ const exportJsonBtn = document.getElementById("export-json-btn");
 const compareContentEl = document.getElementById("compare-content");
 const closeCompareBtn = document.getElementById("close-compare-btn");
 
+const approvalListEl = document.getElementById("approval-list");
+const closeApprovalBtn = document.getElementById("close-approval-btn");
+
+const authPasswordInput = document.getElementById("auth-password");
+const authSubmitBtn = document.getElementById("auth-submit-btn");
+const authErrorEl = document.getElementById("auth-error");
+
 function loadTheme() {
   const saved = localStorage.getItem("pelada-theme") || "dark";
   document.documentElement.setAttribute("data-theme", saved);
@@ -715,8 +722,30 @@ if (exportJsonBtn) {
   exportJsonBtn.addEventListener("click", exportPlayersJson);
 }
 
+if (fabApprovalBtn) {
+  fabApprovalBtn.addEventListener("click", openApprovalModal);
+}
+
+if (approvalListEl) {
+  approvalListEl.addEventListener("click", handleApprovalClick);
+}
+
+if (closeApprovalBtn) {
+  closeApprovalBtn.addEventListener("click", () => closeModal(approvalModalEl));
+}
+
 if (fabAddPlayerBtn) {
   fabAddPlayerBtn.addEventListener("click", openNewPlayerModal);
+}
+
+if (authSubmitBtn) {
+  authSubmitBtn.addEventListener("click", handleAuth);
+}
+
+if (authPasswordInput) {
+  authPasswordInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") handleAuth();
+  });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
