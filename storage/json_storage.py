@@ -8,7 +8,7 @@ from models import Player
 
 class PlayerStorage:
     """
-    JSON-based storage for players and pending change requests.
+    JSON-based storage for players.
     """
 
     def __init__(self, filepath: str):
@@ -27,9 +27,7 @@ class PlayerStorage:
             json.dumps(
                 {
                     "last_id": 0,
-                    "last_request_id": 0,
                     "players": [],
-                    "change_requests": [],
                 },
                 ensure_ascii=False,
                 indent=2,
@@ -52,9 +50,7 @@ class PlayerStorage:
                 data = json.loads(self.path.read_text(encoding="utf-8"))
 
         data.setdefault("last_id", 0)
-        data.setdefault("last_request_id", 0)
         data.setdefault("players", [])
-        data.setdefault("change_requests", [])
 
         return data
 
@@ -87,6 +83,23 @@ class PlayerStorage:
 
         return player
 
+    def update_player(self, player_id: int, name: str, rating: float) -> Optional[Player]:
+        data = self._load()
+        updated_player = None
+
+        for p in data.get("players", []):
+            if int(p["id"]) == player_id:
+                p["name"] = name
+                p["rating"] = rating
+                updated_player = Player.from_dict(p)
+                break
+
+        if updated_player is None:
+            return None
+
+        self._save(data)
+        return updated_player
+
     def delete_player(self, player_id: int) -> bool:
         data = self._load()
         players = data.get("players", [])
@@ -97,14 +110,8 @@ class PlayerStorage:
             return False
 
         data["players"] = new_players
-
-        # Remove pending requests for deleted player
-        data["change_requests"] = [
-            r for r in data.get("change_requests", [])
-            if int(r["player_id"]) != player_id
-        ]
-
         self._save(data)
+
         return True
 
     def toggle_active(self, player_id: int) -> Optional[Player]:
@@ -130,106 +137,3 @@ class PlayerStorage:
             p["active"] = False
 
         self._save(data)
-
-    def create_change_request(
-        self,
-        player_id: int,
-        requested_name: str,
-        requested_rating: float,
-    ) -> Optional[Dict]:
-        data = self._load()
-
-        player = self._find_player_dict(data, player_id)
-        if player is None:
-            return None
-
-        new_request_id = int(data.get("last_request_id", 0)) + 1
-        data["last_request_id"] = new_request_id
-
-        request_item = {
-            "id": new_request_id,
-            "player_id": player_id,
-            "player_name": player["name"],
-            "current_name": player["name"],
-            "current_rating": float(player["rating"]),
-            "requested_name": requested_name,
-            "requested_rating": requested_rating,
-            "status": "pending",
-        }
-
-        data["change_requests"].append(request_item)
-        self._save(data)
-
-        return request_item
-
-    def get_pending_change_requests(self) -> List[Dict]:
-        data = self._load()
-        players_by_id = {
-            int(p["id"]): p
-            for p in data.get("players", [])
-        }
-
-        pending = []
-
-        for request_item in data.get("change_requests", []):
-            if request_item.get("status") != "pending":
-                continue
-
-            player_id = int(request_item["player_id"])
-            player = players_by_id.get(player_id)
-
-            if not player:
-                continue
-
-            pending.append(
-                {
-                    **request_item,
-                    "player_name": player["name"],
-                    "current_name": player["name"],
-                    "current_rating": float(player["rating"]),
-                }
-            )
-
-        return pending
-
-    def approve_change_request(self, request_id: int) -> bool:
-        data = self._load()
-        request_item = self._find_request_dict(data, request_id)
-
-        if request_item is None or request_item.get("status") != "pending":
-            return False
-
-        player = self._find_player_dict(data, int(request_item["player_id"]))
-        if player is None:
-            return False
-
-        player["name"] = request_item["requested_name"]
-        player["rating"] = float(request_item["requested_rating"])
-        request_item["status"] = "approved"
-
-        self._save(data)
-        return True
-
-    def reject_change_request(self, request_id: int) -> bool:
-        data = self._load()
-        request_item = self._find_request_dict(data, request_id)
-
-        if request_item is None or request_item.get("status") != "pending":
-            return False
-
-        request_item["status"] = "rejected"
-
-        self._save(data)
-        return True
-
-    def _find_player_dict(self, data: Dict, player_id: int) -> Optional[Dict]:
-        for player in data.get("players", []):
-            if int(player["id"]) == player_id:
-                return player
-        return None
-
-    def _find_request_dict(self, data: Dict, request_id: int) -> Optional[Dict]:
-        for request_item in data.get("change_requests", []):
-            if int(request_item["id"]) == request_id:
-                return request_item
-        return None

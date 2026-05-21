@@ -90,33 +90,9 @@
       </div>
     </footer>
 
-    <button id="fab-approval" class="fab-button secondary-fab" aria-label="Aprovações">
-      <i class="fa-solid fa-check"></i>
-    </button>
-
     <button id="fab-add-player" class="fab-button" aria-label="Adicionar jogador">
       <i class="fa-solid fa-plus"></i>
     </button>
-  </div>
-
-  <div id="auth-modal" class="modal">
-    <div class="modal-backdrop"></div>
-
-    <div class="modal-content small">
-      <h3>Acesso</h3>
-      <p class="muted-text">Digite a senha para usar o aplicativo.</p>
-
-      <label class="form-label" for="auth-password">Senha</label>
-      <input id="auth-password" class="form-input" type="password">
-
-      <p id="auth-error" class="error-text hidden-text">Senha inválida.</p>
-
-      <div class="modal-actions">
-        <button type="button" class="primary-button" id="auth-submit-btn">
-          Entrar
-        </button>
-      </div>
-    </div>
   </div>
 
   <div id="player-modal" class="modal hidden">
@@ -134,10 +110,6 @@
         <label class="form-label">Nível (estrelas)</label>
         <div id="star-widget" class="star-widget" data-rating="0"></div>
         <input type="hidden" id="player-rating" value="0">
-
-        <p id="edit-approval-note" class="muted-text hidden-text">
-          Alterações em estrelas serão enviadas para aprovação.
-        </p>
 
         <div class="modal-actions">
           <button type="button" class="secondary-button" id="cancel-player-btn">
@@ -205,22 +177,6 @@
 
       <div class="modal-actions">
         <button type="button" class="secondary-button" id="close-compare-btn">
-          Fechar
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <div id="approval-modal" class="modal hidden">
-    <div class="modal-backdrop"></div>
-
-    <div class="modal-content">
-      <h3>Aprovações pendentes</h3>
-
-      <div id="approval-list" class="approval-list"></div>
-
-      <div class="modal-actions">
-        <button type="button" class="secondary-button" id="close-approval-btn">
           Fechar
         </button>
       </div>

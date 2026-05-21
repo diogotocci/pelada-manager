@@ -1,9 +1,7 @@
 let players = [];
-let pendingRequests = [];
 let currentEditingId = null;
 let deleteTargetId = null;
 let lastTeamSize = 5;
-let isAuthenticated = false;
 
 const playersListEl = document.getElementById("players-list");
 const playerCountEl = document.getElementById("player-count");
@@ -14,8 +12,6 @@ const playerModalEl = document.getElementById("player-modal");
 const confirmModalEl = document.getElementById("confirm-modal");
 const drawModalEl = document.getElementById("draw-modal");
 const compareModalEl = document.getElementById("compare-modal");
-const approvalModalEl = document.getElementById("approval-modal");
-const authModalEl = document.getElementById("auth-modal");
 
 const playerModalTitleEl = document.getElementById("player-modal-title");
 const playerFormEl = document.getElementById("player-form");
@@ -24,7 +20,6 @@ const playerNameInput = document.getElementById("player-name");
 const playerRatingInput = document.getElementById("player-rating");
 const starWidgetEl = document.getElementById("star-widget");
 const cancelPlayerBtn = document.getElementById("cancel-player-btn");
-const editApprovalNoteEl = document.getElementById("edit-approval-note");
 
 const cancelDeleteBtn = document.getElementById("cancel-delete-btn");
 const confirmDeleteBtn = document.getElementById("confirm-delete-btn");
@@ -34,7 +29,6 @@ const cancelDrawBtn = document.getElementById("cancel-draw-btn");
 const confirmDrawBtn = document.getElementById("confirm-draw-btn");
 
 const fabAddPlayerBtn = document.getElementById("fab-add-player");
-const fabApprovalBtn = document.getElementById("fab-approval");
 const toggleThemeBtn = document.getElementById("toggle-theme-btn");
 const drawTeamsBtn = document.getElementById("draw-teams-btn");
 const redrawBtn = document.getElementById("redraw-btn");
@@ -218,29 +212,6 @@ async function loadPlayers() {
   }
 }
 
-async function loadPendingRequests() {
-  try {
-    pendingRequests = await fetchJSON("/api/pending-requests");
-    updateApprovalBadge();
-  } catch (err) {
-    console.error("Failed to load pending requests:", err);
-  }
-}
-
-function updateApprovalBadge() {
-  if (!fabApprovalBtn) return;
-
-  const existingBadge = fabApprovalBtn.querySelector(".fab-badge");
-  if (existingBadge) existingBadge.remove();
-
-  if (pendingRequests.length > 0) {
-    const badge = document.createElement("span");
-    badge.className = "fab-badge";
-    badge.textContent = pendingRequests.length.toString();
-    fabApprovalBtn.appendChild(badge);
-  }
-}
-
 function renderPlayers() {
   playersListEl.innerHTML = "";
 
@@ -255,7 +226,9 @@ function renderPlayers() {
   playerCountEl.textContent = `${total} jogador(es) · ${activeCount} selecionado(s)`;
 
   const sortedPlayers = [...players].sort((a, b) =>
-    a.name.localeCompare(b.name, "pt-BR")
+    a.name.trim().localeCompare(b.name.trim(), "pt-BR", {
+      sensitivity: "base",
+    })
   );
 
   sortedPlayers.forEach((p) => {
@@ -325,7 +298,6 @@ function openNewPlayerModal() {
   playerIdInput.value = "";
   playerNameInput.value = "";
   playerRatingInput.value = "0";
-  editApprovalNoteEl.classList.add("hidden-text");
 
   renderStarWidget(starWidgetEl, 0);
   openModal(playerModalEl);
@@ -339,7 +311,6 @@ function openEditPlayerModal(player) {
   playerIdInput.value = player.id;
   playerNameInput.value = player.name;
   playerRatingInput.value = player.rating.toString();
-  editApprovalNoteEl.classList.remove("hidden-text");
 
   renderStarWidget(starWidgetEl, player.rating);
   openModal(playerModalEl);
@@ -370,24 +341,20 @@ async function handlePlayerSubmit(e) {
       return;
     }
 
-    const currentPlayer = players.find((p) => p.id === currentEditingId);
-    if (!currentPlayer) {
-      alert("Jogador não encontrado.");
-      return;
-    }
-
-    await fetchJSON(`/api/players/${currentEditingId}/change-request`, {
-      method: "POST",
+    const updatedPlayer = await fetchJSON(`/api/players/${currentEditingId}`, {
+      method: "PUT",
       body: JSON.stringify({
         name,
         rating,
       }),
     });
 
-    closeModal(playerModalEl);
-    await loadPendingRequests();
+    players = players.map((p) =>
+      p.id === updatedPlayer.id ? updatedPlayer : p
+    );
 
-    alert("Alteração enviada para aprovação.");
+    renderPlayers();
+    closeModal(playerModalEl);
   } catch (err) {
     console.error(err);
     alert("Erro ao salvar jogador.");
@@ -509,12 +476,19 @@ function getTeamLabel(teamIndex) {
   return "de fora";
 }
 
+function getTeamBibClass(teamIndex) {
+  if (teamIndex === 1) return "bib-blue";
+  if (teamIndex === 2) return "bib-yellow";
+  return "";
+}
+
 function renderTeams(teams) {
   teamsResultEl.innerHTML = "";
 
   teams.forEach((team, index) => {
     const teamNumber = index + 1;
     const label = getTeamLabel(teamNumber);
+    const bibClass = getTeamBibClass(teamNumber);
 
     const card = document.createElement("div");
     card.className = "team-card";
@@ -522,14 +496,26 @@ function renderTeams(teams) {
     const header = document.createElement("div");
     header.className = "team-header";
 
+    const titleWrap = document.createElement("div");
+    titleWrap.className = "team-title-wrap";
+
     const nameSpan = document.createElement("span");
     nameSpan.textContent = `${team.name} - ${label}`;
+
+    titleWrap.appendChild(nameSpan);
+
+    if (bibClass) {
+      const bibIcon = document.createElement("span");
+      bibIcon.className = `bib-icon ${bibClass}`;
+      bibIcon.setAttribute("aria-hidden", "true");
+      titleWrap.appendChild(bibIcon);
+    }
 
     const ratingSpan = document.createElement("span");
     ratingSpan.className = "team-rating";
     ratingSpan.textContent = `Total: ${team.total_rating.toFixed(1)} ★`;
 
-    header.appendChild(nameSpan);
+    header.appendChild(titleWrap);
     header.appendChild(ratingSpan);
 
     const table = document.createElement("table");
@@ -546,8 +532,10 @@ function renderTeams(teams) {
 
     const tbody = document.createElement("tbody");
 
-    const sortedPlayers = [...team.players].sort(
-      (a, b) => b.rating - a.rating
+    const sortedPlayers = [...team.players].sort((a, b) =>
+      a.name.trim().localeCompare(b.name.trim(), "pt-BR", {
+        sensitivity: "base",
+      })
     );
 
     sortedPlayers.forEach((p) => {
@@ -608,7 +596,11 @@ function renderCompareTable() {
 
     const names = groups[key]
       .map((p) => p.name)
-      .sort((a, b) => a.localeCompare(b, "pt-BR"));
+      .sort((a, b) =>
+        a.trim().localeCompare(b.trim(), "pt-BR", {
+          sensitivity: "base",
+        })
+      );
 
     const tr = document.createElement("tr");
     const ratingTd = document.createElement("td");
@@ -624,124 +616,6 @@ function renderCompareTable() {
 
   table.appendChild(tbody);
   compareContentEl.appendChild(table);
-}
-
-async function openApprovalModal() {
-  await loadPendingRequests();
-  approvalListEl.innerHTML = "";
-
-  if (pendingRequests.length === 0) {
-    approvalListEl.innerHTML =
-      '<p class="muted-text">Nenhuma aprovação pendente.</p>';
-    openModal(approvalModalEl);
-    return;
-  }
-
-  pendingRequests.forEach((request) => {
-    const card = document.createElement("div");
-    card.className = "approval-card";
-
-    const currentRating = Number(request.current_rating).toFixed(1);
-    const requestedRating = Number(request.requested_rating).toFixed(1);
-
-    card.innerHTML = `
-      <div class="approval-main">
-        <strong>${request.player_name}</strong>
-        <span>Atual: ${currentRating} ★</span>
-        <span>Proposto: ${requestedRating} ★</span>
-      </div>
-
-      <div class="approval-actions">
-        <button class="primary-button approve-request" data-id="${request.id}">
-          Aprovar
-        </button>
-        <button class="danger-button reject-request" data-id="${request.id}">
-          Rejeitar
-        </button>
-      </div>
-    `;
-
-    approvalListEl.appendChild(card);
-  });
-
-  openModal(approvalModalEl);
-}
-
-async function handleApprovalClick(e) {
-  const approveButton = e.target.closest(".approve-request");
-  const rejectButton = e.target.closest(".reject-request");
-
-  if (!approveButton && !rejectButton) return;
-
-  const requestId = parseInt(
-    (approveButton || rejectButton).dataset.id,
-    10
-  );
-
-  try {
-    if (approveButton) {
-      await fetchJSON(`/api/change-requests/${requestId}/approve`, {
-        method: "POST",
-      });
-    }
-
-    if (rejectButton) {
-      await fetchJSON(`/api/change-requests/${requestId}/reject`, {
-        method: "POST",
-      });
-    }
-
-    await loadPlayers();
-    await openApprovalModal();
-  } catch (err) {
-    console.error(err);
-    alert("Erro ao processar aprovação.");
-  }
-}
-
-async function checkPassword(password) {
-  const res = await fetch("/api/check-password", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ password }),
-  });
-
-  if (!res.ok) return false;
-
-  const data = await res.json();
-  return data.valid === true;
-}
-
-async function handleAuth() {
-  const pwd = authPasswordInput.value.trim();
-
-  if (!pwd) {
-    authErrorEl.textContent = "Senha obrigatória.";
-    authErrorEl.classList.remove("hidden-text");
-    return;
-  }
-
-  try {
-    const ok = await checkPassword(pwd);
-
-    if (!ok) {
-      authErrorEl.textContent = "Senha inválida.";
-      authErrorEl.classList.remove("hidden-text");
-      authPasswordInput.select();
-      return;
-    }
-
-    authErrorEl.classList.add("hidden-text");
-    isAuthenticated = true;
-    closeModal(authModalEl);
-
-    await loadPlayers();
-    await loadPendingRequests();
-  } catch (err) {
-    console.error(err);
-    authErrorEl.textContent = "Erro ao validar senha.";
-    authErrorEl.classList.remove("hidden-text");
-  }
 }
 
 if (toggleThemeBtn) {
@@ -877,8 +751,5 @@ if (authPasswordInput) {
 document.addEventListener("DOMContentLoaded", () => {
   loadTheme();
   renderStarWidget(starWidgetEl, 0);
-
-  if (authPasswordInput) {
-    authPasswordInput.focus();
-  }
+  loadPlayers();
 });
