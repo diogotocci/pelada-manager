@@ -52,6 +52,12 @@ class PlayerStorage:
         data.setdefault("last_id", 0)
         data.setdefault("players", [])
 
+        for player in data["players"]:
+            player.setdefault("active", True)
+            player.setdefault("marking", 2)
+            player.setdefault("stamina", 2)
+            player.setdefault("scoring", 2)
+
         return data
 
     def _save(self, data: Dict) -> None:
@@ -65,7 +71,14 @@ class PlayerStorage:
         data = self._load()
         return [Player.from_dict(p) for p in data.get("players", [])]
 
-    def add_player(self, name: str, rating: float) -> Player:
+    def add_player(
+        self,
+        name: str,
+        rating: float,
+        marking: int = 2,
+        stamina: int = 2,
+        scoring: int = 2,
+    ) -> Player:
         data = self._load()
 
         new_id = int(data.get("last_id", 0)) + 1
@@ -76,6 +89,9 @@ class PlayerStorage:
             name=name,
             rating=rating,
             active=True,
+            marking=marking,
+            stamina=stamina,
+            scoring=scoring,
         )
 
         data["players"].append(player.to_dict())
@@ -83,7 +99,15 @@ class PlayerStorage:
 
         return player
 
-    def update_player(self, player_id: int, name: str, rating: float) -> Optional[Player]:
+    def update_player(
+        self,
+        player_id: int,
+        name: str,
+        rating: float,
+        marking: Optional[int] = None,
+        stamina: Optional[int] = None,
+        scoring: Optional[int] = None,
+    ) -> Optional[Player]:
         data = self._load()
         updated_player = None
 
@@ -91,6 +115,20 @@ class PlayerStorage:
             if int(p["id"]) == player_id:
                 p["name"] = name
                 p["rating"] = rating
+
+                if marking is not None:
+                    p["marking"] = marking
+
+                if stamina is not None:
+                    p["stamina"] = stamina
+
+                if scoring is not None:
+                    p["scoring"] = scoring
+
+                p.setdefault("marking", 2)
+                p.setdefault("stamina", 2)
+                p.setdefault("scoring", 2)
+
                 updated_player = Player.from_dict(p)
                 break
 
@@ -121,6 +159,9 @@ class PlayerStorage:
         for p in data.get("players", []):
             if int(p["id"]) == player_id:
                 p["active"] = not bool(p.get("active", True))
+                p.setdefault("marking", 2)
+                p.setdefault("stamina", 2)
+                p.setdefault("scoring", 2)
                 updated_player = Player.from_dict(p)
                 break
 
@@ -135,5 +176,8 @@ class PlayerStorage:
 
         for p in data.get("players", []):
             p["active"] = False
+            p.setdefault("marking", 2)
+            p.setdefault("stamina", 2)
+            p.setdefault("scoring", 2)
 
         self._save(data)

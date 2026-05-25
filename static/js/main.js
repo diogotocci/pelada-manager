@@ -2,6 +2,10 @@ let players = [];
 let currentEditingId = null;
 let deleteTargetId = null;
 let lastTeamSize = 5;
+let lastDrawnTeams = [];
+let isAdminMode = false;
+
+const ADMIN_SECRET = "secret123";
 
 const playersListEl = document.getElementById("players-list");
 const playerCountEl = document.getElementById("player-count");
@@ -12,14 +16,19 @@ const playerModalEl = document.getElementById("player-modal");
 const confirmModalEl = document.getElementById("confirm-modal");
 const drawModalEl = document.getElementById("draw-modal");
 const compareModalEl = document.getElementById("compare-modal");
+const auditModalEl = document.getElementById("audit-modal");
 
 const playerModalTitleEl = document.getElementById("player-modal-title");
 const playerFormEl = document.getElementById("player-form");
 const playerIdInput = document.getElementById("player-id");
 const playerNameInput = document.getElementById("player-name");
 const playerRatingInput = document.getElementById("player-rating");
+const playerMarkingInput = document.getElementById("player-marking");
+const playerStaminaInput = document.getElementById("player-stamina");
+const playerScoringInput = document.getElementById("player-scoring");
 const starWidgetEl = document.getElementById("star-widget");
 const cancelPlayerBtn = document.getElementById("cancel-player-btn");
+const advancedAttributesSectionEl = document.getElementById("advanced-attributes-section");
 
 const cancelDeleteBtn = document.getElementById("cancel-delete-btn");
 const confirmDeleteBtn = document.getElementById("confirm-delete-btn");
@@ -30,6 +39,7 @@ const confirmDrawBtn = document.getElementById("confirm-draw-btn");
 
 const fabAddPlayerBtn = document.getElementById("fab-add-player");
 const toggleThemeBtn = document.getElementById("toggle-theme-btn");
+const adminModeBtn = document.getElementById("admin-mode-btn");
 const drawTeamsBtn = document.getElementById("draw-teams-btn");
 const redrawBtn = document.getElementById("redraw-btn");
 const compareBtn = document.getElementById("compare-btn");
@@ -39,17 +49,18 @@ const exportJsonBtn = document.getElementById("export-json-btn");
 const compareContentEl = document.getElementById("compare-content");
 const closeCompareBtn = document.getElementById("close-compare-btn");
 
-const approvalListEl = document.getElementById("approval-list");
-const closeApprovalBtn = document.getElementById("close-approval-btn");
-
-const authPasswordInput = document.getElementById("auth-password");
-const authSubmitBtn = document.getElementById("auth-submit-btn");
-const authErrorEl = document.getElementById("auth-error");
+const auditContentEl = document.getElementById("audit-content");
+const closeAuditBtn = document.getElementById("close-audit-btn");
 
 function loadTheme() {
   const saved = localStorage.getItem("pelada-theme") || "dark";
   document.documentElement.setAttribute("data-theme", saved);
   updateThemeIcon(saved);
+}
+
+function loadAdminMode() {
+  isAdminMode = localStorage.getItem("pelada-admin-mode") === "true";
+  updateAdminModeUI();
 }
 
 function updateThemeIcon(theme) {
@@ -65,6 +76,45 @@ function updateThemeIcon(theme) {
     icon.classList.remove("fa-sun");
     icon.classList.add("fa-moon");
   }
+}
+
+function updateAdminModeUI() {
+  if (adminModeBtn) {
+    adminModeBtn.classList.toggle("admin-active", isAdminMode);
+  }
+
+  if (advancedAttributesSectionEl) {
+    advancedAttributesSectionEl.classList.toggle("hidden", !isAdminMode);
+  }
+
+  if (lastDrawnTeams.length > 0) {
+    renderTeams(lastDrawnTeams);
+  }
+}
+
+function handleAdminModeClick() {
+  if (isAdminMode) {
+    const shouldDisable = confirm("Deseja sair do modo admin?");
+    if (!shouldDisable) return;
+
+    isAdminMode = false;
+    localStorage.removeItem("pelada-admin-mode");
+    updateAdminModeUI();
+    return;
+  }
+
+  const secret = prompt("Digite a chave admin:");
+
+  if (secret !== ADMIN_SECRET) {
+    alert("Chave admin inválida.");
+    return;
+  }
+
+  isAdminMode = true;
+  localStorage.setItem("pelada-admin-mode", "true");
+  updateAdminModeUI();
+
+  alert("Modo admin ativado.");
 }
 
 function openModal(el) {
@@ -203,6 +253,10 @@ function buildStarsHTML(rating) {
   return html;
 }
 
+function getAttributeValue(player, attributeName) {
+  return Number(player[attributeName] ?? 2);
+}
+
 async function loadPlayers() {
   try {
     players = await fetchJSON("/api/players");
@@ -291,6 +345,12 @@ function renderPlayers() {
   });
 }
 
+function resetAdvancedAttributes() {
+  playerMarkingInput.value = "2";
+  playerStaminaInput.value = "2";
+  playerScoringInput.value = "2";
+}
+
 function openNewPlayerModal() {
   currentEditingId = null;
 
@@ -298,8 +358,10 @@ function openNewPlayerModal() {
   playerIdInput.value = "";
   playerNameInput.value = "";
   playerRatingInput.value = "0";
+  resetAdvancedAttributes();
 
   renderStarWidget(starWidgetEl, 0);
+  updateAdminModeUI();
   openModal(playerModalEl);
   playerNameInput.focus();
 }
@@ -312,7 +374,12 @@ function openEditPlayerModal(player) {
   playerNameInput.value = player.name;
   playerRatingInput.value = player.rating.toString();
 
+  playerMarkingInput.value = getAttributeValue(player, "marking").toString();
+  playerStaminaInput.value = getAttributeValue(player, "stamina").toString();
+  playerScoringInput.value = getAttributeValue(player, "scoring").toString();
+
   renderStarWidget(starWidgetEl, player.rating);
+  updateAdminModeUI();
   openModal(playerModalEl);
   playerNameInput.focus();
 }
@@ -328,11 +395,22 @@ async function handlePlayerSubmit(e) {
     return;
   }
 
+  const payload = {
+    name,
+    rating,
+  };
+
+  if (isAdminMode) {
+    payload.marking = parseInt(playerMarkingInput.value || "2", 10);
+    payload.stamina = parseInt(playerStaminaInput.value || "2", 10);
+    payload.scoring = parseInt(playerScoringInput.value || "2", 10);
+  }
+
   try {
     if (currentEditingId == null) {
       const newPlayer = await fetchJSON("/api/players", {
         method: "POST",
-        body: JSON.stringify({ name, rating }),
+        body: JSON.stringify(payload),
       });
 
       players.push(newPlayer);
@@ -343,10 +421,7 @@ async function handlePlayerSubmit(e) {
 
     const updatedPlayer = await fetchJSON(`/api/players/${currentEditingId}`, {
       method: "PUT",
-      body: JSON.stringify({
-        name,
-        rating,
-      }),
+      body: JSON.stringify(payload),
     });
 
     players = players.map((p) =>
@@ -455,7 +530,9 @@ async function performDraw(teamSize) {
     });
 
     lastTeamSize = teamSize;
-    renderTeams(data.teams);
+    lastDrawnTeams = data.teams;
+
+    renderTeams(lastDrawnTeams);
     teamsSectionEl.classList.remove("hidden");
 
     setTimeout(() => {
@@ -511,6 +588,16 @@ function renderTeams(teams) {
       titleWrap.appendChild(bibIcon);
     }
 
+    if (isAdminMode) {
+      const auditButton = document.createElement("button");
+      auditButton.className = "audit-icon-button";
+      auditButton.title = "Ver auditoria do sorteio";
+      auditButton.setAttribute("aria-label", "Ver auditoria do sorteio");
+      auditButton.innerHTML = '<i class="fa-solid fa-chart-simple"></i>';
+      auditButton.addEventListener("click", () => openAuditModal());
+      titleWrap.appendChild(auditButton);
+    }
+
     const ratingSpan = document.createElement("span");
     ratingSpan.className = "team-rating";
     ratingSpan.textContent = `Total: ${team.total_rating.toFixed(1)} ★`;
@@ -553,6 +640,131 @@ function renderTeams(teams) {
     card.appendChild(table);
     teamsResultEl.appendChild(card);
   });
+}
+
+function getTeamAuditStats(team) {
+  const teamPlayers = team.players || [];
+  const playerCount = teamPlayers.length || 1;
+
+  const totalRating = teamPlayers.reduce((sum, p) => sum + Number(p.rating || 0), 0);
+  const totalMarking = teamPlayers.reduce((sum, p) => sum + getAttributeValue(p, "marking"), 0);
+  const totalStamina = teamPlayers.reduce((sum, p) => sum + getAttributeValue(p, "stamina"), 0);
+  const totalScoring = teamPlayers.reduce((sum, p) => sum + getAttributeValue(p, "scoring"), 0);
+
+  return {
+    totalRating,
+    totalMarking,
+    totalStamina,
+    totalScoring,
+    averageRating: totalRating / playerCount,
+    averageMarking: totalMarking / playerCount,
+    averageStamina: totalStamina / playerCount,
+    averageScoring: totalScoring / playerCount,
+  };
+}
+
+function formatDecimal(value) {
+  return Number(value).toFixed(1);
+}
+
+function renderAuditView() {
+  auditContentEl.innerHTML = "";
+
+  if (!lastDrawnTeams.length) {
+    auditContentEl.innerHTML = '<p class="muted-text">Nenhum sorteio disponível para auditar.</p>';
+    return;
+  }
+
+  const summary = document.createElement("div");
+  summary.className = "audit-summary-grid";
+
+  lastDrawnTeams.forEach((team, index) => {
+    const teamNumber = index + 1;
+    const label = getTeamLabel(teamNumber);
+    const stats = getTeamAuditStats(team);
+
+    const summaryCard = document.createElement("div");
+    summaryCard.className = "audit-summary-card";
+
+    summaryCard.innerHTML = `
+      <strong>${team.name} - ${label}</strong>
+      <span>Rating: ${formatDecimal(stats.totalRating)} total · ${formatDecimal(stats.averageRating)} média</span>
+      <span>Marca: ${stats.totalMarking} total · ${formatDecimal(stats.averageMarking)} média</span>
+      <span>Gol: ${stats.totalScoring} total · ${formatDecimal(stats.averageScoring)} média</span>
+      <span>Corre: ${stats.totalStamina} total · ${formatDecimal(stats.averageStamina)} média</span>
+    `;
+
+    summary.appendChild(summaryCard);
+  });
+
+  auditContentEl.appendChild(summary);
+
+  lastDrawnTeams.forEach((team, index) => {
+    const teamNumber = index + 1;
+    const label = getTeamLabel(teamNumber);
+    const stats = getTeamAuditStats(team);
+
+    const teamCard = document.createElement("div");
+    teamCard.className = "audit-team-card";
+
+    const sortedPlayers = [...team.players].sort((a, b) =>
+      a.name.trim().localeCompare(b.name.trim(), "pt-BR", {
+        sensitivity: "base",
+      })
+    );
+
+    teamCard.innerHTML = `
+      <div class="audit-team-header">
+        <strong>${team.name} - ${label}</strong>
+        <span>Total: ${formatDecimal(stats.totalRating)} ★</span>
+      </div>
+
+      <div class="audit-metrics">
+        <span>Marca ${stats.totalMarking}</span>
+        <span>Gol ${stats.totalScoring}</span>
+        <span>Corre ${stats.totalStamina}</span>
+      </div>
+
+      <table class="audit-table">
+        <thead>
+          <tr>
+            <th>Jogador</th>
+            <th>Rating</th>
+            <th>Marca</th>
+            <th>Gol</th>
+            <th>Corre</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${sortedPlayers
+            .map(
+              (p) => `
+                <tr>
+                  <td>${p.name}</td>
+                  <td>${formatDecimal(p.rating)}</td>
+                  <td>${getAttributeValue(p, "marking")}</td>
+                  <td>${getAttributeValue(p, "scoring")}</td>
+                  <td>${getAttributeValue(p, "stamina")}</td>
+                </tr>
+              `
+            )
+            .join("")}
+        </tbody>
+      </table>
+    `;
+
+    auditContentEl.appendChild(teamCard);
+  });
+}
+
+function openAuditModal() {
+  if (!isAdminMode) {
+    alert("Ative o modo admin para ver a auditoria.");
+    return;
+  }
+
+  renderAuditView();
+  openModal(auditModalEl);
 }
 
 function renderCompareTable() {
@@ -627,6 +839,10 @@ if (toggleThemeBtn) {
     localStorage.setItem("pelada-theme", next);
     updateThemeIcon(next);
   });
+}
+
+if (adminModeBtn) {
+  adminModeBtn.addEventListener("click", handleAdminModeClick);
 }
 
 if (starWidgetEl) {
@@ -722,34 +938,17 @@ if (exportJsonBtn) {
   exportJsonBtn.addEventListener("click", exportPlayersJson);
 }
 
-if (fabApprovalBtn) {
-  fabApprovalBtn.addEventListener("click", openApprovalModal);
-}
-
-if (approvalListEl) {
-  approvalListEl.addEventListener("click", handleApprovalClick);
-}
-
-if (closeApprovalBtn) {
-  closeApprovalBtn.addEventListener("click", () => closeModal(approvalModalEl));
-}
-
 if (fabAddPlayerBtn) {
   fabAddPlayerBtn.addEventListener("click", openNewPlayerModal);
 }
 
-if (authSubmitBtn) {
-  authSubmitBtn.addEventListener("click", handleAuth);
-}
-
-if (authPasswordInput) {
-  authPasswordInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") handleAuth();
-  });
+if (closeAuditBtn) {
+  closeAuditBtn.addEventListener("click", () => closeModal(auditModalEl));
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   loadTheme();
+  loadAdminMode();
   renderStarWidget(starWidgetEl, 0);
   loadPlayers();
 });

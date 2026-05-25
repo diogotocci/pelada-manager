@@ -152,6 +152,11 @@ body {
   color: var(--text-muted);
 }
 
+.player-attributes-text {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
 .player-stars {
   font-size: 0.9rem;
   color: #facc15;
@@ -213,6 +218,12 @@ body {
   height: 36px;
   justify-content: center;
   border-radius: 999px;
+}
+
+.icon-button.admin-active {
+  color: #fff;
+  background: linear-gradient(135deg, var(--success), #34d399);
+  box-shadow: 0 10px 28px rgba(16, 185, 129, 0.24);
 }
 
 .btn-icon {
@@ -335,6 +346,52 @@ body {
   box-shadow: 0 0 0 1px var(--accent-soft);
 }
 
+.compact-select {
+  margin-bottom: 0;
+}
+
+.advanced-attributes {
+  margin: 12px 0 8px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border-subtle);
+  background-color: rgba(148, 163, 184, 0.06);
+}
+
+.advanced-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 10px;
+}
+
+.advanced-header span {
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.advanced-header small {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+}
+
+.attribute-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.attribute-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.attribute-field span {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
 .modal {
   position: fixed;
   inset: 0;
@@ -371,6 +428,10 @@ body {
 
 .modal-content.small {
   max-width: 360px;
+}
+
+.audit-modal-content {
+  max-width: 860px;
 }
 
 .modal-content h3 {
@@ -477,6 +538,24 @@ body {
   background: linear-gradient(180deg, #ffd94d 0%, #f5be18 100%);
 }
 
+.audit-icon-button {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background-color: rgba(148, 163, 184, 0.12);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.audit-icon-button:hover {
+  background-color: var(--accent-soft);
+  color: #fff;
+}
+
 .team-table {
   width: 100%;
   border-collapse: collapse;
@@ -495,6 +574,98 @@ body {
 
 .team-table tr + tr td {
   border-top: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.audit-description {
+  margin-top: -4px;
+  margin-bottom: 14px;
+}
+
+.audit-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.audit-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.audit-summary-card {
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.audit-summary-card strong {
+  font-size: 0.95rem;
+}
+
+.audit-summary-card span {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.audit-team-card {
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.audit-team-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.audit-team-header span {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.audit-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.audit-metrics span {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background-color: rgba(148, 163, 184, 0.12);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.audit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.audit-table th,
+.audit-table td {
+  padding: 7px 6px;
+  text-align: left;
+}
+
+.audit-table th {
+  color: var(--text-muted);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.audit-table td {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
 }
 
 .app-footer {
@@ -567,5 +738,22 @@ body {
   .team-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .attribute-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .audit-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .audit-table {
+    font-size: 0.76rem;
+  }
+
+  .audit-table th,
+  .audit-table td {
+    padding: 6px 4px;
   }
 }
