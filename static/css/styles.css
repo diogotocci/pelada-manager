@@ -432,6 +432,31 @@ body {
 
 .audit-modal-content {
   max-width: 860px;
+  padding-top: 52px;
+}
+
+.modal-close-button {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background-color: rgba(148, 163, 184, 0.12);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 60;
+  transition: background-color 0.15s ease, transform 0.08s ease, color 0.15s ease;
+}
+
+.modal-close-button:hover {
+  background-color: var(--danger);
+  color: #fff;
+  transform: translateY(-1px);
 }
 
 .modal-content h3 {
