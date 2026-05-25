@@ -7,7 +7,7 @@ from services.team_balancer import balance_teams
 app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-APP_VERSION = os.getenv("APP_VERSION", "0.4.1")
+APP_VERSION = os.getenv("APP_VERSION", "0.1.0")
 
 player_storage = PlayerStorage("data/players.json")
 
@@ -47,6 +47,9 @@ def create_player():
 
     name = data["name"].strip()
     rating = float(data["rating"])
+    marking = int(data.get("marking", 2))
+    stamina = int(data.get("stamina", 2))
+    scoring = int(data.get("scoring", 2))
 
     if not name:
         abort(400, description="Name cannot be empty")
@@ -54,7 +57,23 @@ def create_player():
     if rating < 0 or rating > 5:
         abort(400, description="Rating must be between 0 and 5")
 
-    player = player_storage.add_player(name=name, rating=rating)
+    if not _is_valid_attribute(marking):
+        abort(400, description="Marking must be between 1 and 3")
+
+    if not _is_valid_attribute(stamina):
+        abort(400, description="Stamina must be between 1 and 3")
+
+    if not _is_valid_attribute(scoring):
+        abort(400, description="Scoring must be between 1 and 3")
+
+    player = player_storage.add_player(
+        name=name,
+        rating=rating,
+        marking=marking,
+        stamina=stamina,
+        scoring=scoring,
+    )
+
     return jsonify(player.to_dict()), 201
 
 
@@ -79,10 +98,32 @@ def update_player(player_id):
     if rating < 0 or rating > 5:
         abort(400, description="Rating must be between 0 and 5")
 
+    marking = data.get("marking")
+    stamina = data.get("stamina")
+    scoring = data.get("scoring")
+
+    if marking is not None:
+        marking = int(marking)
+        if not _is_valid_attribute(marking):
+            abort(400, description="Marking must be between 1 and 3")
+
+    if stamina is not None:
+        stamina = int(stamina)
+        if not _is_valid_attribute(stamina):
+            abort(400, description="Stamina must be between 1 and 3")
+
+    if scoring is not None:
+        scoring = int(scoring)
+        if not _is_valid_attribute(scoring):
+            abort(400, description="Scoring must be between 1 and 3")
+
     updated_player = player_storage.update_player(
         player_id=player_id,
         name=name,
         rating=rating,
+        marking=marking,
+        stamina=stamina,
+        scoring=scoring,
     )
 
     if not updated_player:
@@ -150,6 +191,10 @@ def draw_teams():
         )
 
     return jsonify({"teams": result})
+
+
+def _is_valid_attribute(value: int) -> bool:
+    return 1 <= value <= 3
 
 
 if __name__ == "__main__":

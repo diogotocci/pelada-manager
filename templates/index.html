@@ -38,6 +38,10 @@
           <i class="fa-solid fa-moon"></i>
         </button>
 
+        <button id="admin-mode-btn" class="icon-button" aria-label="Modo admin" title="Modo admin">
+          <i class="fa-solid fa-gear"></i>
+        </button>
+
         <button id="compare-btn" class="secondary-button">
           <i class="fa-solid fa-table"></i>
           Comparar jogadores
@@ -113,9 +117,45 @@
         <label class="form-label" for="player-name">Nome</label>
         <input id="player-name" class="form-input" type="text" required>
 
-        <label class="form-label">Nível (estrelas)</label>
+        <label class="form-label">Nível geral (estrelas)</label>
         <div id="star-widget" class="star-widget" data-rating="0"></div>
         <input type="hidden" id="player-rating" value="0">
+
+        <div id="advanced-attributes-section" class="advanced-attributes hidden">
+          <div class="advanced-header">
+            <span>Atributos avançados</span>
+            <small>Visível apenas no modo admin</small>
+          </div>
+
+          <div class="attribute-grid">
+            <label class="attribute-field" for="player-marking">
+              <span>Marca</span>
+              <select id="player-marking" class="form-input compact-select">
+                <option value="1">1 estrela</option>
+                <option value="2" selected>2 estrelas</option>
+                <option value="3">3 estrelas</option>
+              </select>
+            </label>
+
+            <label class="attribute-field" for="player-stamina">
+              <span>Corre</span>
+              <select id="player-stamina" class="form-input compact-select">
+                <option value="1">1 estrela</option>
+                <option value="2" selected>2 estrelas</option>
+                <option value="3">3 estrelas</option>
+              </select>
+            </label>
+
+            <label class="attribute-field" for="player-scoring">
+              <span>Faz gol</span>
+              <select id="player-scoring" class="form-input compact-select">
+                <option value="1">1 estrela</option>
+                <option value="2" selected>2 estrelas</option>
+                <option value="3">3 estrelas</option>
+              </select>
+            </label>
+          </div>
+        </div>
 
         <div class="modal-actions">
           <button type="button" class="secondary-button" id="cancel-player-btn">
@@ -183,6 +223,26 @@
 
       <div class="modal-actions">
         <button type="button" class="secondary-button" id="close-compare-btn">
+          Fechar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="audit-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+
+    <div class="modal-content audit-modal-content">
+      <h3>Auditoria do sorteio</h3>
+
+      <p class="muted-text audit-description">
+        Esta visão mostra os totais e atributos usados para avaliar o equilíbrio dos times.
+      </p>
+
+      <div id="audit-content" class="audit-content"></div>
+
+      <div class="modal-actions">
+        <button type="button" class="secondary-button" id="close-audit-btn">
           Fechar
         </button>
       </div>
