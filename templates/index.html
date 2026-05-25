@@ -233,6 +233,16 @@
     <div class="modal-backdrop"></div>
 
     <div class="modal-content audit-modal-content">
+      <button
+        type="button"
+        class="modal-close-button"
+        aria-label="Fechar auditoria"
+        title="Fechar"
+        onclick="document.getElementById('audit-modal').classList.add('hidden')"
+      >
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
       <h3>Auditoria do sorteio</h3>
 
       <p class="muted-text audit-description">
