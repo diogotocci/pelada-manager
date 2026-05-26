@@ -6,6 +6,7 @@ let lastDrawnTeams = [];
 let isAdminMode = false;
 
 const ADMIN_SECRET = "secret123";
+const DEPLOY_ENDPOINT_BASE_URL = "https://peladamanager.bandeira.dev/deploy";
 
 const playersListEl = document.getElementById("players-list");
 const playerCountEl = document.getElementById("player-count");
@@ -17,6 +18,7 @@ const confirmModalEl = document.getElementById("confirm-modal");
 const drawModalEl = document.getElementById("draw-modal");
 const compareModalEl = document.getElementById("compare-modal");
 const auditModalEl = document.getElementById("audit-modal");
+const deployModalEl = document.getElementById("deploy-modal");
 
 const playerModalTitleEl = document.getElementById("player-modal-title");
 const playerFormEl = document.getElementById("player-form");
@@ -40,6 +42,7 @@ const confirmDrawBtn = document.getElementById("confirm-draw-btn");
 const fabAddPlayerBtn = document.getElementById("fab-add-player");
 const toggleThemeBtn = document.getElementById("toggle-theme-btn");
 const adminModeBtn = document.getElementById("admin-mode-btn");
+const deployBtn = document.getElementById("deploy-btn");
 const drawTeamsBtn = document.getElementById("draw-teams-btn");
 const redrawBtn = document.getElementById("redraw-btn");
 const compareBtn = document.getElementById("compare-btn");
@@ -51,6 +54,13 @@ const closeCompareBtn = document.getElementById("close-compare-btn");
 
 const auditContentEl = document.getElementById("audit-content");
 const closeAuditBtn = document.getElementById("close-audit-btn");
+
+const deployMainRadio = document.getElementById("deploy-main-radio");
+const deployCustomRadio = document.getElementById("deploy-custom-radio");
+const deployCustomBranchInput = document.getElementById("deploy-custom-branch-input");
+const cancelDeployBtn = document.getElementById("cancel-deploy-btn");
+const confirmDeployBtn = document.getElementById("confirm-deploy-btn");
+const deployErrorEl = document.getElementById("deploy-error");
 
 function loadTheme() {
   const saved = localStorage.getItem("pelada-theme") || "dark";
@@ -81,6 +91,10 @@ function updateThemeIcon(theme) {
 function updateAdminModeUI() {
   if (adminModeBtn) {
     adminModeBtn.classList.toggle("admin-active", isAdminMode);
+  }
+
+  if (deployBtn) {
+    deployBtn.classList.toggle("hidden", !isAdminMode);
   }
 
   if (advancedAttributesSectionEl) {
@@ -830,6 +844,67 @@ function renderCompareTable() {
   compareContentEl.appendChild(table);
 }
 
+function openDeployModal() {
+  if (!isAdminMode) {
+    alert("Ative o modo admin para solicitar deploy.");
+    return;
+  }
+
+  deployMainRadio.checked = true;
+  deployCustomRadio.checked = false;
+  deployCustomBranchInput.value = "";
+  deployErrorEl.textContent = "";
+  deployErrorEl.classList.add("hidden-text");
+
+  openModal(deployModalEl);
+}
+
+function getSelectedDeployBranch() {
+  if (deployMainRadio.checked) {
+    return "main";
+  }
+
+  return deployCustomBranchInput.value.trim();
+}
+
+function isValidBranchName(branchName) {
+  if (!branchName) return false;
+  if (branchName.includes(" ")) return false;
+  if (branchName.includes("..")) return false;
+  if (branchName.startsWith("/")) return false;
+  if (branchName.endsWith("/")) return false;
+
+  return /^[A-Za-z0-9._/-]+$/.test(branchName);
+}
+
+function showDeployError(message) {
+  deployErrorEl.textContent = message;
+  deployErrorEl.classList.remove("hidden-text");
+}
+
+function requestDeploy() {
+  const branchName = getSelectedDeployBranch();
+
+  if (!isValidBranchName(branchName)) {
+    showDeployError("Informe uma branch válida.");
+    return;
+  }
+
+  const deployUrl = `${DEPLOY_ENDPOINT_BASE_URL}?reference=${encodeURIComponent(branchName)}`;
+
+  closeModal(deployModalEl);
+  alert(`Deploy solicitado para a branch ${branchName}.`);
+
+  fetch(deployUrl, {
+    method: "GET",
+    mode: "no-cors",
+    cache: "no-store",
+    keepalive: true,
+  }).catch((err) => {
+    console.warn("Deploy request was sent, but the browser could not confirm the response.", err);
+  });
+}
+
 if (toggleThemeBtn) {
   toggleThemeBtn.addEventListener("click", () => {
     const current = document.documentElement.getAttribute("data-theme") || "dark";
@@ -843,6 +918,44 @@ if (toggleThemeBtn) {
 
 if (adminModeBtn) {
   adminModeBtn.addEventListener("click", handleAdminModeClick);
+}
+
+if (deployBtn) {
+  deployBtn.addEventListener("click", openDeployModal);
+}
+
+if (deployCustomBranchInput) {
+  deployCustomBranchInput.addEventListener("focus", () => {
+    deployCustomRadio.checked = true;
+    deployMainRadio.checked = false;
+  });
+
+  deployCustomBranchInput.addEventListener("input", () => {
+    deployCustomRadio.checked = true;
+    deployMainRadio.checked = false;
+    deployErrorEl.classList.add("hidden-text");
+  });
+}
+
+if (deployMainRadio) {
+  deployMainRadio.addEventListener("change", () => {
+    deployErrorEl.classList.add("hidden-text");
+  });
+}
+
+if (deployCustomRadio) {
+  deployCustomRadio.addEventListener("change", () => {
+    deployCustomBranchInput.focus();
+    deployErrorEl.classList.add("hidden-text");
+  });
+}
+
+if (cancelDeployBtn) {
+  cancelDeployBtn.addEventListener("click", () => closeModal(deployModalEl));
+}
+
+if (confirmDeployBtn) {
+  confirmDeployBtn.addEventListener("click", requestDeploy);
 }
 
 if (starWidgetEl) {

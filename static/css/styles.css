@@ -214,6 +214,7 @@ body {
 
 .icon-button {
   background-color: var(--bg-elevated);
+  color: var(--text);
   width: 36px;
   height: 36px;
   justify-content: center;
@@ -224,6 +225,10 @@ body {
   color: #fff;
   background: linear-gradient(135deg, var(--success), #34d399);
   box-shadow: 0 10px 28px rgba(16, 185, 129, 0.24);
+}
+
+[data-theme="light"] .icon-button {
+  color: #111827;
 }
 
 .btn-icon {
@@ -691,6 +696,48 @@ body {
 
 .audit-table td {
   border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.deploy-description {
+  margin-top: -4px;
+  margin-bottom: 14px;
+}
+
+.deploy-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.deploy-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.deploy-option input[type="radio"] {
+  accent-color: var(--accent);
+}
+
+.custom-deploy-option {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.custom-deploy-option > span {
+  margin-left: 26px;
+  margin-top: -26px;
+}
+
+.deploy-branch-input {
+  margin-bottom: 0;
+  margin-left: 26px;
+  width: calc(100% - 26px);
 }
 
 .app-footer {

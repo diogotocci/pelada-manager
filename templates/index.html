@@ -42,6 +42,10 @@
           <i class="fa-solid fa-gear"></i>
         </button>
 
+        <button id="deploy-btn" class="icon-button admin-only hidden" aria-label="Deploy" title="Deploy">
+          <i class="fa-solid fa-rocket"></i>
+        </button>
+
         <button id="compare-btn" class="secondary-button">
           <i class="fa-solid fa-table"></i>
           Comparar jogadores
@@ -254,6 +258,49 @@
       <div class="modal-actions">
         <button type="button" class="secondary-button" id="close-audit-btn">
           Fechar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="deploy-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+
+    <div class="modal-content small">
+      <h3>Deploy da aplicação</h3>
+
+      <p class="muted-text deploy-description">
+        Escolha a branch que será enviada para deploy.
+      </p>
+
+      <div class="deploy-options">
+        <label class="deploy-option">
+          <input type="radio" name="deploy-branch-mode" id="deploy-main-radio" value="main" checked>
+          <span>Main</span>
+        </label>
+
+        <label class="deploy-option custom-deploy-option">
+          <input type="radio" name="deploy-branch-mode" id="deploy-custom-radio" value="custom">
+          <span>Outra branch</span>
+          <input
+            id="deploy-custom-branch-input"
+            class="form-input deploy-branch-input"
+            type="text"
+            placeholder="ex: sorted-table"
+            autocomplete="off"
+          >
+        </label>
+      </div>
+
+      <p id="deploy-error" class="error-text hidden-text"></p>
+
+      <div class="modal-actions">
+        <button type="button" class="secondary-button" id="cancel-deploy-btn">
+          Cancelar
+        </button>
+
+        <button type="button" class="primary-button" id="confirm-deploy-btn">
+          Deploy
         </button>
       </div>
     </div>
