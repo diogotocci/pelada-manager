@@ -7,7 +7,7 @@ from services.team_balancer import balance_teams
 app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-APP_VERSION = os.getenv("APP_VERSION", "1.0.0")
+APP_VERSION = os.getenv("APP_VERSION", "1.0.2")
 
 player_storage = PlayerStorage("data/players.json")
 
