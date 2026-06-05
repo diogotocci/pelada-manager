@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Pelada Balanceada</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
 
   <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon_final.ico') }}">
   <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='icon-180.png') }}">
@@ -23,6 +23,21 @@
   >
 
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+
+  <style>
+    @media screen and (orientation: landscape) and (max-width: 1024px) {
+      html {
+        transform: rotate(-90deg);
+        transform-origin: left top;
+        width: 100vh;
+        height: 100vw;
+        overflow-x: hidden;
+        position: absolute;
+        top: 100%;
+        left: 0;
+      }
+    }
+  </style>
 </head>
 
 <body>
