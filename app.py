@@ -7,7 +7,7 @@ from services.team_balancer import balance_teams
 app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-APP_VERSION = os.getenv("APP_VERSION", "1.0.3")
+APP_VERSION = os.getenv("APP_VERSION", "1.0.0")
 
 player_storage = PlayerStorage("data/players.json")
 
@@ -156,6 +156,27 @@ def toggle_player_active(player_id):
 def deactivate_all_players():
     player_storage.deactivate_all_players()
     return jsonify({"status": "ok"})
+
+
+@app.route("/api/players/set-active-batch", methods=["PATCH"])
+def set_active_batch():
+    data = request.get_json()
+
+    if not data or "active_ids" not in data:
+        abort(400, description="Missing 'active_ids' field")
+
+    active_ids = data["active_ids"]
+
+    if not isinstance(active_ids, list):
+        abort(400, description="'active_ids' must be a list")
+
+    try:
+        active_ids = [int(i) for i in active_ids]
+    except (ValueError, TypeError):
+        abort(400, description="'active_ids' must contain integers")
+
+    updated_players = player_storage.set_active_batch(active_ids)
+    return jsonify([p.to_dict() for p in updated_players])
 
 
 @app.route("/api/draw-teams", methods=["POST"])

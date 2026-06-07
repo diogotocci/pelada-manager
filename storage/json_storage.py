@@ -181,3 +181,22 @@ class PlayerStorage:
             p.setdefault("scoring", 2)
 
         self._save(data)
+
+    def set_active_batch(self, active_ids: List[int]) -> List[Player]:
+        """
+        Set active=True for players whose id is in active_ids,
+        and active=False for all others.
+        Returns the full updated player list.
+        """
+        active_set = set(active_ids)
+        data = self._load()
+
+        for p in data.get("players", []):
+            p["active"] = int(p["id"]) in active_set
+            p.setdefault("marking", 2)
+            p.setdefault("stamina", 2)
+            p.setdefault("scoring", 2)
+
+        self._save(data)
+
+        return [Player.from_dict(p) for p in data.get("players", [])]
