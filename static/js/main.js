@@ -111,6 +111,10 @@ function updateAdminModeUI() {
     advancedAttributesSectionEl.classList.toggle("hidden", !isAdminMode);
   }
 
+  if (players.length > 0) {
+    renderPlayers();
+  }
+
   if (lastDrawnTeams.length > 0) {
     renderTeams(lastDrawnTeams);
   }
