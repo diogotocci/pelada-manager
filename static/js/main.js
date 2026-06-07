@@ -285,12 +285,12 @@ async function loadPlayers() {
   try {
     players = await fetchJSON("/api/players");
     renderPlayers();
-    // setTimeout is required for Safari/iOS: opening a modal after an async
-    // fetch is treated as a non-user-gesture action and may be blocked by
-    // WebKit if called synchronously inside the promise chain.
+    // A delay is required for Safari/iOS PWA: the WebKit engine blocks modal
+    // display triggered programmatically after an async fetch on page load.
+    // 300ms is enough for the initial render to settle before showing the modal.
     setTimeout(function () {
       openCheckinModal();
-    }, 0);
+    }, 300);
   } catch (err) {
     console.error("Failed to load players:", err);
   }
