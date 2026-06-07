@@ -285,6 +285,7 @@ async function loadPlayers() {
   try {
     players = await fetchJSON("/api/players");
     renderPlayers();
+    openCheckinModal();
   } catch (err) {
     console.error("Failed to load players:", err);
   }
@@ -607,18 +608,7 @@ function renderCheckinList() {
     nameEl.className = "checkin-name";
     nameEl.textContent = p.name;
 
-    const ratingEl = document.createElement("p");
-    ratingEl.className = "checkin-rating";
-    ratingEl.innerHTML =
-      '<span class="checkin-stars">' +
-      buildStarsHTML(p.rating) +
-      "</span>" +
-      "<span>" +
-      p.rating.toFixed(1) +
-      "</span>";
-
     info.appendChild(nameEl);
-    info.appendChild(ratingEl);
 
     const check = document.createElement("div");
     check.className = "checkin-check" + (isPresent ? " checkin-checked" : "");
@@ -641,14 +631,12 @@ function renderCheckinList() {
 }
 
 function openCheckinModal() {
-  if (players.length === 0) {
-    alert("Nenhum jogador cadastrado para selecionar.");
-    return;
-  }
+  if (players.length === 0) return;
 
+  // Always start with all players unchecked
   checkinState = {};
   players.forEach(function (p) {
-    checkinState[p.id] = p.active;
+    checkinState[p.id] = false;
   });
 
   checkinSessionDateEl.textContent = buildCheckinSessionDateText();
@@ -1162,7 +1150,7 @@ if (confirmDeleteBtn) {
 }
 
 if (drawTeamsBtn) {
-  drawTeamsBtn.addEventListener("click", openCheckinModal);
+  drawTeamsBtn.addEventListener("click", openDrawModal);
 }
 
 if (redrawBtn) {
