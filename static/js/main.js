@@ -327,17 +327,20 @@ function renderPlayers() {
     nameSpan.className = "player-name";
     nameSpan.textContent = p.name;
 
-    const starsSpan = document.createElement("span");
-    starsSpan.className = "player-stars";
-    starsSpan.innerHTML = buildStarsHTML(p.rating);
-
-    const ratingText = document.createElement("span");
-    ratingText.className = "player-rating-text";
-    ratingText.textContent = `${p.rating.toFixed(1)} ★`;
-
     main.appendChild(nameSpan);
-    main.appendChild(starsSpan);
-    main.appendChild(ratingText);
+
+    if (isAdminMode) {
+      const starsSpan = document.createElement("span");
+      starsSpan.className = "player-stars";
+      starsSpan.innerHTML = buildStarsHTML(p.rating);
+
+      const ratingText = document.createElement("span");
+      ratingText.className = "player-rating-text";
+      ratingText.textContent = `${p.rating.toFixed(1)} ★`;
+
+      main.appendChild(starsSpan);
+      main.appendChild(ratingText);
+    }
 
     const actions = document.createElement("div");
     actions.className = "player-actions";
@@ -356,17 +359,20 @@ function renderPlayers() {
     switchLabel.appendChild(switchInput);
     switchLabel.appendChild(slider);
 
-    const editBtn = document.createElement("button");
-    editBtn.className = "btn-icon edit-player";
-    editBtn.innerHTML = '<i class="fa-solid fa-pen"></i>';
-
-    const deleteBtn = document.createElement("button");
-    deleteBtn.className = "btn-icon delete-player";
-    deleteBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
-
     actions.appendChild(switchLabel);
-    actions.appendChild(editBtn);
-    actions.appendChild(deleteBtn);
+
+    if (isAdminMode) {
+      const editBtn = document.createElement("button");
+      editBtn.className = "btn-icon edit-player";
+      editBtn.innerHTML = '<i class="fa-solid fa-pen"></i>';
+
+      const deleteBtn = document.createElement("button");
+      deleteBtn.className = "btn-icon delete-player";
+      deleteBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
+
+      actions.appendChild(editBtn);
+      actions.appendChild(deleteBtn);
+    }
 
     row.appendChild(main);
     row.appendChild(actions);
