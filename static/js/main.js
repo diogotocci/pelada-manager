@@ -4,6 +4,7 @@ let deleteTargetId = null;
 let lastTeamSize = 5;
 let lastDrawnTeams = [];
 let isAdminMode = false;
+let checkinState = {};
 
 const ADMIN_SECRET = "secret123";
 const DEPLOY_ENDPOINT_BASE_URL = "https://peladamanager.bandeira.dev/deploy";
@@ -19,6 +20,7 @@ const drawModalEl = document.getElementById("draw-modal");
 const compareModalEl = document.getElementById("compare-modal");
 const auditModalEl = document.getElementById("audit-modal");
 const deployModalEl = document.getElementById("deploy-modal");
+const checkinModalEl = document.getElementById("checkin-modal");
 
 const playerModalTitleEl = document.getElementById("player-modal-title");
 const playerFormEl = document.getElementById("player-form");
@@ -62,6 +64,14 @@ const cancelDeployBtn = document.getElementById("cancel-deploy-btn");
 const confirmDeployBtn = document.getElementById("confirm-deploy-btn");
 const deployErrorEl = document.getElementById("deploy-error");
 
+const checkinSessionDateEl = document.getElementById("checkin-session-date");
+const checkinTotalLabelEl = document.getElementById("checkin-total-label");
+const checkinPresentBadgeEl = document.getElementById("checkin-present-badge");
+const checkinPlayersListEl = document.getElementById("checkin-players-list");
+const cancelCheckinBtn = document.getElementById("cancel-checkin-btn");
+const confirmCheckinBtn = document.getElementById("confirm-checkin-btn");
+const confirmCheckinLabelEl = document.getElementById("confirm-checkin-label");
+
 function loadTheme() {
   const saved = localStorage.getItem("pelada-theme") || "dark";
   document.documentElement.setAttribute("data-theme", saved);
@@ -101,6 +111,10 @@ function updateAdminModeUI() {
     advancedAttributesSectionEl.classList.toggle("hidden", !isAdminMode);
   }
 
+  if (players.length > 0) {
+    renderPlayers();
+  }
+
   if (lastDrawnTeams.length > 0) {
     renderTeams(lastDrawnTeams);
   }
@@ -120,7 +134,7 @@ function handleAdminModeClick() {
   const secret = prompt("Digite a chave admin:");
 
   if (secret !== ADMIN_SECRET) {
-    alert("Chave admin inválida.");
+    alert("Chave admin invalida.");
     return;
   }
 
@@ -275,6 +289,12 @@ async function loadPlayers() {
   try {
     players = await fetchJSON("/api/players");
     renderPlayers();
+    // A delay is required for Safari/iOS PWA: the WebKit engine blocks modal
+    // display triggered programmatically after an async fetch on page load.
+    // 300ms is enough for the initial render to settle before showing the modal.
+    setTimeout(function () {
+      openCheckinModal();
+    }, 300);
   } catch (err) {
     console.error("Failed to load players:", err);
   }
@@ -311,17 +331,20 @@ function renderPlayers() {
     nameSpan.className = "player-name";
     nameSpan.textContent = p.name;
 
-    const starsSpan = document.createElement("span");
-    starsSpan.className = "player-stars";
-    starsSpan.innerHTML = buildStarsHTML(p.rating);
-
-    const ratingText = document.createElement("span");
-    ratingText.className = "player-rating-text";
-    ratingText.textContent = `${p.rating.toFixed(1)} ★`;
-
     main.appendChild(nameSpan);
-    main.appendChild(starsSpan);
-    main.appendChild(ratingText);
+
+    if (isAdminMode) {
+      const starsSpan = document.createElement("span");
+      starsSpan.className = "player-stars";
+      starsSpan.innerHTML = buildStarsHTML(p.rating);
+
+      const ratingText = document.createElement("span");
+      ratingText.className = "player-rating-text";
+      ratingText.textContent = `${p.rating.toFixed(1)} ★`;
+
+      main.appendChild(starsSpan);
+      main.appendChild(ratingText);
+    }
 
     const actions = document.createElement("div");
     actions.className = "player-actions";
@@ -340,17 +363,20 @@ function renderPlayers() {
     switchLabel.appendChild(switchInput);
     switchLabel.appendChild(slider);
 
-    const editBtn = document.createElement("button");
-    editBtn.className = "btn-icon edit-player";
-    editBtn.innerHTML = '<i class="fa-solid fa-pen"></i>';
-
-    const deleteBtn = document.createElement("button");
-    deleteBtn.className = "btn-icon delete-player";
-    deleteBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
-
     actions.appendChild(switchLabel);
-    actions.appendChild(editBtn);
-    actions.appendChild(deleteBtn);
+
+    if (isAdminMode) {
+      const editBtn = document.createElement("button");
+      editBtn.className = "btn-icon edit-player";
+      editBtn.innerHTML = '<i class="fa-solid fa-pen"></i>';
+
+      const deleteBtn = document.createElement("button");
+      deleteBtn.className = "btn-icon delete-player";
+      deleteBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
+
+      actions.appendChild(editBtn);
+      actions.appendChild(deleteBtn);
+    }
 
     row.appendChild(main);
     row.appendChild(actions);
@@ -405,7 +431,7 @@ async function handlePlayerSubmit(e) {
   const rating = parseFloat(playerRatingInput.value || "0");
 
   if (!name) {
-    alert("Nome não pode ser vazio.");
+    alert("Nome nao pode ser vazio.");
     return;
   }
 
@@ -506,7 +532,7 @@ async function deletePlayer() {
 
 async function clearAllPlayers() {
   if (!players.some((p) => p.active)) {
-    alert("Nenhum jogador está selecionado.");
+    alert("Nenhum jogador esta selecionado.");
     return;
   }
 
@@ -525,6 +551,146 @@ async function clearAllPlayers() {
     alert("Erro ao desmarcar jogadores.");
   }
 }
+
+// ============================================================
+// Check-in modal
+// ============================================================
+
+function buildCheckinSessionDateText() {
+  const now = new Date();
+  const days = [
+    "Domingo", "Segunda", "Terca", "Quarta",
+    "Quinta", "Sexta", "Sabado",
+  ];
+  const months = [
+    "janeiro", "fevereiro", "marco", "abril", "maio", "junho",
+    "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+  ];
+  return (
+    days[now.getDay()] +
+    ", " +
+    now.getDate() +
+    " de " +
+    months[now.getMonth()] +
+    " - marque quem esta presente"
+  );
+}
+
+function buildCheckinAvatarInitials(name) {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function getCheckinPresentCount() {
+  return Object.values(checkinState).filter(Boolean).length;
+}
+
+function updateCheckinMeta() {
+  const total = players.length;
+  const present = getCheckinPresentCount();
+
+  checkinTotalLabelEl.textContent = total + " cadastrado(s)";
+  checkinPresentBadgeEl.textContent = present + " presente(s)";
+  confirmCheckinLabelEl.textContent =
+    present > 0
+      ? "Sortear times (" + present + ")"
+      : "Sortear times";
+  confirmCheckinBtn.disabled = present < 2;
+}
+
+function renderCheckinList() {
+  checkinPlayersListEl.innerHTML = "";
+
+  const sorted = [...players].sort((a, b) =>
+    a.name.trim().localeCompare(b.name.trim(), "pt-BR", { sensitivity: "base" })
+  );
+
+  sorted.forEach(function (p) {
+    const isPresent = !!checkinState[p.id];
+
+    const row = document.createElement("div");
+    row.className = "checkin-row" + (isPresent ? " checkin-active" : "");
+
+    const avatar = document.createElement("div");
+    avatar.className = "checkin-avatar";
+    avatar.textContent = buildCheckinAvatarInitials(p.name);
+
+    const info = document.createElement("div");
+    info.className = "checkin-info";
+
+    const nameEl = document.createElement("p");
+    nameEl.className = "checkin-name";
+    nameEl.textContent = p.name;
+
+    info.appendChild(nameEl);
+
+    const check = document.createElement("div");
+    check.className = "checkin-check" + (isPresent ? " checkin-checked" : "");
+    if (isPresent) {
+      check.innerHTML = '<i class="fa-solid fa-check"></i>';
+    }
+
+    row.appendChild(avatar);
+    row.appendChild(info);
+    row.appendChild(check);
+
+    row.addEventListener("click", function () {
+      checkinState[p.id] = !checkinState[p.id];
+      renderCheckinList();
+      updateCheckinMeta();
+    });
+
+    checkinPlayersListEl.appendChild(row);
+  });
+}
+
+function openCheckinModal() {
+  if (players.length === 0) return;
+
+  // Always start with all players unchecked
+  checkinState = {};
+  players.forEach(function (p) {
+    checkinState[p.id] = false;
+  });
+
+  checkinSessionDateEl.textContent = buildCheckinSessionDateText();
+  renderCheckinList();
+  updateCheckinMeta();
+  openModal(checkinModalEl);
+}
+
+async function confirmCheckin() {
+  const presentIds = Object.entries(checkinState)
+    .filter(function (entry) { return entry[1]; })
+    .map(function (entry) { return parseInt(entry[0], 10); });
+
+  if (presentIds.length < 2) {
+    alert("Selecione pelo menos 2 jogadores para sortear.");
+    return;
+  }
+
+  try {
+    const updatedList = await fetchJSON("/api/players/set-active-batch", {
+      method: "PATCH",
+      body: JSON.stringify({ active_ids: presentIds }),
+    });
+
+    players = updatedList;
+    renderPlayers();
+    closeModal(checkinModalEl);
+
+    teamSizeInput.value = lastTeamSize.toString();
+    openModal(drawModalEl);
+  } catch (err) {
+    console.error(err);
+    alert("Erro ao confirmar presencas.");
+  }
+}
+
+// ============================================================
+// Draw
+// ============================================================
 
 function openDrawModal() {
   if (!players.some((p) => p.active)) {
@@ -685,7 +851,7 @@ function renderAuditView() {
   auditContentEl.innerHTML = "";
 
   if (!lastDrawnTeams.length) {
-    auditContentEl.innerHTML = '<p class="muted-text">Nenhum sorteio disponível para auditar.</p>';
+    auditContentEl.innerHTML = '<p class="muted-text">Nenhum sorteio disponivel para auditar.</p>';
     return;
   }
 
@@ -702,10 +868,10 @@ function renderAuditView() {
 
     summaryCard.innerHTML = `
       <strong>${team.name} - ${label}</strong>
-      <span>Rating: ${formatDecimal(stats.totalRating)} total · ${formatDecimal(stats.averageRating)} média</span>
-      <span>Marca: ${stats.totalMarking} total · ${formatDecimal(stats.averageMarking)} média</span>
-      <span>Gol: ${stats.totalScoring} total · ${formatDecimal(stats.averageScoring)} média</span>
-      <span>Corre: ${stats.totalStamina} total · ${formatDecimal(stats.averageStamina)} média</span>
+      <span>Rating: ${formatDecimal(stats.totalRating)} total · ${formatDecimal(stats.averageRating)} media</span>
+      <span>Marca: ${stats.totalMarking} total · ${formatDecimal(stats.averageMarking)} media</span>
+      <span>Gol: ${stats.totalScoring} total · ${formatDecimal(stats.averageScoring)} media</span>
+      <span>Corre: ${stats.totalStamina} total · ${formatDecimal(stats.averageStamina)} media</span>
     `;
 
     summary.appendChild(summaryCard);
@@ -886,7 +1052,7 @@ function requestDeploy() {
   const branchName = getSelectedDeployBranch();
 
   if (!isValidBranchName(branchName)) {
-    showDeployError("Informe uma branch válida.");
+    showDeployError("Informe uma branch valida.");
     return;
   }
 
@@ -904,6 +1070,10 @@ function requestDeploy() {
     console.warn("Deploy request was sent, but the browser could not confirm the response.", err);
   });
 }
+
+// ============================================================
+// Event listeners
+// ============================================================
 
 if (toggleThemeBtn) {
   toggleThemeBtn.addEventListener("click", () => {
@@ -1018,7 +1188,7 @@ if (confirmDrawBtn) {
     const size = parseInt(teamSizeInput.value || "0", 10);
 
     if (!size || size <= 0) {
-      alert("Informe um número válido de jogadores por time.");
+      alert("Informe um numero valido de jogadores por time.");
       return;
     }
 
@@ -1057,6 +1227,14 @@ if (fabAddPlayerBtn) {
 
 if (closeAuditBtn) {
   closeAuditBtn.addEventListener("click", () => closeModal(auditModalEl));
+}
+
+if (cancelCheckinBtn) {
+  cancelCheckinBtn.addEventListener("click", () => closeModal(checkinModalEl));
+}
+
+if (confirmCheckinBtn) {
+  confirmCheckinBtn.addEventListener("click", confirmCheckin);
 }
 
 document.addEventListener("DOMContentLoaded", () => {
