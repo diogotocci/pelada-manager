@@ -324,26 +324,34 @@ function renderPlayers() {
     row.className = "player-row";
     row.dataset.id = p.id;
 
-    const main = document.createElement("div");
-    main.className = "player-main";
+    const avatar = document.createElement("div");
+    avatar.className = "player-avatar" + (p.active ? " player-avatar-active" : "");
+    avatar.textContent = buildPlayerInitials(p.name);
+
+    const info = document.createElement("div");
+    info.className = "player-info" + (isAdminMode ? "" : " player-info-centered");
 
     const nameSpan = document.createElement("span");
     nameSpan.className = "player-name";
     nameSpan.textContent = p.name;
 
-    main.appendChild(nameSpan);
+    info.appendChild(nameSpan);
 
     if (isAdminMode) {
+      const starsRow = document.createElement("div");
+      starsRow.className = "player-stars-row";
+
       const starsSpan = document.createElement("span");
       starsSpan.className = "player-stars";
       starsSpan.innerHTML = buildStarsHTML(p.rating);
 
       const ratingText = document.createElement("span");
       ratingText.className = "player-rating-text";
-      ratingText.textContent = `${p.rating.toFixed(1)} ★`;
+      ratingText.textContent = p.rating.toFixed(1);
 
-      main.appendChild(starsSpan);
-      main.appendChild(ratingText);
+      starsRow.appendChild(starsSpan);
+      starsRow.appendChild(ratingText);
+      info.appendChild(starsRow);
     }
 
     const actions = document.createElement("div");
@@ -378,7 +386,8 @@ function renderPlayers() {
       actions.appendChild(deleteBtn);
     }
 
-    row.appendChild(main);
+    row.appendChild(avatar);
+    row.appendChild(info);
     row.appendChild(actions);
 
     playersListEl.appendChild(row);
@@ -574,6 +583,12 @@ function buildCheckinSessionDateText() {
     months[now.getMonth()] +
     " - marque quem esta presente"
   );
+}
+
+function buildPlayerInitials(name) {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 function buildCheckinAvatarInitials(name) {
