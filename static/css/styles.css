@@ -124,17 +124,53 @@ body {
 .player-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
   background-color: var(--bg-elevated);
   border-radius: 12px;
-  padding: 10px 12px;
-  border: 1px solid transparent;
-  transition: border 0.15s ease, background-color 0.15s ease;
+  padding: 9px 12px;
+  border: 1px solid var(--border-subtle);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
 }
 
 .player-row:hover {
   border-color: var(--accent-soft);
   background-color: rgba(37, 47, 89, 0.9);
+}
+
+.player-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background-color: var(--bg);
+  border: 1.5px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+
+.player-avatar-active {
+  background-color: rgba(79, 70, 229, 0.15);
+  border-color: rgba(79, 70, 229, 0.4);
+  color: #818cf8;
+}
+
+.player-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.player-info-centered {
+  justify-content: center;
 }
 
 .player-main {
@@ -144,11 +180,19 @@ body {
 }
 
 .player-name {
+  font-size: 0.9rem;
   font-weight: 600;
+  color: var(--text);
+}
+
+.player-stars-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .player-rating-text {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
 }
 
@@ -158,14 +202,17 @@ body {
 }
 
 .player-stars {
-  font-size: 0.9rem;
+  font-size: 0.75rem;
   color: #facc15;
+  display: inline-flex;
+  gap: 1px;
 }
 
 .player-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .primary-button,
