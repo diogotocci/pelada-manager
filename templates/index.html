@@ -5,54 +5,69 @@
   <title>Pelada Balanceada</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
 
-  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon_final.ico') }}">
-  <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='icon-180.png') }}">
-  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.png') }}">
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='icon-192.png') }}">
   <meta name="theme-color" content="#000000">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap"
-    rel="stylesheet"
-  >
-
-  <link
-    rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
-  >
-
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v={{ app_version }}">
 
   <style>
     @media screen and (orientation: landscape) and (max-width: 1024px) {
-      html {
-        transform: rotate(-90deg);
-        transform-origin: left top;
-        width: 100vh;
-        height: 100vw;
-        overflow-x: hidden;
-        position: absolute;
-        top: 100%;
-        left: 0;
-      }
+      html { transform: rotate(-90deg); transform-origin: left top; width: 100vh; height: 100vw; overflow-x: hidden; position: absolute; top: 100%; left: 0; }
     }
   </style>
 </head>
 
 <body>
-  <div class="app-container">
-    <header class="app-header">
+
+  <!-- ============================================================
+       Pelada selection screen
+       ============================================================ -->
+  <div id="pelada-screen" class="pelada-screen">
+    <div class="pelada-screen-header">
       <div>
         <h1>Pelada Balanceada</h1>
-        <p>Gerencie jogadores e sorteie times equilibrados.</p>
+        <p>Escolha uma pelada para entrar</p>
+      </div>
+      <button id="toggle-theme-btn" class="icon-button" aria-label="Alternar tema">
+        <i class="fa-solid fa-moon"></i>
+      </button>
+    </div>
+
+    <div class="pelada-screen-body">
+      <p id="pelada-loading" class="muted-text" style="text-align:center;padding:1rem">Carregando...</p>
+      <p id="pelada-empty" class="muted-text hidden" style="text-align:center;padding:1rem">Nenhuma pelada cadastrada ainda.</p>
+      <div id="pelada-list" class="pelada-list"></div>
+    </div>
+
+    <div class="pelada-screen-footer">
+      <button id="new-pelada-btn" class="primary-button" style="width:100%">
+        <i class="fa-solid fa-plus"></i>
+        Nova pelada
+      </button>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       Main app
+       ============================================================ -->
+  <div id="app-container" class="app-container hidden">
+    <header class="app-header">
+      <div style="display:flex;align-items:center;gap:10px">
+        <button id="back-to-peladas-btn" class="icon-button" aria-label="Voltar para peladas" title="Voltar">
+          <i class="fa-solid fa-arrow-left"></i>
+        </button>
+        <div>
+          <h1 id="app-header-title">Pelada Balanceada</h1>
+          <p id="app-header-sub">Sorteio de times equilibrados</p>
+        </div>
       </div>
 
       <div class="header-actions">
-        <button id="toggle-theme-btn" class="icon-button" aria-label="Alternar tema">
-          <i class="fa-solid fa-moon"></i>
-        </button>
-
         <button id="admin-mode-btn" class="icon-button" aria-label="Modo admin" title="Modo admin">
           <i class="fa-solid fa-gear"></i>
         </button>
@@ -88,34 +103,26 @@
           <h2>Jogadores</h2>
           <span id="player-count" class="muted-text"></span>
         </div>
-
         <div id="players-list" class="players-list"></div>
       </section>
 
       <section id="teams-section" class="card hidden">
         <div class="card-header">
           <h2>Times sorteados</h2>
-
           <button id="redraw-btn" class="secondary-button">
             <i class="fa-solid fa-rotate-right"></i>
             Sortear novamente
           </button>
         </div>
-
         <div id="teams-result"></div>
       </section>
     </main>
 
     <footer class="app-footer">
       <div>Versão {{ app_version }}</div>
-
       <div class="footer-credit">
         <span>Developed by <strong>Diogo Tocci</strong></span>
-        <img
-          src="{{ url_for('static', filename='flamengo-shield.png') }}"
-          alt="Escudo do Flamengo"
-          class="footer-flamengo-shield"
-        >
+        <img src="{{ url_for('static', filename='flamengo-shield.png') }}" alt="Escudo do Flamengo" class="footer-flamengo-shield">
       </div>
     </footer>
 
@@ -124,29 +131,119 @@
     </button>
   </div>
 
-  <!-- Player modal -->
+  <!-- ============================================================
+       Auth modal
+       ============================================================ -->
+  <div id="auth-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content small">
+      <h3 id="auth-pelada-name">Pelada</h3>
+      <p class="muted-text" style="margin-bottom:12px">Digite a palavra-passe para entrar</p>
+
+      <label class="form-label" for="auth-password-input">Palavra-passe</label>
+      <input id="auth-password-input" class="form-input" type="password" placeholder="••••••••" autocomplete="off">
+
+      <p id="auth-error" class="error-text hidden" style="margin-top:6px"></p>
+
+      <div class="modal-actions">
+        <button type="button" class="secondary-button" id="cancel-auth-btn">Cancelar</button>
+        <button type="button" class="primary-button" id="confirm-auth-btn">Entrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       Create pelada modal (wizard)
+       ============================================================ -->
+  <div id="create-pelada-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+
+      <!-- Step 1 -->
+      <div id="create-step-1">
+        <h3>Nova pelada</h3>
+        <p class="muted-text" style="margin-bottom:14px">Passo 1 de 2 — informacoes basicas</p>
+
+        <div class="wizard-steps">
+          <div class="wizard-step wizard-step-active"></div>
+          <div class="wizard-step"></div>
+        </div>
+
+        <label class="form-label" for="create-pelada-name">Nome da pelada</label>
+        <input id="create-pelada-name" class="form-input" type="text" placeholder="Ex: Pelada do bairro" style="margin-bottom:12px">
+
+        <label class="form-label" for="create-pelada-pass">Palavra-passe</label>
+        <input id="create-pelada-pass" class="form-input" type="password" placeholder="Defina uma senha de acesso" style="margin-bottom:12px" autocomplete="new-password">
+
+        <label class="form-label" for="create-pelada-pass2">Confirmar palavra-passe</label>
+        <input id="create-pelada-pass2" class="form-input" type="password" placeholder="Repita a senha" autocomplete="new-password">
+
+        <p id="create-pass-error" class="error-text hidden" style="margin-top:6px"></p>
+
+        <div class="modal-actions">
+          <button type="button" class="secondary-button" id="cancel-create-btn">Cancelar</button>
+          <button type="button" class="primary-button" id="next-create-btn">Proximo</button>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div id="create-step-2" class="hidden">
+        <h3>Nova pelada</h3>
+        <p class="muted-text" style="margin-bottom:14px">Passo 2 de 2 — adicione os jogadores</p>
+
+        <div class="wizard-steps">
+          <div class="wizard-step wizard-step-active"></div>
+          <div class="wizard-step wizard-step-active"></div>
+        </div>
+
+        <div class="wizard-add-player">
+          <input id="wizard-player-name" class="form-input" type="text" placeholder="Nome do jogador" style="margin-bottom:10px">
+
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+            <div>
+              <label class="form-label" style="margin-bottom:4px">Nivel</label>
+              <div id="wizard-star-widget" class="star-widget" data-rating="3"></div>
+              <input type="hidden" id="wizard-player-rating" value="3">
+            </div>
+            <button type="button" class="primary-button" id="add-wizard-player-btn" style="margin-top:18px">
+              <i class="fa-solid fa-plus"></i> Adicionar
+            </button>
+          </div>
+        </div>
+
+        <div id="wizard-players-list" class="wizard-players-list"></div>
+        <p id="wizard-player-count" class="muted-text" style="font-size:0.78rem;margin-bottom:4px">0 jogador(es) adicionado(s)</p>
+        <p class="muted-text" style="font-size:0.75rem;margin-bottom:8px">Pode adicionar mais depois</p>
+
+        <div class="modal-actions">
+          <button type="button" class="secondary-button" id="back-create-btn">Voltar</button>
+          <button type="button" class="primary-button" id="confirm-create-btn">Criar pelada</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============================================================
+       Player modal
+       ============================================================ -->
   <div id="player-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
-
     <div class="modal-content">
       <h3 id="player-modal-title">Novo jogador</h3>
-
       <form id="player-form">
         <input type="hidden" id="player-id">
-
         <label class="form-label" for="player-name">Nome</label>
         <input id="player-name" class="form-input" type="text" required>
-
-        <label class="form-label">Nível geral (estrelas)</label>
+        <label class="form-label">Nivel geral (estrelas)</label>
         <div id="star-widget" class="star-widget" data-rating="0"></div>
         <input type="hidden" id="player-rating" value="0">
 
         <div id="advanced-attributes-section" class="advanced-attributes hidden">
           <div class="advanced-header">
-            <span>Atributos avançados</span>
-            <small>Visível apenas no modo admin</small>
+            <span>Atributos avancados</span>
+            <small>Visivel apenas no modo admin</small>
           </div>
-
           <div class="attribute-grid">
             <label class="attribute-field" for="player-marking">
               <span>Marca</span>
@@ -156,7 +253,6 @@
                 <option value="3">3 estrelas</option>
               </select>
             </label>
-
             <label class="attribute-field" for="player-stamina">
               <span>Corre</span>
               <select id="player-stamina" class="form-input compact-select">
@@ -165,7 +261,6 @@
                 <option value="3">3 estrelas</option>
               </select>
             </label>
-
             <label class="attribute-field" for="player-scoring">
               <span>Faz gol</span>
               <select id="player-scoring" class="form-input compact-select">
@@ -178,13 +273,8 @@
         </div>
 
         <div class="modal-actions">
-          <button type="button" class="secondary-button" id="cancel-player-btn">
-            Cancelar
-          </button>
-
-          <button type="submit" class="primary-button">
-            Salvar
-          </button>
+          <button type="button" class="secondary-button" id="cancel-player-btn">Cancelar</button>
+          <button type="submit" class="primary-button">Salvar</button>
         </div>
       </form>
     </div>
@@ -193,19 +283,12 @@
   <!-- Confirm delete modal -->
   <div id="confirm-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
-
     <div class="modal-content small">
       <h3>Remover jogador</h3>
       <p>Tem certeza que deseja remover este jogador?</p>
-
       <div class="modal-actions">
-        <button type="button" class="secondary-button" id="cancel-delete-btn">
-          Cancelar
-        </button>
-
-        <button type="button" class="danger-button" id="confirm-delete-btn">
-          Remover
-        </button>
+        <button type="button" class="secondary-button" id="cancel-delete-btn">Cancelar</button>
+        <button type="button" class="danger-button" id="confirm-delete-btn">Remover</button>
       </div>
     </div>
   </div>
@@ -213,24 +296,13 @@
   <!-- Draw teams modal -->
   <div id="draw-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
-
     <div class="modal-content small">
       <h3>Sortear times</h3>
-
-      <label class="form-label" for="team-size-input">
-        Quantos jogadores por time?
-      </label>
-
+      <label class="form-label" for="team-size-input">Quantos jogadores por time?</label>
       <input id="team-size-input" class="form-input" type="number" min="1" value="5">
-
       <div class="modal-actions">
-        <button type="button" class="secondary-button" id="cancel-draw-btn">
-          Cancelar
-        </button>
-
-        <button type="button" class="primary-button" id="confirm-draw-btn">
-          Sortear
-        </button>
+        <button type="button" class="secondary-button" id="cancel-draw-btn">Cancelar</button>
+        <button type="button" class="primary-button" id="confirm-draw-btn">Sortear</button>
       </div>
     </div>
   </div>
@@ -238,16 +310,11 @@
   <!-- Compare modal -->
   <div id="compare-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
-
     <div class="modal-content">
       <h3>Comparar jogadores</h3>
-
       <div id="compare-content"></div>
-
       <div class="modal-actions">
-        <button type="button" class="secondary-button" id="close-compare-btn">
-          Fechar
-        </button>
+        <button type="button" class="secondary-button" id="close-compare-btn">Fechar</button>
       </div>
     </div>
   </div>
@@ -255,30 +322,16 @@
   <!-- Audit modal -->
   <div id="audit-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
-
     <div class="modal-content audit-modal-content">
-      <button
-        type="button"
-        class="modal-close-button"
-        aria-label="Fechar auditoria"
-        title="Fechar"
-        onclick="document.getElementById('audit-modal').classList.add('hidden')"
-      >
+      <button type="button" class="modal-close-button" aria-label="Fechar auditoria" title="Fechar"
+        onclick="document.getElementById('audit-modal').classList.add('hidden')">
         <i class="fa-solid fa-xmark"></i>
       </button>
-
       <h3>Auditoria do sorteio</h3>
-
-      <p class="muted-text audit-description">
-        Esta visão mostra os totais e atributos usados para avaliar o equilíbrio dos times.
-      </p>
-
+      <p class="muted-text audit-description">Esta visao mostra os totais e atributos usados para avaliar o equilibrio dos times.</p>
       <div id="audit-content" class="audit-content"></div>
-
       <div class="modal-actions">
-        <button type="button" class="secondary-button" id="close-audit-btn">
-          Fechar
-        </button>
+        <button type="button" class="secondary-button" id="close-audit-btn">Fechar</button>
       </div>
     </div>
   </div>
@@ -286,43 +339,24 @@
   <!-- Deploy modal -->
   <div id="deploy-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
-
     <div class="modal-content small">
-      <h3>Deploy da aplicação</h3>
-
-      <p class="muted-text deploy-description">
-        Escolha a branch que será enviada para deploy.
-      </p>
-
+      <h3>Deploy da aplicacao</h3>
+      <p class="muted-text deploy-description">Escolha a branch que sera enviada para deploy.</p>
       <div class="deploy-options">
         <label class="deploy-option">
           <input type="radio" name="deploy-branch-mode" id="deploy-main-radio" value="main" checked>
           <span>Main</span>
         </label>
-
         <label class="deploy-option custom-deploy-option">
           <input type="radio" name="deploy-branch-mode" id="deploy-custom-radio" value="custom">
           <span>Outra branch</span>
-          <input
-            id="deploy-custom-branch-input"
-            class="form-input deploy-branch-input"
-            type="text"
-            placeholder="ex: sorted-table"
-            autocomplete="off"
-          >
+          <input id="deploy-custom-branch-input" class="form-input deploy-branch-input" type="text" placeholder="ex: sorted-table" autocomplete="off">
         </label>
       </div>
-
       <p id="deploy-error" class="error-text hidden-text"></p>
-
       <div class="modal-actions">
-        <button type="button" class="secondary-button" id="cancel-deploy-btn">
-          Cancelar
-        </button>
-
-        <button type="button" class="primary-button" id="confirm-deploy-btn">
-          Deploy
-        </button>
+        <button type="button" class="secondary-button" id="cancel-deploy-btn">Cancelar</button>
+        <button type="button" class="primary-button" id="confirm-deploy-btn">Deploy</button>
       </div>
     </div>
   </div>
@@ -330,23 +364,16 @@
   <!-- Check-in modal -->
   <div id="checkin-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
-
     <div class="modal-content checkin-modal-content">
       <h3>Iniciar pelada</h3>
       <p id="checkin-session-date" class="muted-text checkin-description"></p>
-
       <div class="checkin-meta-bar">
         <span id="checkin-total-label" class="muted-text"></span>
         <span id="checkin-present-badge" class="checkin-present-badge"></span>
       </div>
-
       <div id="checkin-players-list" class="checkin-players-list"></div>
-
       <div class="modal-actions">
-        <button type="button" class="secondary-button" id="cancel-checkin-btn">
-          Cancelar
-        </button>
-
+        <button type="button" class="secondary-button" id="cancel-checkin-btn">Cancelar</button>
         <button type="button" class="primary-button" id="confirm-checkin-btn">
           <i class="fa-solid fa-shuffle"></i>
           <span id="confirm-checkin-label">Sortear times</span>

@@ -1,3 +1,7 @@
+// ============================================================
+// State
+// ============================================================
+
 let players = [];
 let currentEditingId = null;
 let deleteTargetId = null;
@@ -5,14 +9,23 @@ let lastTeamSize = 5;
 let lastDrawnTeams = [];
 let isAdminMode = false;
 let checkinState = {};
+let currentPeladaId = null;
+let currentPeladaName = "";
 
 const ADMIN_SECRET = window.ADMIN_SECRET || "";
 const DEPLOY_ENDPOINT_BASE_URL = "https://peladamanager.bandeira.dev/deploy";
+
+// ============================================================
+// DOM references — main app
+// ============================================================
 
 const playersListEl = document.getElementById("players-list");
 const playerCountEl = document.getElementById("player-count");
 const teamsSectionEl = document.getElementById("teams-section");
 const teamsResultEl = document.getElementById("teams-result");
+const appHeaderTitleEl = document.getElementById("app-header-title");
+const appHeaderSubEl = document.getElementById("app-header-sub");
+const backToPeladasBtn = document.getElementById("back-to-peladas-btn");
 
 const playerModalEl = document.getElementById("player-modal");
 const confirmModalEl = document.getElementById("confirm-modal");
@@ -72,23 +85,66 @@ const cancelCheckinBtn = document.getElementById("cancel-checkin-btn");
 const confirmCheckinBtn = document.getElementById("confirm-checkin-btn");
 const confirmCheckinLabelEl = document.getElementById("confirm-checkin-label");
 
+// ============================================================
+// DOM references — pelada screens
+// ============================================================
+
+const peladaScreenEl = document.getElementById("pelada-screen");
+const appContainerEl = document.getElementById("app-container");
+const peladaListEl = document.getElementById("pelada-list");
+const peladaLoadingEl = document.getElementById("pelada-loading");
+const peladaEmptyEl = document.getElementById("pelada-empty");
+
+const authModalEl = document.getElementById("auth-modal");
+const authPeladaNameEl = document.getElementById("auth-pelada-name");
+const authPasswordInput = document.getElementById("auth-password-input");
+const authErrorEl = document.getElementById("auth-error");
+const cancelAuthBtn = document.getElementById("cancel-auth-btn");
+const confirmAuthBtn = document.getElementById("confirm-auth-btn");
+
+const createModalEl = document.getElementById("create-pelada-modal");
+const createStep1El = document.getElementById("create-step-1");
+const createStep2El = document.getElementById("create-step-2");
+const createNameInput = document.getElementById("create-pelada-name");
+const createPassInput = document.getElementById("create-pelada-pass");
+const createPass2Input = document.getElementById("create-pelada-pass2");
+const createPassErrorEl = document.getElementById("create-pass-error");
+const cancelCreateBtn = document.getElementById("cancel-create-btn");
+const nextCreateBtn = document.getElementById("next-create-btn");
+const backCreateBtn = document.getElementById("back-create-btn");
+const confirmCreateBtn = document.getElementById("confirm-create-btn");
+const createWizardPlayerNameInput = document.getElementById("wizard-player-name");
+const createWizardStarWidgetEl = document.getElementById("wizard-star-widget");
+const createWizardPlayerRatingInput = document.getElementById("wizard-player-rating");
+const addWizardPlayerBtn = document.getElementById("add-wizard-player-btn");
+const wizardPlayersListEl = document.getElementById("wizard-players-list");
+const wizardPlayerCountEl = document.getElementById("wizard-player-count");
+const newPeladaBtn = document.getElementById("new-pelada-btn");
+
+// ============================================================
+// Pelada screen state
+// ============================================================
+
+let authTargetPeladaId = null;
+let authTargetPeladaName = "";
+let wizardPlayers = [];
+let wizardPlayerRating = 3;
+let newPeladaId = null;
+
+// ============================================================
+// Theme
+// ============================================================
+
 function loadTheme() {
   const saved = localStorage.getItem("pelada-theme") || "dark";
   document.documentElement.setAttribute("data-theme", saved);
   updateThemeIcon(saved);
 }
 
-function loadAdminMode() {
-  isAdminMode = localStorage.getItem("pelada-admin-mode") === "true";
-  updateAdminModeUI();
-}
-
 function updateThemeIcon(theme) {
   if (!toggleThemeBtn) return;
-
   const icon = toggleThemeBtn.querySelector("i");
   if (!icon) return;
-
   if (theme === "light") {
     icon.classList.remove("fa-moon");
     icon.classList.add("fa-sun");
@@ -98,23 +154,28 @@ function updateThemeIcon(theme) {
   }
 }
 
+// ============================================================
+// Admin mode
+// ============================================================
+
+function loadAdminMode() {
+  isAdminMode = localStorage.getItem("pelada-admin-mode") === "true";
+  updateAdminModeUI();
+}
+
 function updateAdminModeUI() {
   if (adminModeBtn) {
     adminModeBtn.classList.toggle("admin-active", isAdminMode);
   }
-
   if (deployBtn) {
     deployBtn.classList.toggle("hidden", !isAdminMode);
   }
-
   if (advancedAttributesSectionEl) {
     advancedAttributesSectionEl.classList.toggle("hidden", !isAdminMode);
   }
-
   if (players.length > 0) {
     renderPlayers();
   }
-
   if (lastDrawnTeams.length > 0) {
     renderTeams(lastDrawnTeams);
   }
@@ -124,7 +185,6 @@ function handleAdminModeClick() {
   if (isAdminMode) {
     const shouldDisable = confirm("Deseja sair do modo admin?");
     if (!shouldDisable) return;
-
     isAdminMode = false;
     localStorage.removeItem("pelada-admin-mode");
     updateAdminModeUI();
@@ -132,7 +192,6 @@ function handleAdminModeClick() {
   }
 
   const secret = prompt("Digite a chave admin:");
-
   if (secret !== ADMIN_SECRET) {
     alert("Chave admin invalida.");
     return;
@@ -141,9 +200,12 @@ function handleAdminModeClick() {
   isAdminMode = true;
   localStorage.setItem("pelada-admin-mode", "true");
   updateAdminModeUI();
-
   alert("Modo admin ativado.");
 }
+
+// ============================================================
+// Modal helpers
+// ============================================================
 
 function openModal(el) {
   if (!el) return;
@@ -155,9 +217,18 @@ function closeModal(el) {
   el.classList.add("hidden");
 }
 
+// ============================================================
+// Fetch helper — always sends X-Pelada-Id when available
+// ============================================================
+
 async function fetchJSON(url, options = {}) {
+  const headers = { "Content-Type": "application/json" };
+  if (currentPeladaId) {
+    headers["X-Pelada-Id"] = String(currentPeladaId);
+  }
+
   const res = await fetch(url, {
-    headers: { "Content-Type": "application/json" },
+    headers,
     ...options,
   });
 
@@ -169,54 +240,34 @@ async function fetchJSON(url, options = {}) {
   return res.json();
 }
 
-function getBackupFileName() {
-  const now = new Date();
-  const pad = (value) => value.toString().padStart(2, "0");
-
-  const year = now.getFullYear();
-  const month = pad(now.getMonth() + 1);
-  const day = pad(now.getDate());
-  const hour = pad(now.getHours());
-  const minute = pad(now.getMinutes());
-
-  return `players-${year}-${month}-${day}-${hour}${minute}.json`;
+async function fetchJSONRaw(url, options = {}) {
+  const res = await fetch(url, {
+    headers: { "Content-Type": "application/json" },
+    ...options,
+  });
+  return res;
 }
 
-async function exportPlayersJson() {
-  try {
-    const response = await fetch("/api/export-players", {
-      method: "GET",
-      cache: "no-store",
-    });
+// ============================================================
+// Stars
+// ============================================================
 
-    if (!response.ok) {
-      throw new Error("Failed to export players JSON");
+function buildStarsHTML(rating) {
+  let html = "";
+  for (let i = 1; i <= 5; i++) {
+    if (rating >= i) {
+      html += '<i class="fa-solid fa-star"></i>';
+    } else if (rating >= i - 0.5) {
+      html += '<i class="fa-regular fa-star-half-stroke"></i>';
+    } else {
+      html += '<i class="fa-regular fa-star"></i>';
     }
-
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-
-    link.href = url;
-    link.download = getBackupFileName();
-    link.style.display = "none";
-
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-
-    window.URL.revokeObjectURL(url);
-
-    alert("Arquivo baixado com sucesso.");
-  } catch (err) {
-    console.error(err);
-    alert("Erro ao baixar o JSON.");
   }
+  return html;
 }
 
-function renderStarWidget(element, rating) {
+function renderStarWidget(element, rating, ratingInput) {
   if (!element) return;
-
   element.innerHTML = "";
   const currentRating = rating ?? 0;
   element.dataset.rating = currentRating.toString();
@@ -227,7 +278,6 @@ function renderStarWidget(element, rating) {
     starEl.dataset.index = i.toString();
 
     const icon = document.createElement("i");
-
     if (currentRating >= i) {
       icon.className = "fa-solid fa-star";
     } else if (currentRating >= i - 0.5) {
@@ -241,12 +291,10 @@ function renderStarWidget(element, rating) {
   }
 }
 
-function updateStarWidgetFromClick(element, clickedIndex) {
+function updateStarWidgetFromClick(element, clickedIndex, ratingInput) {
   if (!element) return;
-
   const current = parseFloat(element.dataset.rating || "0");
   const i = clickedIndex;
-
   let newRating;
 
   if (current < i - 0.5) {
@@ -261,37 +309,291 @@ function updateStarWidgetFromClick(element, clickedIndex) {
   if (newRating > 5) newRating = 5;
 
   element.dataset.rating = newRating.toString();
-  renderStarWidget(element, newRating);
-  playerRatingInput.value = newRating.toString();
-}
-
-function buildStarsHTML(rating) {
-  let html = "";
-
-  for (let i = 1; i <= 5; i++) {
-    if (rating >= i) {
-      html += '<i class="fa-solid fa-star"></i>';
-    } else if (rating >= i - 0.5) {
-      html += '<i class="fa-regular fa-star-half-stroke"></i>';
-    } else {
-      html += '<i class="fa-regular fa-star"></i>';
-    }
-  }
-
-  return html;
+  renderStarWidget(element, newRating, ratingInput);
+  if (ratingInput) ratingInput.value = newRating.toString();
 }
 
 function getAttributeValue(player, attributeName) {
   return Number(player[attributeName] ?? 2);
 }
 
+// ============================================================
+// Pelada screen
+// ============================================================
+
+function showPeladaScreen() {
+  peladaScreenEl.classList.remove("hidden");
+  appContainerEl.classList.add("hidden");
+  loadPeladas();
+}
+
+function showAppScreen(peladaId, peladaName) {
+  currentPeladaId = peladaId;
+  currentPeladaName = peladaName;
+
+  peladaScreenEl.classList.add("hidden");
+  appContainerEl.classList.remove("hidden");
+
+  if (appHeaderTitleEl) appHeaderTitleEl.textContent = peladaName;
+  if (appHeaderSubEl) appHeaderSubEl.textContent = "Sorteio de times equilibrados";
+
+  localStorage.setItem("pelada-current-id", String(peladaId));
+  localStorage.setItem("pelada-current-name", peladaName);
+
+  players = [];
+  lastDrawnTeams = [];
+  teamsSectionEl.classList.add("hidden");
+
+  setTimeout(function () {
+    loadPlayers();
+  }, 0);
+}
+
+async function loadPeladas() {
+  peladaLoadingEl.classList.remove("hidden");
+  peladaEmptyEl.classList.add("hidden");
+  peladaListEl.innerHTML = "";
+
+  try {
+    const res = await fetch("/api/peladas");
+    const peladas = await res.json();
+
+    peladaLoadingEl.classList.add("hidden");
+
+    if (peladas.length === 0) {
+      peladaEmptyEl.classList.remove("hidden");
+      return;
+    }
+
+    peladas.forEach(function (p) {
+      const card = document.createElement("div");
+      card.className = "pelada-card";
+
+      const initials = p.name.trim().split(/\s+/).map(function (w) { return w[0]; }).join("").substring(0, 2).toUpperCase();
+
+      card.innerHTML =
+        '<div class="pelada-card-avatar">' + initials + '</div>' +
+        '<div class="pelada-card-info">' +
+          '<div class="pelada-card-name">' + p.name + '</div>' +
+          '<div class="pelada-card-meta">' + p.player_count + ' jogador(es)</div>' +
+        '</div>' +
+        '<i class="fa-solid fa-lock pelada-card-lock" aria-hidden="true"></i>';
+
+      card.addEventListener("click", function () {
+        openAuthModal(p.id, p.name);
+      });
+
+      peladaListEl.appendChild(card);
+    });
+  } catch (err) {
+    console.error("Failed to load peladas:", err);
+    peladaLoadingEl.classList.add("hidden");
+  }
+}
+
+function openAuthModal(peladaId, peladaName) {
+  authTargetPeladaId = peladaId;
+  authTargetPeladaName = peladaName;
+  authPeladaNameEl.textContent = peladaName;
+  authPasswordInput.value = "";
+  authErrorEl.classList.add("hidden");
+  openModal(authModalEl);
+  setTimeout(function () { authPasswordInput.focus(); }, 100);
+}
+
+async function confirmAuth() {
+  const password = authPasswordInput.value.trim();
+  if (!password) {
+    authErrorEl.textContent = "Digite a palavra-passe.";
+    authErrorEl.classList.remove("hidden");
+    return;
+  }
+
+  try {
+    const res = await fetchJSONRaw("/api/peladas/" + authTargetPeladaId + "/auth", {
+      method: "POST",
+      body: JSON.stringify({ password }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || !data.ok) {
+      authErrorEl.textContent = "Palavra-passe incorreta.";
+      authErrorEl.classList.remove("hidden");
+      authPasswordInput.value = "";
+      authPasswordInput.focus();
+      return;
+    }
+
+    if (data.is_admin) {
+      isAdminMode = true;
+      localStorage.setItem("pelada-admin-mode", "true");
+    }
+
+    closeModal(authModalEl);
+    showAppScreen(authTargetPeladaId, authTargetPeladaName);
+  } catch (err) {
+    console.error(err);
+    authErrorEl.textContent = "Erro ao autenticar.";
+    authErrorEl.classList.remove("hidden");
+  }
+}
+
+// ============================================================
+// Create pelada wizard
+// ============================================================
+
+function openCreateModal() {
+  createNameInput.value = "";
+  createPassInput.value = "";
+  createPass2Input.value = "";
+  createPassErrorEl.classList.add("hidden");
+  wizardPlayers = [];
+  wizardPlayerRating = 3;
+  renderWizardPlayerList();
+  renderStarWidget(createWizardStarWidgetEl, 3, createWizardPlayerRatingInput);
+  if (createWizardPlayerRatingInput) createWizardPlayerRatingInput.value = "3";
+  showCreateStep(1);
+  openModal(createModalEl);
+}
+
+function showCreateStep(step) {
+  createStep1El.classList.toggle("hidden", step !== 1);
+  createStep2El.classList.toggle("hidden", step !== 2);
+}
+
+function validateCreateStep1() {
+  const name = createNameInput.value.trim();
+  const pass = createPassInput.value.trim();
+  const pass2 = createPass2Input.value.trim();
+
+  if (!name) {
+    createPassErrorEl.textContent = "Informe o nome da pelada.";
+    createPassErrorEl.classList.remove("hidden");
+    return false;
+  }
+
+  if (!pass) {
+    createPassErrorEl.textContent = "Informe a palavra-passe.";
+    createPassErrorEl.classList.remove("hidden");
+    return false;
+  }
+
+  if (pass !== pass2) {
+    createPassErrorEl.textContent = "As palavras-passe nao coincidem.";
+    createPassErrorEl.classList.remove("hidden");
+    return false;
+  }
+
+  createPassErrorEl.classList.add("hidden");
+  return true;
+}
+
+function buildPlayerInitials(name) {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function renderWizardPlayerList() {
+  wizardPlayersListEl.innerHTML = "";
+  wizardPlayers.forEach(function (p, idx) {
+    const row = document.createElement("div");
+    row.className = "wizard-player-row";
+
+    const avatar = document.createElement("div");
+    avatar.className = "wizard-player-avatar";
+    avatar.textContent = buildPlayerInitials(p.name);
+
+    const nameEl = document.createElement("span");
+    nameEl.className = "wizard-player-name";
+    nameEl.textContent = p.name;
+
+    const starsEl = document.createElement("span");
+    starsEl.className = "wizard-player-stars";
+    starsEl.innerHTML = buildStarsHTML(p.rating);
+
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "wizard-player-remove";
+    removeBtn.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
+    removeBtn.setAttribute("aria-label", "Remover jogador");
+    removeBtn.addEventListener("click", function () {
+      wizardPlayers.splice(idx, 1);
+      renderWizardPlayerList();
+    });
+
+    row.appendChild(avatar);
+    row.appendChild(nameEl);
+    row.appendChild(starsEl);
+    row.appendChild(removeBtn);
+    wizardPlayersListEl.appendChild(row);
+  });
+
+  wizardPlayerCountEl.textContent = wizardPlayers.length + " jogador(es) adicionado(s)";
+}
+
+function addWizardPlayer() {
+  const name = createWizardPlayerNameInput.value.trim();
+  if (!name) return;
+
+  const rating = parseFloat(createWizardPlayerRatingInput.value || "3");
+  wizardPlayers.push({ name, rating });
+  createWizardPlayerNameInput.value = "";
+  wizardPlayerRating = 3;
+  renderStarWidget(createWizardStarWidgetEl, 3, createWizardPlayerRatingInput);
+  if (createWizardPlayerRatingInput) createWizardPlayerRatingInput.value = "3";
+  renderWizardPlayerList();
+  createWizardPlayerNameInput.focus();
+}
+
+async function confirmCreate() {
+  const name = createNameInput.value.trim();
+  const password = createPassInput.value.trim();
+
+  try {
+    const res = await fetchJSONRaw("/api/peladas", {
+      method: "POST",
+      body: JSON.stringify({ name, password }),
+    });
+
+    const pelada = await res.json();
+
+    if (!res.ok) {
+      alert("Erro ao criar pelada.");
+      return;
+    }
+
+    newPeladaId = pelada.id;
+
+    for (const p of wizardPlayers) {
+      await fetch("/api/players", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Pelada-Id": String(newPeladaId),
+        },
+        body: JSON.stringify({ name: p.name, rating: p.rating }),
+      });
+    }
+
+    closeModal(createModalEl);
+    isAdminMode = true;
+    localStorage.setItem("pelada-admin-mode", "true");
+    showAppScreen(newPeladaId, name);
+  } catch (err) {
+    console.error(err);
+    alert("Erro ao criar pelada.");
+  }
+}
+
+// ============================================================
+// Players
+// ============================================================
+
 async function loadPlayers() {
   try {
     players = await fetchJSON("/api/players");
     renderPlayers();
-    // A delay is required for Safari/iOS PWA: the WebKit engine blocks modal
-    // display triggered programmatically after an async fetch on page load.
-    // 300ms is enough for the initial render to settle before showing the modal.
     setTimeout(function () {
       openCheckinModal();
     }, 300);
@@ -304,22 +606,20 @@ function renderPlayers() {
   playersListEl.innerHTML = "";
 
   const total = players.length;
-  const activeCount = players.filter((p) => p.active).length;
+  const activeCount = players.filter(function (p) { return p.active; }).length;
 
   if (total === 0) {
     playerCountEl.textContent = "Nenhum jogador cadastrado ainda.";
     return;
   }
 
-  playerCountEl.textContent = `${total} jogador(es) · ${activeCount} selecionado(s)`;
+  playerCountEl.textContent = total + " jogador(es) \u00b7 " + activeCount + " selecionado(s)";
 
-  const sortedPlayers = [...players].sort((a, b) =>
-    a.name.trim().localeCompare(b.name.trim(), "pt-BR", {
-      sensitivity: "base",
-    })
-  );
+  const sortedPlayers = [...players].sort(function (a, b) {
+    return a.name.trim().localeCompare(b.name.trim(), "pt-BR", { sensitivity: "base" });
+  });
 
-  sortedPlayers.forEach((p) => {
+  sortedPlayers.forEach(function (p) {
     const row = document.createElement("div");
     row.className = "player-row";
     row.dataset.id = p.id;
@@ -370,7 +670,6 @@ function renderPlayers() {
 
     switchLabel.appendChild(switchInput);
     switchLabel.appendChild(slider);
-
     actions.appendChild(switchLabel);
 
     if (isAdminMode) {
@@ -389,7 +688,6 @@ function renderPlayers() {
     row.appendChild(avatar);
     row.appendChild(info);
     row.appendChild(actions);
-
     playersListEl.appendChild(row);
   });
 }
@@ -402,14 +700,12 @@ function resetAdvancedAttributes() {
 
 function openNewPlayerModal() {
   currentEditingId = null;
-
   playerModalTitleEl.textContent = "Novo jogador";
   playerIdInput.value = "";
   playerNameInput.value = "";
   playerRatingInput.value = "0";
   resetAdvancedAttributes();
-
-  renderStarWidget(starWidgetEl, 0);
+  renderStarWidget(starWidgetEl, 0, playerRatingInput);
   updateAdminModeUI();
   openModal(playerModalEl);
   playerNameInput.focus();
@@ -417,17 +713,14 @@ function openNewPlayerModal() {
 
 function openEditPlayerModal(player) {
   currentEditingId = player.id;
-
   playerModalTitleEl.textContent = "Editar jogador";
   playerIdInput.value = player.id;
   playerNameInput.value = player.name;
   playerRatingInput.value = player.rating.toString();
-
   playerMarkingInput.value = getAttributeValue(player, "marking").toString();
   playerStaminaInput.value = getAttributeValue(player, "stamina").toString();
   playerScoringInput.value = getAttributeValue(player, "scoring").toString();
-
-  renderStarWidget(starWidgetEl, player.rating);
+  renderStarWidget(starWidgetEl, player.rating, playerRatingInput);
   updateAdminModeUI();
   openModal(playerModalEl);
   playerNameInput.focus();
@@ -444,10 +737,7 @@ async function handlePlayerSubmit(e) {
     return;
   }
 
-  const payload = {
-    name,
-    rating,
-  };
+  const payload = { name, rating };
 
   if (isAdminMode) {
     payload.marking = parseInt(playerMarkingInput.value || "2", 10);
@@ -461,22 +751,18 @@ async function handlePlayerSubmit(e) {
         method: "POST",
         body: JSON.stringify(payload),
       });
-
       players.push(newPlayer);
       renderPlayers();
       closeModal(playerModalEl);
       return;
     }
 
-    const updatedPlayer = await fetchJSON(`/api/players/${currentEditingId}`, {
+    const updatedPlayer = await fetchJSON("/api/players/" + currentEditingId, {
       method: "PUT",
       body: JSON.stringify(payload),
     });
 
-    players = players.map((p) =>
-      p.id === updatedPlayer.id ? updatedPlayer : p
-    );
-
+    players = players.map(function (p) { return p.id === updatedPlayer.id ? updatedPlayer : p; });
     renderPlayers();
     closeModal(playerModalEl);
   } catch (err) {
@@ -494,22 +780,18 @@ async function handlePlayerListClick(e) {
 
   if (target.classList.contains("toggle-active")) {
     try {
-      const updated = await fetchJSON(`/api/players/${id}/toggle-active`, {
-        method: "PATCH",
-      });
-
-      players = players.map((p) => (p.id === updated.id ? updated : p));
+      const updated = await fetchJSON("/api/players/" + id + "/toggle-active", { method: "PATCH" });
+      players = players.map(function (p) { return p.id === updated.id ? updated : p; });
       renderPlayers();
     } catch (err) {
       console.error(err);
       alert("Erro ao atualizar jogador.");
     }
-
     return;
   }
 
   if (target.closest(".edit-player")) {
-    const player = players.find((p) => p.id === id);
+    const player = players.find(function (p) { return p.id === id; });
     if (player) openEditPlayerModal(player);
     return;
   }
@@ -524,11 +806,8 @@ async function deletePlayer() {
   if (deleteTargetId == null) return;
 
   try {
-    await fetchJSON(`/api/players/${deleteTargetId}`, {
-      method: "DELETE",
-    });
-
-    players = players.filter((p) => p.id !== deleteTargetId);
+    await fetchJSON("/api/players/" + deleteTargetId, { method: "DELETE" });
+    players = players.filter(function (p) { return p.id !== deleteTargetId; });
     renderPlayers();
   } catch (err) {
     console.error(err);
@@ -540,7 +819,7 @@ async function deletePlayer() {
 }
 
 async function clearAllPlayers() {
-  if (!players.some((p) => p.active)) {
+  if (!players.some(function (p) { return p.active; })) {
     alert("Nenhum jogador esta selecionado.");
     return;
   }
@@ -549,11 +828,8 @@ async function clearAllPlayers() {
   if (!confirmed) return;
 
   try {
-    await fetchJSON("/api/players/deactivate-all", {
-      method: "PATCH",
-    });
-
-    players = players.map((p) => ({ ...p, active: false }));
+    await fetchJSON("/api/players/deactivate-all", { method: "PATCH" });
+    players = players.map(function (p) { return Object.assign({}, p, { active: false }); });
     renderPlayers();
   } catch (err) {
     console.error(err);
@@ -567,34 +843,13 @@ async function clearAllPlayers() {
 
 function buildCheckinSessionDateText() {
   const now = new Date();
-  const days = [
-    "Domingo", "Segunda", "Terca", "Quarta",
-    "Quinta", "Sexta", "Sabado",
-  ];
-  const months = [
-    "janeiro", "fevereiro", "marco", "abril", "maio", "junho",
-    "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
-  ];
-  return (
-    days[now.getDay()] +
-    ", " +
-    now.getDate() +
-    " de " +
-    months[now.getMonth()] +
-    " - marque quem esta presente"
-  );
-}
-
-function buildPlayerInitials(name) {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  const days = ["Domingo", "Segunda", "Terca", "Quarta", "Quinta", "Sexta", "Sabado"];
+  const months = ["janeiro", "fevereiro", "marco", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+  return days[now.getDay()] + ", " + now.getDate() + " de " + months[now.getMonth()] + " - marque quem esta presente";
 }
 
 function buildCheckinAvatarInitials(name) {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return buildPlayerInitials(name);
 }
 
 function getCheckinPresentCount() {
@@ -604,22 +859,18 @@ function getCheckinPresentCount() {
 function updateCheckinMeta() {
   const total = players.length;
   const present = getCheckinPresentCount();
-
   checkinTotalLabelEl.textContent = total + " cadastrado(s)";
   checkinPresentBadgeEl.textContent = present + " presente(s)";
-  confirmCheckinLabelEl.textContent =
-    present > 0
-      ? "Sortear times (" + present + ")"
-      : "Sortear times";
+  confirmCheckinLabelEl.textContent = present > 0 ? "Sortear times (" + present + ")" : "Sortear times";
   confirmCheckinBtn.disabled = present < 2;
 }
 
 function renderCheckinList() {
   checkinPlayersListEl.innerHTML = "";
 
-  const sorted = [...players].sort((a, b) =>
-    a.name.trim().localeCompare(b.name.trim(), "pt-BR", { sensitivity: "base" })
-  );
+  const sorted = [...players].sort(function (a, b) {
+    return a.name.trim().localeCompare(b.name.trim(), "pt-BR", { sensitivity: "base" });
+  });
 
   sorted.forEach(function (p) {
     const isPresent = !!checkinState[p.id];
@@ -663,11 +914,8 @@ function renderCheckinList() {
 function openCheckinModal() {
   if (players.length === 0) return;
 
-  // Always start with all players unchecked
   checkinState = {};
-  players.forEach(function (p) {
-    checkinState[p.id] = false;
-  });
+  players.forEach(function (p) { checkinState[p.id] = false; });
 
   checkinSessionDateEl.textContent = buildCheckinSessionDateText();
   renderCheckinList();
@@ -694,7 +942,6 @@ async function confirmCheckin() {
     players = updatedList;
     renderPlayers();
     closeModal(checkinModalEl);
-
     teamSizeInput.value = lastTeamSize.toString();
     openModal(drawModalEl);
   } catch (err) {
@@ -708,11 +955,10 @@ async function confirmCheckin() {
 // ============================================================
 
 function openDrawModal() {
-  if (!players.some((p) => p.active)) {
+  if (!players.some(function (p) { return p.active; })) {
     alert("Nenhum jogador ativo para sortear.");
     return;
   }
-
   teamSizeInput.value = lastTeamSize.toString();
   openModal(drawModalEl);
 }
@@ -730,11 +976,8 @@ async function performDraw(teamSize) {
     renderTeams(lastDrawnTeams);
     teamsSectionEl.classList.remove("hidden");
 
-    setTimeout(() => {
-      teamsSectionEl.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
+    setTimeout(function () {
+      teamsSectionEl.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 50);
   } catch (err) {
     console.error(err);
@@ -757,7 +1000,7 @@ function getTeamBibClass(teamIndex) {
 function renderTeams(teams) {
   teamsResultEl.innerHTML = "";
 
-  teams.forEach((team, index) => {
+  teams.forEach(function (team, index) {
     const teamNumber = index + 1;
     const label = getTeamLabel(teamNumber);
     const bibClass = getTeamBibClass(teamNumber);
@@ -772,13 +1015,12 @@ function renderTeams(teams) {
     titleWrap.className = "team-title-wrap";
 
     const nameSpan = document.createElement("span");
-    nameSpan.textContent = `${team.name} - ${label}`;
-
+    nameSpan.textContent = team.name + " - " + label;
     titleWrap.appendChild(nameSpan);
 
     if (bibClass) {
       const bibIcon = document.createElement("span");
-      bibIcon.className = `bib-icon ${bibClass}`;
+      bibIcon.className = "bib-icon " + bibClass;
       bibIcon.setAttribute("aria-hidden", "true");
       titleWrap.appendChild(bibIcon);
     }
@@ -789,13 +1031,13 @@ function renderTeams(teams) {
       auditButton.title = "Ver auditoria do sorteio";
       auditButton.setAttribute("aria-label", "Ver auditoria do sorteio");
       auditButton.innerHTML = '<i class="fa-solid fa-chart-simple"></i>';
-      auditButton.addEventListener("click", () => openAuditModal());
+      auditButton.addEventListener("click", function () { openAuditModal(); });
       titleWrap.appendChild(auditButton);
     }
 
     const ratingSpan = document.createElement("span");
     ratingSpan.className = "team-rating";
-    ratingSpan.textContent = `Total: ${team.total_rating.toFixed(1)} ★`;
+    ratingSpan.textContent = "Total: " + team.total_rating.toFixed(1) + " \u2605";
 
     header.appendChild(titleWrap);
     header.appendChild(ratingSpan);
@@ -804,28 +1046,19 @@ function renderTeams(teams) {
     table.className = "team-table";
 
     const thead = document.createElement("thead");
-    thead.innerHTML = `
-      <tr>
-        <th>Jogador</th>
-      </tr>
-    `;
-
+    thead.innerHTML = "<tr><th>Jogador</th></tr>";
     table.appendChild(thead);
 
     const tbody = document.createElement("tbody");
 
-    const sortedPlayers = [...team.players].sort((a, b) =>
-      a.name.trim().localeCompare(b.name.trim(), "pt-BR", {
-        sensitivity: "base",
-      })
-    );
+    const sortedPlayers = [...team.players].sort(function (a, b) {
+      return a.name.trim().localeCompare(b.name.trim(), "pt-BR", { sensitivity: "base" });
+    });
 
-    sortedPlayers.forEach((p) => {
+    sortedPlayers.forEach(function (p) {
       const tr = document.createElement("tr");
       const nameTd = document.createElement("td");
-
       nameTd.textContent = p.name;
-
       tr.appendChild(nameTd);
       tbody.appendChild(tr);
     });
@@ -837,20 +1070,19 @@ function renderTeams(teams) {
   });
 }
 
+// ============================================================
+// Audit
+// ============================================================
+
 function getTeamAuditStats(team) {
   const teamPlayers = team.players || [];
   const playerCount = teamPlayers.length || 1;
-
-  const totalRating = teamPlayers.reduce((sum, p) => sum + Number(p.rating || 0), 0);
-  const totalMarking = teamPlayers.reduce((sum, p) => sum + getAttributeValue(p, "marking"), 0);
-  const totalStamina = teamPlayers.reduce((sum, p) => sum + getAttributeValue(p, "stamina"), 0);
-  const totalScoring = teamPlayers.reduce((sum, p) => sum + getAttributeValue(p, "scoring"), 0);
-
+  const totalRating = teamPlayers.reduce(function (sum, p) { return sum + Number(p.rating || 0); }, 0);
+  const totalMarking = teamPlayers.reduce(function (sum, p) { return sum + getAttributeValue(p, "marking"); }, 0);
+  const totalStamina = teamPlayers.reduce(function (sum, p) { return sum + getAttributeValue(p, "stamina"); }, 0);
+  const totalScoring = teamPlayers.reduce(function (sum, p) { return sum + getAttributeValue(p, "scoring"); }, 0);
   return {
-    totalRating,
-    totalMarking,
-    totalStamina,
-    totalScoring,
+    totalRating, totalMarking, totalStamina, totalScoring,
     averageRating: totalRating / playerCount,
     averageMarking: totalMarking / playerCount,
     averageStamina: totalStamina / playerCount,
@@ -858,9 +1090,7 @@ function getTeamAuditStats(team) {
   };
 }
 
-function formatDecimal(value) {
-  return Number(value).toFixed(1);
-}
+function formatDecimal(value) { return Number(value).toFixed(1); }
 
 function renderAuditView() {
   auditContentEl.innerHTML = "";
@@ -873,149 +1103,90 @@ function renderAuditView() {
   const summary = document.createElement("div");
   summary.className = "audit-summary-grid";
 
-  lastDrawnTeams.forEach((team, index) => {
+  lastDrawnTeams.forEach(function (team, index) {
     const teamNumber = index + 1;
     const label = getTeamLabel(teamNumber);
     const stats = getTeamAuditStats(team);
-
     const summaryCard = document.createElement("div");
     summaryCard.className = "audit-summary-card";
-
-    summaryCard.innerHTML = `
-      <strong>${team.name} - ${label}</strong>
-      <span>Rating: ${formatDecimal(stats.totalRating)} total · ${formatDecimal(stats.averageRating)} media</span>
-      <span>Marca: ${stats.totalMarking} total · ${formatDecimal(stats.averageMarking)} media</span>
-      <span>Gol: ${stats.totalScoring} total · ${formatDecimal(stats.averageScoring)} media</span>
-      <span>Corre: ${stats.totalStamina} total · ${formatDecimal(stats.averageStamina)} media</span>
-    `;
-
+    summaryCard.innerHTML =
+      "<strong>" + team.name + " - " + label + "</strong>" +
+      "<span>Rating: " + formatDecimal(stats.totalRating) + " total \u00b7 " + formatDecimal(stats.averageRating) + " media</span>" +
+      "<span>Marca: " + stats.totalMarking + " total \u00b7 " + formatDecimal(stats.averageMarking) + " media</span>" +
+      "<span>Gol: " + stats.totalScoring + " total \u00b7 " + formatDecimal(stats.averageScoring) + " media</span>" +
+      "<span>Corre: " + stats.totalStamina + " total \u00b7 " + formatDecimal(stats.averageStamina) + " media</span>";
     summary.appendChild(summaryCard);
   });
 
   auditContentEl.appendChild(summary);
 
-  lastDrawnTeams.forEach((team, index) => {
+  lastDrawnTeams.forEach(function (team, index) {
     const teamNumber = index + 1;
     const label = getTeamLabel(teamNumber);
     const stats = getTeamAuditStats(team);
-
     const teamCard = document.createElement("div");
     teamCard.className = "audit-team-card";
 
-    const sortedPlayers = [...team.players].sort((a, b) =>
-      a.name.trim().localeCompare(b.name.trim(), "pt-BR", {
-        sensitivity: "base",
-      })
-    );
+    const sortedPlayers = [...team.players].sort(function (a, b) {
+      return a.name.trim().localeCompare(b.name.trim(), "pt-BR", { sensitivity: "base" });
+    });
 
-    teamCard.innerHTML = `
-      <div class="audit-team-header">
-        <strong>${team.name} - ${label}</strong>
-        <span>Total: ${formatDecimal(stats.totalRating)} ★</span>
-      </div>
-
-      <div class="audit-metrics">
-        <span>Marca ${stats.totalMarking}</span>
-        <span>Gol ${stats.totalScoring}</span>
-        <span>Corre ${stats.totalStamina}</span>
-      </div>
-
-      <table class="audit-table">
-        <thead>
-          <tr>
-            <th>Jogador</th>
-            <th>Rating</th>
-            <th>Marca</th>
-            <th>Gol</th>
-            <th>Corre</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${sortedPlayers
-            .map(
-              (p) => `
-                <tr>
-                  <td>${p.name}</td>
-                  <td>${formatDecimal(p.rating)}</td>
-                  <td>${getAttributeValue(p, "marking")}</td>
-                  <td>${getAttributeValue(p, "scoring")}</td>
-                  <td>${getAttributeValue(p, "stamina")}</td>
-                </tr>
-              `
-            )
-            .join("")}
-        </tbody>
-      </table>
-    `;
+    teamCard.innerHTML =
+      '<div class="audit-team-header"><strong>' + team.name + " - " + label + "</strong><span>Total: " + formatDecimal(stats.totalRating) + " \u2605</span></div>" +
+      '<div class="audit-metrics"><span>Marca ' + stats.totalMarking + "</span><span>Gol " + stats.totalScoring + "</span><span>Corre " + stats.totalStamina + "</span></div>" +
+      '<table class="audit-table"><thead><tr><th>Jogador</th><th>Rating</th><th>Marca</th><th>Gol</th><th>Corre</th></tr></thead><tbody>' +
+      sortedPlayers.map(function (p) {
+        return "<tr><td>" + p.name + "</td><td>" + formatDecimal(p.rating) + "</td><td>" + getAttributeValue(p, "marking") + "</td><td>" + getAttributeValue(p, "scoring") + "</td><td>" + getAttributeValue(p, "stamina") + "</td></tr>";
+      }).join("") +
+      "</tbody></table>";
 
     auditContentEl.appendChild(teamCard);
   });
 }
 
 function openAuditModal() {
-  if (!isAdminMode) {
-    alert("Ative o modo admin para ver a auditoria.");
-    return;
-  }
-
+  if (!isAdminMode) { alert("Ative o modo admin para ver a auditoria."); return; }
   renderAuditView();
   openModal(auditModalEl);
 }
 
+// ============================================================
+// Compare
+// ============================================================
+
 function renderCompareTable() {
   compareContentEl.innerHTML = "";
-
   if (players.length === 0) {
-    compareContentEl.innerHTML =
-      '<p class="muted-text">Nenhum jogador cadastrado.</p>';
+    compareContentEl.innerHTML = '<p class="muted-text">Nenhum jogador cadastrado.</p>';
     return;
   }
 
   const groups = {};
-
-  players.forEach((p) => {
+  players.forEach(function (p) {
     const key = p.rating.toFixed(1);
     if (!groups[key]) groups[key] = [];
     groups[key].push(p);
   });
 
-  const sortedRatings = Object.keys(groups)
-    .map((r) => parseFloat(r))
-    .sort((a, b) => b - a);
+  const sortedRatings = Object.keys(groups).map(function (r) { return parseFloat(r); }).sort(function (a, b) { return b - a; });
 
   const table = document.createElement("table");
   table.className = "team-table";
-
   const thead = document.createElement("thead");
-  thead.innerHTML = `
-    <tr>
-      <th>Estrelas</th>
-      <th>Jogadores</th>
-    </tr>
-  `;
-
+  thead.innerHTML = "<tr><th>Estrelas</th><th>Jogadores</th></tr>";
   table.appendChild(thead);
 
   const tbody = document.createElement("tbody");
-
-  sortedRatings.forEach((rating) => {
+  sortedRatings.forEach(function (rating) {
     const key = rating.toFixed(1);
-
-    const names = groups[key]
-      .map((p) => p.name)
-      .sort((a, b) =>
-        a.trim().localeCompare(b.trim(), "pt-BR", {
-          sensitivity: "base",
-        })
-      );
-
+    const names = groups[key].map(function (p) { return p.name; }).sort(function (a, b) {
+      return a.trim().localeCompare(b.trim(), "pt-BR", { sensitivity: "base" });
+    });
     const tr = document.createElement("tr");
     const ratingTd = document.createElement("td");
     const playersTd = document.createElement("td");
-
-    ratingTd.textContent = `${key} ★`;
+    ratingTd.textContent = key + " \u2605";
     playersTd.textContent = names.join(", ");
-
     tr.appendChild(ratingTd);
     tr.appendChild(playersTd);
     tbody.appendChild(tr);
@@ -1025,26 +1196,22 @@ function renderCompareTable() {
   compareContentEl.appendChild(table);
 }
 
-function openDeployModal() {
-  if (!isAdminMode) {
-    alert("Ative o modo admin para solicitar deploy.");
-    return;
-  }
+// ============================================================
+// Deploy
+// ============================================================
 
+function openDeployModal() {
+  if (!isAdminMode) { alert("Ative o modo admin para solicitar deploy."); return; }
   deployMainRadio.checked = true;
   deployCustomRadio.checked = false;
   deployCustomBranchInput.value = "";
   deployErrorEl.textContent = "";
   deployErrorEl.classList.add("hidden-text");
-
   openModal(deployModalEl);
 }
 
 function getSelectedDeployBranch() {
-  if (deployMainRadio.checked) {
-    return "main";
-  }
-
+  if (deployMainRadio.checked) return "main";
   return deployCustomBranchInput.value.trim();
 }
 
@@ -1054,7 +1221,6 @@ function isValidBranchName(branchName) {
   if (branchName.includes("..")) return false;
   if (branchName.startsWith("/")) return false;
   if (branchName.endsWith("/")) return false;
-
   return /^[A-Za-z0-9._/-]+$/.test(branchName);
 }
 
@@ -1065,25 +1231,27 @@ function showDeployError(message) {
 
 function requestDeploy() {
   const branchName = getSelectedDeployBranch();
-
-  if (!isValidBranchName(branchName)) {
-    showDeployError("Informe uma branch valida.");
-    return;
-  }
-
-  const deployUrl = `${DEPLOY_ENDPOINT_BASE_URL}?reference=${encodeURIComponent(branchName)}`;
-
+  if (!isValidBranchName(branchName)) { showDeployError("Informe uma branch valida."); return; }
+  const deployUrl = DEPLOY_ENDPOINT_BASE_URL + "?reference=" + encodeURIComponent(branchName);
   closeModal(deployModalEl);
-  alert(`Deploy solicitado para a branch ${branchName}.`);
-
-  fetch(deployUrl, {
-    method: "GET",
-    mode: "no-cors",
-    cache: "no-store",
-    keepalive: true,
-  }).catch((err) => {
+  alert("Deploy solicitado para a branch " + branchName + ".");
+  fetch(deployUrl, { method: "GET", mode: "no-cors", cache: "no-store", keepalive: true }).catch(function (err) {
     console.warn("Deploy request was sent, but the browser could not confirm the response.", err);
   });
+}
+
+// ============================================================
+// Export
+// ============================================================
+
+function getBackupFileName() {
+  const now = new Date();
+  const pad = function (v) { return v.toString().padStart(2, "0"); };
+  return "players-" + now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate()) + "-" + pad(now.getHours()) + pad(now.getMinutes()) + ".json";
+}
+
+async function exportPlayersJson() {
+  alert("Export JSON nao disponivel nesta versao.");
 }
 
 // ============================================================
@@ -1091,170 +1259,137 @@ function requestDeploy() {
 // ============================================================
 
 if (toggleThemeBtn) {
-  toggleThemeBtn.addEventListener("click", () => {
+  toggleThemeBtn.addEventListener("click", function () {
     const current = document.documentElement.getAttribute("data-theme") || "dark";
     const next = current === "dark" ? "light" : "dark";
-
     document.documentElement.setAttribute("data-theme", next);
     localStorage.setItem("pelada-theme", next);
     updateThemeIcon(next);
   });
 }
 
-if (adminModeBtn) {
-  adminModeBtn.addEventListener("click", handleAdminModeClick);
-}
-
-if (deployBtn) {
-  deployBtn.addEventListener("click", openDeployModal);
-}
+if (adminModeBtn) { adminModeBtn.addEventListener("click", handleAdminModeClick); }
+if (deployBtn) { deployBtn.addEventListener("click", openDeployModal); }
 
 if (deployCustomBranchInput) {
-  deployCustomBranchInput.addEventListener("focus", () => {
-    deployCustomRadio.checked = true;
-    deployMainRadio.checked = false;
-  });
-
-  deployCustomBranchInput.addEventListener("input", () => {
-    deployCustomRadio.checked = true;
-    deployMainRadio.checked = false;
-    deployErrorEl.classList.add("hidden-text");
-  });
+  deployCustomBranchInput.addEventListener("focus", function () { deployCustomRadio.checked = true; deployMainRadio.checked = false; });
+  deployCustomBranchInput.addEventListener("input", function () { deployCustomRadio.checked = true; deployMainRadio.checked = false; deployErrorEl.classList.add("hidden-text"); });
 }
 
-if (deployMainRadio) {
-  deployMainRadio.addEventListener("change", () => {
-    deployErrorEl.classList.add("hidden-text");
-  });
-}
-
-if (deployCustomRadio) {
-  deployCustomRadio.addEventListener("change", () => {
-    deployCustomBranchInput.focus();
-    deployErrorEl.classList.add("hidden-text");
-  });
-}
-
-if (cancelDeployBtn) {
-  cancelDeployBtn.addEventListener("click", () => closeModal(deployModalEl));
-}
-
-if (confirmDeployBtn) {
-  confirmDeployBtn.addEventListener("click", requestDeploy);
-}
+if (deployMainRadio) { deployMainRadio.addEventListener("change", function () { deployErrorEl.classList.add("hidden-text"); }); }
+if (deployCustomRadio) { deployCustomRadio.addEventListener("change", function () { deployCustomBranchInput.focus(); deployErrorEl.classList.add("hidden-text"); }); }
+if (cancelDeployBtn) { cancelDeployBtn.addEventListener("click", function () { closeModal(deployModalEl); }); }
+if (confirmDeployBtn) { confirmDeployBtn.addEventListener("click", requestDeploy); }
 
 if (starWidgetEl) {
-  starWidgetEl.addEventListener("click", (e) => {
+  starWidgetEl.addEventListener("click", function (e) {
     const target = e.target;
-    const starEl =
-      target.classList.contains("star") ? target : target.parentElement;
-
+    const starEl = target.classList.contains("star") ? target : target.parentElement;
     if (!starEl || !starEl.dataset.index) return;
-
     const index = parseInt(starEl.dataset.index, 10);
-    updateStarWidgetFromClick(starWidgetEl, index);
+    updateStarWidgetFromClick(starWidgetEl, index, playerRatingInput);
   });
 }
 
-if (playerFormEl) {
-  playerFormEl.addEventListener("submit", handlePlayerSubmit);
-}
-
-if (cancelPlayerBtn) {
-  cancelPlayerBtn.addEventListener("click", () => closeModal(playerModalEl));
-}
-
-if (playersListEl) {
-  playersListEl.addEventListener("click", handlePlayerListClick);
-}
-
-if (cancelDeleteBtn) {
-  cancelDeleteBtn.addEventListener("click", () => {
-    deleteTargetId = null;
-    closeModal(confirmModalEl);
+if (createWizardStarWidgetEl) {
+  createWizardStarWidgetEl.addEventListener("click", function (e) {
+    const target = e.target;
+    const starEl = target.classList.contains("star") ? target : target.parentElement;
+    if (!starEl || !starEl.dataset.index) return;
+    const index = parseInt(starEl.dataset.index, 10);
+    updateStarWidgetFromClick(createWizardStarWidgetEl, index, createWizardPlayerRatingInput);
   });
 }
 
-if (confirmDeleteBtn) {
-  confirmDeleteBtn.addEventListener("click", deletePlayer);
-}
+if (playerFormEl) { playerFormEl.addEventListener("submit", handlePlayerSubmit); }
+if (cancelPlayerBtn) { cancelPlayerBtn.addEventListener("click", function () { closeModal(playerModalEl); }); }
+if (playersListEl) { playersListEl.addEventListener("click", handlePlayerListClick); }
+if (cancelDeleteBtn) { cancelDeleteBtn.addEventListener("click", function () { deleteTargetId = null; closeModal(confirmModalEl); }); }
+if (confirmDeleteBtn) { confirmDeleteBtn.addEventListener("click", deletePlayer); }
 
-if (drawTeamsBtn) {
-  drawTeamsBtn.addEventListener("click", openDrawModal);
-}
+if (drawTeamsBtn) { drawTeamsBtn.addEventListener("click", openDrawModal); }
 
 if (redrawBtn) {
-  redrawBtn.addEventListener("click", () => {
-    if (!players.some((p) => p.active)) {
-      alert("Nenhum jogador ativo para sortear.");
-      return;
-    }
-
+  redrawBtn.addEventListener("click", function () {
+    if (!players.some(function (p) { return p.active; })) { alert("Nenhum jogador ativo para sortear."); return; }
     performDraw(lastTeamSize);
   });
 }
 
-if (cancelDrawBtn) {
-  cancelDrawBtn.addEventListener("click", () => closeModal(drawModalEl));
-}
+if (cancelDrawBtn) { cancelDrawBtn.addEventListener("click", function () { closeModal(drawModalEl); }); }
 
 if (confirmDrawBtn) {
-  confirmDrawBtn.addEventListener("click", () => {
+  confirmDrawBtn.addEventListener("click", function () {
     const size = parseInt(teamSizeInput.value || "0", 10);
-
-    if (!size || size <= 0) {
-      alert("Informe um numero valido de jogadores por time.");
-      return;
-    }
-
+    if (!size || size <= 0) { alert("Informe um numero valido de jogadores por time."); return; }
     closeModal(drawModalEl);
     performDraw(size);
   });
 }
 
 if (compareBtn) {
-  compareBtn.addEventListener("click", () => {
-    if (players.length === 0) {
-      alert("Nenhum jogador cadastrado para comparar.");
-      return;
-    }
-
+  compareBtn.addEventListener("click", function () {
+    if (players.length === 0) { alert("Nenhum jogador cadastrado para comparar."); return; }
     renderCompareTable();
     openModal(compareModalEl);
   });
 }
 
-if (closeCompareBtn) {
-  closeCompareBtn.addEventListener("click", () => closeModal(compareModalEl));
+if (closeCompareBtn) { closeCompareBtn.addEventListener("click", function () { closeModal(compareModalEl); }); }
+if (clearAllBtn) { clearAllBtn.addEventListener("click", clearAllPlayers); }
+if (exportJsonBtn) { exportJsonBtn.addEventListener("click", exportPlayersJson); }
+if (fabAddPlayerBtn) { fabAddPlayerBtn.addEventListener("click", openNewPlayerModal); }
+if (closeAuditBtn) { closeAuditBtn.addEventListener("click", function () { closeModal(auditModalEl); }); }
+if (cancelCheckinBtn) { cancelCheckinBtn.addEventListener("click", function () { closeModal(checkinModalEl); }); }
+if (confirmCheckinBtn) { confirmCheckinBtn.addEventListener("click", confirmCheckin); }
+
+if (backToPeladasBtn) {
+  backToPeladasBtn.addEventListener("click", function () {
+    currentPeladaId = null;
+    currentPeladaName = "";
+    isAdminMode = false;
+    localStorage.removeItem("pelada-admin-mode");
+    localStorage.removeItem("pelada-current-id");
+    localStorage.removeItem("pelada-current-name");
+    showPeladaScreen();
+  });
 }
 
-if (clearAllBtn) {
-  clearAllBtn.addEventListener("click", clearAllPlayers);
+if (cancelAuthBtn) { cancelAuthBtn.addEventListener("click", function () { closeModal(authModalEl); }); }
+if (confirmAuthBtn) { confirmAuthBtn.addEventListener("click", confirmAuth); }
+
+if (authPasswordInput) {
+  authPasswordInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); confirmAuth(); }
+  });
 }
 
-if (exportJsonBtn) {
-  exportJsonBtn.addEventListener("click", exportPlayersJson);
+if (newPeladaBtn) { newPeladaBtn.addEventListener("click", openCreateModal); }
+if (cancelCreateBtn) { cancelCreateBtn.addEventListener("click", function () { closeModal(createModalEl); }); }
+
+if (nextCreateBtn) {
+  nextCreateBtn.addEventListener("click", function () {
+    if (validateCreateStep1()) showCreateStep(2);
+  });
 }
 
-if (fabAddPlayerBtn) {
-  fabAddPlayerBtn.addEventListener("click", openNewPlayerModal);
+if (backCreateBtn) { backCreateBtn.addEventListener("click", function () { showCreateStep(1); }); }
+if (confirmCreateBtn) { confirmCreateBtn.addEventListener("click", confirmCreate); }
+if (addWizardPlayerBtn) { addWizardPlayerBtn.addEventListener("click", addWizardPlayer); }
+
+if (createWizardPlayerNameInput) {
+  createWizardPlayerNameInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); addWizardPlayer(); }
+  });
 }
 
-if (closeAuditBtn) {
-  closeAuditBtn.addEventListener("click", () => closeModal(auditModalEl));
-}
+// ============================================================
+// Init
+// ============================================================
 
-if (cancelCheckinBtn) {
-  cancelCheckinBtn.addEventListener("click", () => closeModal(checkinModalEl));
-}
-
-if (confirmCheckinBtn) {
-  confirmCheckinBtn.addEventListener("click", confirmCheckin);
-}
-
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", function () {
   loadTheme();
   loadAdminMode();
-  renderStarWidget(starWidgetEl, 0);
-  loadPlayers();
+  renderStarWidget(starWidgetEl, 0, playerRatingInput);
+  showPeladaScreen();
 });
