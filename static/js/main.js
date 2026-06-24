@@ -6,7 +6,7 @@ let lastDrawnTeams = [];
 let isAdminMode = false;
 let checkinState = {};
 
-const ADMIN_SECRET = "secret123";
+const ADMIN_SECRET = window.ADMIN_SECRET || "";
 const DEPLOY_ENDPOINT_BASE_URL = "https://peladamanager.bandeira.dev/deploy";
 
 const playersListEl = document.getElementById("players-list");

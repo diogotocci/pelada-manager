@@ -1,34 +1,25 @@
 import os
-from flask import Flask, render_template, jsonify, request, abort, send_file
+from flask import Flask, render_template, jsonify, request, abort
 
-from storage.json_storage import PlayerStorage
+from storage.postgres_storage import PlayerStorage, ensure_schema
 from services.team_balancer import balance_teams
 
 app = Flask(__name__)
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-APP_VERSION = os.getenv("APP_VERSION", "2.1.0")
+APP_VERSION = os.getenv("APP_VERSION", "2.1.1")
+ADMIN_SECRET = os.getenv("ADMIN_SECRET", "")
 
-player_storage = PlayerStorage("data/players.json")
+player_storage = PlayerStorage()
+
+ensure_schema()
 
 
 @app.route("/")
 def index():
-    return render_template("index.html", app_version=APP_VERSION)
-
-
-@app.route("/api/export-players", methods=["GET"])
-def export_players():
-    players_file = os.path.join(BASE_DIR, "data", "players.json")
-
-    if not os.path.exists(players_file):
-        abort(404, description="Players file not found")
-
-    return send_file(
-        players_file,
-        as_attachment=True,
-        download_name="players.json",
-        mimetype="application/json",
+    return render_template(
+        "index.html",
+        app_version=APP_VERSION,
+        admin_secret=ADMIN_SECRET,
     )
 
 
