@@ -1,18 +1,42 @@
 import os
 from flask import Flask, render_template, jsonify, request, abort
 
-from storage.postgres_storage import PlayerStorage, ensure_schema
+from storage.postgres_storage import PlayerStorage, PeladaStorage, ensure_schema
 from services.team_balancer import balance_teams
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "2.1.1")
+APP_VERSION = os.getenv("APP_VERSION", "2.2.0")
 ADMIN_SECRET = os.getenv("ADMIN_SECRET", "")
 
 player_storage = PlayerStorage()
+pelada_storage = PeladaStorage()
 
 ensure_schema()
 
+
+def _get_pelada_id() -> int:
+    """
+    Extract and validate pelada_id from the X-Pelada-Id request header.
+    Aborts with 400 if missing or invalid.
+    """
+    raw = request.headers.get("X-Pelada-Id", "")
+    try:
+        pelada_id = int(raw)
+        if pelada_id <= 0:
+            raise ValueError
+        return pelada_id
+    except (ValueError, TypeError):
+        abort(400, description="Missing or invalid X-Pelada-Id header")
+
+
+def _is_valid_attribute(value: int) -> bool:
+    return 1 <= value <= 3
+
+
+# ============================================================
+# Page
+# ============================================================
 
 @app.route("/")
 def index():
@@ -23,14 +47,72 @@ def index():
     )
 
 
+# ============================================================
+# Peladas
+# ============================================================
+
+@app.route("/api/peladas", methods=["GET"])
+def list_peladas():
+    peladas = pelada_storage.list_peladas()
+    return jsonify(peladas)
+
+
+@app.route("/api/peladas", methods=["POST"])
+def create_pelada():
+    data = request.get_json()
+
+    if not data or "name" not in data or "password" not in data:
+        abort(400, description="Missing 'name' or 'password' field")
+
+    name = data["name"].strip()
+    password = data["password"].strip()
+
+    if not name:
+        abort(400, description="Name cannot be empty")
+
+    if not password:
+        abort(400, description="Password cannot be empty")
+
+    pelada = pelada_storage.create_pelada(name=name, password=password)
+    return jsonify(pelada), 201
+
+
+@app.route("/api/peladas/<int:pelada_id>/auth", methods=["POST"])
+def auth_pelada(pelada_id):
+    data = request.get_json()
+
+    if not data or "password" not in data:
+        abort(400, description="Missing 'password' field")
+
+    password = data["password"]
+
+    if password == ADMIN_SECRET:
+        pelada = pelada_storage.get_pelada(pelada_id)
+        if not pelada:
+            abort(404, description="Pelada not found")
+        return jsonify({"ok": True, "is_admin": True})
+
+    ok = pelada_storage.verify_password(pelada_id, password)
+    if not ok:
+        return jsonify({"ok": False, "is_admin": False}), 401
+
+    return jsonify({"ok": True, "is_admin": False})
+
+
+# ============================================================
+# Players
+# ============================================================
+
 @app.route("/api/players", methods=["GET"])
 def list_players():
-    players = player_storage.get_all_players()
+    pelada_id = _get_pelada_id()
+    players = player_storage.get_all_players(pelada_id)
     return jsonify([p.to_dict() for p in players])
 
 
 @app.route("/api/players", methods=["POST"])
 def create_player():
+    pelada_id = _get_pelada_id()
     data = request.get_json()
 
     if not data or "name" not in data or "rating" not in data:
@@ -58,6 +140,7 @@ def create_player():
         abort(400, description="Scoring must be between 1 and 3")
 
     player = player_storage.add_player(
+        pelada_id=pelada_id,
         name=name,
         rating=rating,
         marking=marking,
@@ -70,6 +153,7 @@ def create_player():
 
 @app.route("/api/players/<int:player_id>", methods=["PUT"])
 def update_player(player_id):
+    pelada_id = _get_pelada_id()
     data = request.get_json()
 
     if not data:
@@ -109,6 +193,7 @@ def update_player(player_id):
             abort(400, description="Scoring must be between 1 and 3")
 
     updated_player = player_storage.update_player(
+        pelada_id=pelada_id,
         player_id=player_id,
         name=name,
         rating=rating,
@@ -125,7 +210,8 @@ def update_player(player_id):
 
 @app.route("/api/players/<int:player_id>", methods=["DELETE"])
 def delete_player(player_id):
-    success = player_storage.delete_player(player_id)
+    pelada_id = _get_pelada_id()
+    success = player_storage.delete_player(pelada_id, player_id)
 
     if not success:
         abort(404, description="Player not found")
@@ -135,7 +221,8 @@ def delete_player(player_id):
 
 @app.route("/api/players/<int:player_id>/toggle-active", methods=["PATCH"])
 def toggle_player_active(player_id):
-    updated_player = player_storage.toggle_active(player_id)
+    pelada_id = _get_pelada_id()
+    updated_player = player_storage.toggle_active(pelada_id, player_id)
 
     if not updated_player:
         abort(404, description="Player not found")
@@ -145,12 +232,14 @@ def toggle_player_active(player_id):
 
 @app.route("/api/players/deactivate-all", methods=["PATCH"])
 def deactivate_all_players():
-    player_storage.deactivate_all_players()
+    pelada_id = _get_pelada_id()
+    player_storage.deactivate_all_players(pelada_id)
     return jsonify({"status": "ok"})
 
 
 @app.route("/api/players/set-active-batch", methods=["PATCH"])
 def set_active_batch():
+    pelada_id = _get_pelada_id()
     data = request.get_json()
 
     if not data or "active_ids" not in data:
@@ -166,12 +255,13 @@ def set_active_batch():
     except (ValueError, TypeError):
         abort(400, description="'active_ids' must contain integers")
 
-    updated_players = player_storage.set_active_batch(active_ids)
+    updated_players = player_storage.set_active_batch(pelada_id, active_ids)
     return jsonify([p.to_dict() for p in updated_players])
 
 
 @app.route("/api/draw-teams", methods=["POST"])
 def draw_teams():
+    pelada_id = _get_pelada_id()
     data = request.get_json()
 
     if not data or "team_size" not in data:
@@ -185,7 +275,7 @@ def draw_teams():
     if team_size <= 0:
         abort(400, description="'team_size' must be greater than 0")
 
-    players = [p for p in player_storage.get_all_players() if p.active]
+    players = [p for p in player_storage.get_all_players(pelada_id) if p.active]
 
     if len(players) == 0:
         abort(400, description="No active players to draw teams")
@@ -203,10 +293,6 @@ def draw_teams():
         )
 
     return jsonify({"teams": result})
-
-
-def _is_valid_attribute(value: int) -> bool:
-    return 1 <= value <= 3
 
 
 if __name__ == "__main__":
