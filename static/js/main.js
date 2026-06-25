@@ -331,6 +331,7 @@ function showAppScreen(peladaId, peladaName) {
   currentPeladaId = peladaId;
   currentPeladaName = peladaName;
 
+  // Hide pelada screen and show app screen before loading players
   peladaScreenEl.classList.add("hidden");
   appContainerEl.classList.remove("hidden");
 
@@ -343,10 +344,10 @@ function showAppScreen(peladaId, peladaName) {
   players = [];
   lastDrawnTeams = [];
   teamsSectionEl.classList.add("hidden");
+  playersListEl.innerHTML = "";
+  playerCountEl.textContent = "Carregando...";
 
-  setTimeout(function () {
-    loadPlayers();
-  }, 0);
+  loadPlayers();
 }
 
 async function loadPeladas() {
@@ -594,11 +595,14 @@ async function loadPlayers() {
   try {
     players = await fetchJSON("/api/players");
     renderPlayers();
+    // Delay ensures the app screen is fully painted before the modal appears.
+    // Required for Safari/iOS WebKit which may block DOM updates mid-async chain.
     setTimeout(function () {
       openCheckinModal();
     }, 300);
   } catch (err) {
     console.error("Failed to load players:", err);
+    playerCountEl.textContent = "Erro ao carregar jogadores.";
   }
 }
 
