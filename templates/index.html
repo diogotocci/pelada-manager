@@ -380,6 +380,9 @@
   </div>
 
   <script>window.ADMIN_SECRET = "{{ admin_secret }}";</script>
-  <script src="{{ url_for('static', filename='js/main.js') }}?v={{ app_version }}"></script>
+  <script src="{{ url_for('static', filename='js/ui.js') }}?v={{ app_version }}"></script>
+  <script src="{{ url_for('static', filename='js/api.js') }}?v={{ app_version }}"></script>
+  <script src="{{ url_for('static', filename='js/players.js') }}?v={{ app_version }}"></script>
+  <script src="{{ url_for('static', filename='js/teams.js') }}?v={{ app_version }}"></script>
 </body>
 </html>

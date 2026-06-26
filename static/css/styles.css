@@ -1,3 +1,7 @@
+/* ============================================================
+   Variables and reset
+   ============================================================ */
+
 :root {
   --bg: #0b0c10;
   --bg-card: #151823;
@@ -47,11 +51,19 @@ body {
   min-height: 100vh;
 }
 
+/* ============================================================
+   Layout and structure
+   ============================================================ */
+
 .app-container {
   max-width: 960px;
   margin: 0 auto;
   padding: 16px 16px 88px;
 }
+
+/* ============================================================
+   Header
+   ============================================================ */
 
 .app-header {
   display: flex;
@@ -78,6 +90,10 @@ body {
   gap: 10px;
   flex-wrap: wrap;
 }
+
+/* ============================================================
+   Cards and lists
+   ============================================================ */
 
 .card {
   background-color: var(--bg-card);
@@ -107,8 +123,12 @@ body {
 }
 
 .error-text {
-  color: #f87171;
-  font-size: 0.85rem;
+  color: var(--danger);
+  font-size: 0.8rem;
+}
+
+.error-text.hidden {
+  display: none;
 }
 
 .hidden-text {
@@ -214,6 +234,10 @@ body {
   gap: 8px;
   flex-shrink: 0;
 }
+
+/* ============================================================
+   Buttons
+   ============================================================ */
 
 .primary-button,
 .secondary-button,
@@ -375,6 +399,10 @@ body {
   border: 2px solid var(--bg);
 }
 
+/* ============================================================
+   Forms
+   ============================================================ */
+
 .form-label {
   display: block;
   font-size: 0.9rem;
@@ -444,6 +472,27 @@ body {
   color: var(--text-muted);
 }
 
+.star-widget {
+  display: inline-flex;
+  gap: 4px;
+  font-size: 1.4rem;
+  color: #facc15;
+  margin-bottom: 6px;
+  cursor: pointer;
+}
+
+.star-widget .star {
+  position: relative;
+}
+
+.star-widget .star i {
+  pointer-events: none;
+}
+
+/* ============================================================
+   Modals
+   ============================================================ */
+
 .modal {
   position: fixed;
   inset: 0;
@@ -482,11 +531,6 @@ body {
   max-width: 360px;
 }
 
-.audit-modal-content {
-  max-width: 860px;
-  padding-top: 52px;
-}
-
 .modal-close-button {
   position: absolute;
   top: 14px;
@@ -522,22 +566,9 @@ body {
   margin-top: 12px;
 }
 
-.star-widget {
-  display: inline-flex;
-  gap: 4px;
-  font-size: 1.4rem;
-  color: #facc15;
-  margin-bottom: 6px;
-  cursor: pointer;
-}
-
-.star-widget .star {
-  position: relative;
-}
-
-.star-widget .star i {
-  pointer-events: none;
-}
+/* ============================================================
+   Teams
+   ============================================================ */
 
 .team-card {
   background-color: var(--bg-elevated);
@@ -653,6 +684,15 @@ body {
   border-top: 1px solid rgba(148, 163, 184, 0.25);
 }
 
+/* ============================================================
+   Audit
+   ============================================================ */
+
+.audit-modal-content {
+  max-width: 860px;
+  padding-top: 52px;
+}
+
 .audit-description {
   margin-top: -4px;
   margin-bottom: 14px;
@@ -745,139 +785,8 @@ body {
   border-bottom: 1px solid rgba(148, 163, 184, 0.16);
 }
 
-.deploy-description {
-  margin-top: -4px;
-  margin-bottom: 14px;
-}
-
-.deploy-options {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.deploy-option {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background-color: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
-  border-radius: 14px;
-  padding: 10px 12px;
-  cursor: pointer;
-}
-
-.deploy-option input[type="radio"] {
-  accent-color: var(--accent);
-}
-
-.custom-deploy-option {
-  align-items: flex-start;
-  flex-direction: column;
-}
-
-.custom-deploy-option > span {
-  margin-left: 26px;
-  margin-top: -26px;
-}
-
-.deploy-branch-input {
-  margin-bottom: 0;
-  margin-left: 26px;
-  width: calc(100% - 26px);
-}
-
-.app-footer {
-  margin-top: 24px;
-  text-align: center;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  padding: 12px 0;
-}
-
-.footer-credit {
-  margin-top: 6px;
-  color: var(--text-muted);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.footer-credit strong {
-  color: var(--text);
-  font-weight: 600;
-}
-
-.footer-flamengo-shield {
-  width: 20px;
-  height: auto;
-  display: inline-block;
-  vertical-align: middle;
-  border-radius: 3px;
-}
-
-.hidden {
-  display: none;
-}
-
-@media (max-width: 640px) {
-  .app-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .header-actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
-
-  .header-actions button {
-    font-size: 0.82rem;
-    padding: 7px 11px;
-  }
-
-  .player-row {
-    flex-direction: row;
-    align-items: center;
-    gap: 10px;
-  }
-
-  .player-actions {
-    flex-shrink: 0;
-    justify-content: flex-end;
-  }
-
-  .card-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .team-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .attribute-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .audit-summary-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .audit-table {
-    font-size: 0.76rem;
-  }
-
-  .audit-table th,
-  .audit-table td {
-    padding: 6px 4px;
-  }
-}
 /* ============================================================
-   Check-in modal
+   Check-in
    ============================================================ */
 
 .checkin-modal-content {
@@ -1018,8 +927,9 @@ body {
   border-color: var(--success);
   color: #fff;
 }
+
 /* ============================================================
-   Pelada selection screen
+   Pelada screen
    ============================================================ */
 
 .pelada-screen {
@@ -1227,14 +1137,221 @@ body {
 }
 
 /* ============================================================
-   Auth error text
+   Deploy
    ============================================================ */
 
-.error-text {
+.deploy-description {
+  margin-top: -4px;
+  margin-bottom: 14px;
+}
+
+.deploy-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.deploy-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.deploy-option input[type="radio"] {
+  accent-color: var(--accent);
+}
+
+.custom-deploy-option {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.custom-deploy-option > span {
+  margin-left: 26px;
+  margin-top: -26px;
+}
+
+.deploy-branch-input {
+  margin-bottom: 0;
+  margin-left: 26px;
+  width: calc(100% - 26px);
+}
+
+/* ============================================================
+   Toast notifications
+   ============================================================ */
+
+#toast-container {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+  width: 100%;
+  max-width: 420px;
+  padding: 0 16px;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  pointer-events: auto;
+  animation: toast-in 0.3s ease;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.toast-error {
+  background-color: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
   color: var(--danger);
+}
+
+.toast-success {
+  background-color: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: var(--success);
+}
+
+.toast-exit {
+  animation: toast-out 0.3s ease forwards;
+}
+
+.toast-close {
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 2px;
+  margin-left: auto;
+  opacity: 0.7;
   font-size: 0.8rem;
 }
 
-.error-text.hidden {
+.toast-close:hover {
+  opacity: 1;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes toast-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-12px); }
+}
+
+/* ============================================================
+   Footer
+   ============================================================ */
+
+.app-footer {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  padding: 12px 0;
+}
+
+.footer-credit {
+  margin-top: 6px;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.footer-credit strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.footer-flamengo-shield {
+  width: 20px;
+  height: auto;
+  display: inline-block;
+  vertical-align: middle;
+  border-radius: 3px;
+}
+
+/* ============================================================
+   Utilities
+   ============================================================ */
+
+.hidden {
   display: none;
+}
+
+/* ============================================================
+   Media queries
+   ============================================================ */
+
+@media (max-width: 640px) {
+  .app-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .header-actions button {
+    font-size: 0.82rem;
+    padding: 7px 11px;
+  }
+
+  .player-row {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .player-actions {
+    flex-shrink: 0;
+    justify-content: flex-end;
+  }
+
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .team-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .attribute-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .audit-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .audit-table {
+    font-size: 0.76rem;
+  }
+
+  .audit-table th,
+  .audit-table td {
+    padding: 6px 4px;
+  }
 }
