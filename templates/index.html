@@ -44,6 +44,14 @@
       <div id="pelada-list" class="pelada-list"></div>
     </div>
 
+    <footer class="pelada-screen-footer app-footer">
+      <div>Versão {{ app_version }}</div>
+      <div class="footer-credit">
+        <span>Developed by <strong>Diogo Tocci</strong></span>
+        <img src="{{ url_for('static', filename='flamengo-shield.png') }}" alt="Escudo do Flamengo" class="footer-flamengo-shield">
+      </div>
+    </footer>
+
     <button id="new-pelada-btn" class="fab-button" aria-label="Nova pelada" title="Nova pelada">
       <i class="fa-solid fa-plus"></i>
     </button>
