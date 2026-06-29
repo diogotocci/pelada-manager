@@ -77,11 +77,7 @@
           <i class="fa-solid fa-gear"></i>
         </button>
 
-        <button id="deploy-btn" class="icon-button admin-only hidden" aria-label="Deploy" title="Deploy">
-          <i class="fa-solid fa-rocket"></i>
-        </button>
-
-        <button id="compare-btn" class="secondary-button">
+        <button id="compare-btn" class="secondary-button hidden">
           <i class="fa-solid fa-table"></i>
           Comparar jogadores
         </button>
@@ -89,10 +85,6 @@
         <button id="clear-all-btn" class="secondary-button">
           <i class="fa-solid fa-user-minus"></i>
           Desmarcar todos
-        </button>
-
-        <button id="export-json-btn" class="secondary-button" aria-label="Baixar JSON" title="Baixar JSON">
-          <i class="fa-solid fa-download"></i>
         </button>
 
         <button id="draw-teams-btn" class="primary-button">
@@ -337,31 +329,6 @@
       <div id="audit-content" class="audit-content"></div>
       <div class="modal-actions">
         <button type="button" class="secondary-button" id="close-audit-btn">Fechar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Deploy modal -->
-  <div id="deploy-modal" class="modal hidden">
-    <div class="modal-backdrop"></div>
-    <div class="modal-content small">
-      <h3>Deploy da aplicacao</h3>
-      <p class="muted-text deploy-description">Escolha a branch que sera enviada para deploy.</p>
-      <div class="deploy-options">
-        <label class="deploy-option">
-          <input type="radio" name="deploy-branch-mode" id="deploy-main-radio" value="main" checked>
-          <span>Main</span>
-        </label>
-        <label class="deploy-option custom-deploy-option">
-          <input type="radio" name="deploy-branch-mode" id="deploy-custom-radio" value="custom">
-          <span>Outra branch</span>
-          <input id="deploy-custom-branch-input" class="form-input deploy-branch-input" type="text" placeholder="ex: sorted-table" autocomplete="off">
-        </label>
-      </div>
-      <p id="deploy-error" class="error-text hidden-text"></p>
-      <div class="modal-actions">
-        <button type="button" class="secondary-button" id="cancel-deploy-btn">Cancelar</button>
-        <button type="button" class="primary-button" id="confirm-deploy-btn">Deploy</button>
       </div>
     </div>
   </div>
