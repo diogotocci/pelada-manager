@@ -13,7 +13,6 @@ let currentPeladaId = null;
 let currentPeladaName = "";
 
 const ADMIN_SECRET = window.ADMIN_SECRET || "";
-const DEPLOY_ENDPOINT_BASE_URL = "https://peladamanager.bandeira.dev/deploy";
 
 // ============================================================
 // DOM references — main app
@@ -32,7 +31,6 @@ const confirmModalEl = document.getElementById("confirm-modal");
 const drawModalEl = document.getElementById("draw-modal");
 const compareModalEl = document.getElementById("compare-modal");
 const auditModalEl = document.getElementById("audit-modal");
-const deployModalEl = document.getElementById("deploy-modal");
 const checkinModalEl = document.getElementById("checkin-modal");
 
 const playerModalTitleEl = document.getElementById("player-modal-title");
@@ -57,25 +55,16 @@ const confirmDrawBtn = document.getElementById("confirm-draw-btn");
 const fabAddPlayerBtn = document.getElementById("fab-add-player");
 const toggleThemeBtn = document.getElementById("toggle-theme-btn");
 const adminModeBtn = document.getElementById("admin-mode-btn");
-const deployBtn = document.getElementById("deploy-btn");
 const drawTeamsBtn = document.getElementById("draw-teams-btn");
 const redrawBtn = document.getElementById("redraw-btn");
 const compareBtn = document.getElementById("compare-btn");
 const clearAllBtn = document.getElementById("clear-all-btn");
-const exportJsonBtn = document.getElementById("export-json-btn");
 
 const compareContentEl = document.getElementById("compare-content");
 const closeCompareBtn = document.getElementById("close-compare-btn");
 
 const auditContentEl = document.getElementById("audit-content");
 const closeAuditBtn = document.getElementById("close-audit-btn");
-
-const deployMainRadio = document.getElementById("deploy-main-radio");
-const deployCustomRadio = document.getElementById("deploy-custom-radio");
-const deployCustomBranchInput = document.getElementById("deploy-custom-branch-input");
-const cancelDeployBtn = document.getElementById("cancel-deploy-btn");
-const confirmDeployBtn = document.getElementById("confirm-deploy-btn");
-const deployErrorEl = document.getElementById("deploy-error");
 
 const checkinSessionDateEl = document.getElementById("checkin-session-date");
 const checkinTotalLabelEl = document.getElementById("checkin-total-label");
@@ -218,8 +207,8 @@ function updateAdminModeUI() {
   if (adminModeBtn) {
     adminModeBtn.classList.toggle("admin-active", isAdminMode);
   }
-  if (deployBtn) {
-    deployBtn.classList.toggle("hidden", !isAdminMode);
+  if (compareBtn) {
+    compareBtn.classList.toggle("hidden", !isAdminMode);
   }
   if (advancedAttributesSectionEl) {
     advancedAttributesSectionEl.classList.toggle("hidden", !isAdminMode);

@@ -243,78 +243,8 @@ function renderCompareTable() {
 }
 
 // ============================================================
-// Deploy
-// ============================================================
-
-function openDeployModal() {
-  if (!isAdminMode) { alert("Ative o modo admin para solicitar deploy."); return; }
-  deployMainRadio.checked = true;
-  deployCustomRadio.checked = false;
-  deployCustomBranchInput.value = "";
-  deployErrorEl.textContent = "";
-  deployErrorEl.classList.add("hidden-text");
-  openModal(deployModalEl);
-}
-
-function getSelectedDeployBranch() {
-  if (deployMainRadio.checked) return "main";
-  return deployCustomBranchInput.value.trim();
-}
-
-function isValidBranchName(branchName) {
-  if (!branchName) return false;
-  if (branchName.includes(" ")) return false;
-  if (branchName.includes("..")) return false;
-  if (branchName.startsWith("/")) return false;
-  if (branchName.endsWith("/")) return false;
-  return /^[A-Za-z0-9._/-]+$/.test(branchName);
-}
-
-function showDeployError(message) {
-  deployErrorEl.textContent = message;
-  deployErrorEl.classList.remove("hidden-text");
-}
-
-function requestDeploy() {
-  const branchName = getSelectedDeployBranch();
-  if (!isValidBranchName(branchName)) { showDeployError("Informe uma branch valida."); return; }
-  const deployUrl = DEPLOY_ENDPOINT_BASE_URL + "?reference=" + encodeURIComponent(branchName);
-  closeModal(deployModalEl);
-  alert("Deploy solicitado para a branch " + branchName + ".");
-  fetch(deployUrl, { method: "GET", mode: "no-cors", cache: "no-store", keepalive: true }).catch(function (err) {
-    console.warn("Deploy request was sent, but the browser could not confirm the response.", err);
-  });
-}
-
-// ============================================================
-// Export
-// ============================================================
-
-function getBackupFileName() {
-  const now = new Date();
-  const pad = function (v) { return v.toString().padStart(2, "0"); };
-  return "players-" + now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate()) + "-" + pad(now.getHours()) + pad(now.getMinutes()) + ".json";
-}
-
-async function exportPlayersJson() {
-  alert("Export JSON nao disponivel nesta versao.");
-}
-
-// ============================================================
 // Event listeners — Teams
 // ============================================================
-
-if (deployBtn) { deployBtn.addEventListener("click", openDeployModal); }
-
-if (deployCustomBranchInput) {
-  deployCustomBranchInput.addEventListener("focus", function () { deployCustomRadio.checked = true; deployMainRadio.checked = false; });
-  deployCustomBranchInput.addEventListener("input", function () { deployCustomRadio.checked = true; deployMainRadio.checked = false; deployErrorEl.classList.add("hidden-text"); });
-}
-
-if (deployMainRadio) { deployMainRadio.addEventListener("change", function () { deployErrorEl.classList.add("hidden-text"); }); }
-if (deployCustomRadio) { deployCustomRadio.addEventListener("change", function () { deployCustomBranchInput.focus(); deployErrorEl.classList.add("hidden-text"); }); }
-if (cancelDeployBtn) { cancelDeployBtn.addEventListener("click", function () { closeModal(deployModalEl); }); }
-if (confirmDeployBtn) { confirmDeployBtn.addEventListener("click", requestDeploy); }
 
 if (drawTeamsBtn) { drawTeamsBtn.addEventListener("click", openDrawModal); }
 
@@ -345,7 +275,6 @@ if (compareBtn) {
 }
 
 if (closeCompareBtn) { closeCompareBtn.addEventListener("click", function () { closeModal(compareModalEl); }); }
-if (exportJsonBtn) { exportJsonBtn.addEventListener("click", exportPlayersJson); }
 if (closeAuditBtn) { closeAuditBtn.addEventListener("click", function () { closeModal(auditModalEl); }); }
 
 // ============================================================
