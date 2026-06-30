@@ -129,6 +129,12 @@ class PeladaStorage:
                 row = cur.fetchone()
                 return _row_to_pelada(row) if row else None
 
+    def delete_pelada(self, pelada_id: int) -> bool:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM peladas WHERE id = %s", (pelada_id,))
+                return cur.rowcount > 0
+
 
 class PlayerStorage:
     """

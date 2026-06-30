@@ -91,6 +91,11 @@ const authErrorEl = document.getElementById("auth-error");
 const cancelAuthBtn = document.getElementById("cancel-auth-btn");
 const confirmAuthBtn = document.getElementById("confirm-auth-btn");
 
+const deletePeladaModalEl = document.getElementById("delete-pelada-modal");
+const deletePeladaMessageEl = document.getElementById("delete-pelada-message");
+const cancelDeletePeladaBtn = document.getElementById("cancel-delete-pelada-btn");
+const confirmDeletePeladaBtn = document.getElementById("confirm-delete-pelada-btn");
+
 const createModalEl = document.getElementById("create-pelada-modal");
 const createStep1El = document.getElementById("create-step-1");
 const createStep2El = document.getElementById("create-step-2");
@@ -116,6 +121,8 @@ const newPeladaBtn = document.getElementById("new-pelada-btn");
 
 let authTargetPeladaId = null;
 let authTargetPeladaName = "";
+let deleteTargetPeladaId = null;
+let deleteTargetPeladaName = "";
 let wizardPlayers = [];
 let wizardPlayerRating = 3;
 let newPeladaId = null;
