@@ -1049,6 +1049,18 @@ body {
   flex-shrink: 0;
 }
 
+.pelada-card-delete {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.pelada-card-delete:hover {
+  color: var(--danger);
+}
+
 /* ============================================================
    Wizard
    ============================================================ */

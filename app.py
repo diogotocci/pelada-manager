@@ -6,7 +6,7 @@ from services.team_balancer import balance_teams
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "2.3.0")
+APP_VERSION = os.getenv("APP_VERSION", "2.4.0")
 ADMIN_SECRET = os.getenv("ADMIN_SECRET", "")
 
 player_storage = PlayerStorage()
@@ -97,6 +97,22 @@ def auth_pelada(pelada_id):
         return jsonify({"ok": False, "is_admin": False}), 401
 
     return jsonify({"ok": True, "is_admin": False})
+
+
+@app.route("/api/peladas/<int:pelada_id>", methods=["DELETE"])
+def delete_pelada(pelada_id):
+    data = request.get_json(silent=True) or {}
+    admin_secret = data.get("admin_secret", "")
+
+    if not ADMIN_SECRET or admin_secret != ADMIN_SECRET:
+        abort(403, description="Invalid admin secret")
+
+    success = pelada_storage.delete_pelada(pelada_id)
+
+    if not success:
+        abort(404, description="Pelada not found")
+
+    return jsonify({"status": "ok"})
 
 
 # ============================================================

@@ -57,8 +57,22 @@ async function loadPeladas() {
         '<div class="pelada-card-info">' +
           '<div class="pelada-card-name">' + p.name + '</div>' +
           '<div class="pelada-card-meta">' + p.player_count + ' jogador(es)</div>' +
-        '</div>' +
-        '<i class="fa-solid fa-lock pelada-card-lock" aria-hidden="true"></i>';
+        '</div>';
+
+      const deleteIcon = document.createElement("i");
+      deleteIcon.className = "fa-solid fa-trash pelada-card-delete";
+      deleteIcon.setAttribute("aria-hidden", "true");
+      deleteIcon.title = "Excluir pelada";
+      deleteIcon.addEventListener("click", function (e) {
+        e.stopPropagation();
+        handleDeletePeladaIconClick(p.id, p.name);
+      });
+      card.appendChild(deleteIcon);
+
+      const lockIcon = document.createElement("i");
+      lockIcon.className = "fa-solid fa-lock pelada-card-lock";
+      lockIcon.setAttribute("aria-hidden", "true");
+      card.appendChild(lockIcon);
 
       card.addEventListener("click", function () {
         openAuthModal(p.id, p.name);
@@ -118,6 +132,57 @@ async function confirmAuth() {
     console.error(err);
     authErrorEl.textContent = "Erro ao autenticar.";
     authErrorEl.classList.remove("hidden");
+  }
+}
+
+function handleDeletePeladaIconClick(peladaId, peladaName) {
+  const secret = prompt("Digite a chave admin:");
+  if (secret == null) return;
+
+  if (secret !== ADMIN_SECRET) {
+    showToast("Chave admin invalida.");
+    return;
+  }
+
+  openDeletePeladaModal(peladaId, peladaName);
+}
+
+function openDeletePeladaModal(peladaId, peladaName) {
+  deleteTargetPeladaId = peladaId;
+  deleteTargetPeladaName = peladaName;
+
+  deletePeladaMessageEl.innerHTML = "";
+  deletePeladaMessageEl.appendChild(document.createTextNode("Tem certeza que deseja excluir a pelada "));
+  const strong = document.createElement("strong");
+  strong.textContent = peladaName;
+  deletePeladaMessageEl.appendChild(strong);
+  deletePeladaMessageEl.appendChild(document.createTextNode("?"));
+
+  openModal(deletePeladaModalEl);
+}
+
+async function confirmDeletePelada() {
+  if (deleteTargetPeladaId == null) return;
+
+  try {
+    const res = await fetchJSONRaw("/api/peladas/" + deleteTargetPeladaId, {
+      method: "DELETE",
+      body: JSON.stringify({ admin_secret: ADMIN_SECRET }),
+    });
+
+    if (!res.ok) {
+      showToast("Erro ao excluir pelada.");
+      return;
+    }
+
+    closeModal(deletePeladaModalEl);
+    loadPeladas();
+  } catch (err) {
+    console.error(err);
+    showToast("Erro ao excluir pelada.");
+  } finally {
+    deleteTargetPeladaId = null;
+    deleteTargetPeladaName = "";
   }
 }
 
@@ -658,6 +723,14 @@ if (backToPeladasBtn) {
 
 if (cancelAuthBtn) { cancelAuthBtn.addEventListener("click", function () { closeModal(authModalEl); }); }
 if (confirmAuthBtn) { confirmAuthBtn.addEventListener("click", confirmAuth); }
+
+if (cancelDeletePeladaBtn) {
+  cancelDeletePeladaBtn.addEventListener("click", function () {
+    deleteTargetPeladaId = null;
+    closeModal(deletePeladaModalEl);
+  });
+}
+if (confirmDeletePeladaBtn) { confirmDeletePeladaBtn.addEventListener("click", confirmDeletePelada); }
 
 if (authPasswordInput) {
   authPasswordInput.addEventListener("keydown", function (e) {
