@@ -77,6 +77,10 @@
           <i class="fa-solid fa-gear"></i>
         </button>
 
+        <button id="edit-colors-btn" class="icon-button hidden" aria-label="Cores dos coletes" title="Cores dos coletes">
+          <i class="fa-solid fa-shirt"></i>
+        </button>
+
         <button id="compare-btn" class="secondary-button hidden">
           <i class="fa-solid fa-table"></i>
           Comparar jogadores
@@ -150,6 +154,25 @@
   </div>
 
   <!-- ============================================================
+       Bib colors modal
+       ============================================================ -->
+  <div id="colors-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content small">
+      <h3>Cores dos coletes</h3>
+      <label class="form-label">Colete do Time 1</label>
+      <div id="edit-team1-picker" class="bib-picker"></div>
+      <label class="form-label" style="margin-top:10px">Colete do Time 2</label>
+      <div id="edit-team2-picker" class="bib-picker"></div>
+      <p id="colors-warn" class="muted-text hidden" style="margin-top:8px">Os dois times estao com a mesma cor.</p>
+      <div class="modal-actions">
+        <button type="button" class="secondary-button" id="cancel-colors-btn">Cancelar</button>
+        <button type="button" class="primary-button" id="confirm-colors-btn">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
        Delete pelada modal
        ============================================================ -->
   <div id="delete-pelada-modal" class="modal hidden">
@@ -190,6 +213,13 @@
 
         <label class="form-label" for="create-pelada-pass2">Confirmar palavra-passe</label>
         <input id="create-pelada-pass2" class="form-input" type="password" placeholder="Repita a senha" autocomplete="new-password">
+
+        <div class="bib-colors-section">
+          <label class="form-label">Colete do Time 1</label>
+          <div id="create-team1-picker" class="bib-picker"></div>
+          <label class="form-label" style="margin-top:10px">Colete do Time 2</label>
+          <div id="create-team2-picker" class="bib-picker"></div>
+        </div>
 
         <p id="create-pass-error" class="error-text hidden" style="margin-top:6px"></p>
 

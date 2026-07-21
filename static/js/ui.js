@@ -14,6 +14,20 @@ let currentPeladaName = "";
 
 const ADMIN_SECRET = window.ADMIN_SECRET || "";
 
+const BIB_COLORS = [
+  { key: "blue", label: "Azul", light: "#4da3ff", dark: "#2d7cff" },
+  { key: "yellow", label: "Amarelo", light: "#ffd94d", dark: "#f5be18" },
+  { key: "green", label: "Verde", light: "#4ade80", dark: "#16a34a" },
+  { key: "red", label: "Vermelho", light: "#f87171", dark: "#dc2626" },
+  { key: "orange", label: "Laranja", light: "#fb923c", dark: "#ea580c" },
+  { key: "black", label: "Preto", light: "#4b5563", dark: "#111827" },
+  { key: "white", label: "Branco", light: "#f9fafb", dark: "#d1d5db" },
+  { key: "pink", label: "Rosa", light: "#f472b6", dark: "#db2777" },
+];
+
+let currentTeam1Color = "blue";
+let currentTeam2Color = "yellow";
+
 // ============================================================
 // DOM references — main app
 // ============================================================
@@ -55,6 +69,17 @@ const confirmDrawBtn = document.getElementById("confirm-draw-btn");
 const fabAddPlayerBtn = document.getElementById("fab-add-player");
 const toggleThemeBtn = document.getElementById("toggle-theme-btn");
 const adminModeBtn = document.getElementById("admin-mode-btn");
+const editColorsBtn = document.getElementById("edit-colors-btn");
+
+const colorsModalEl = document.getElementById("colors-modal");
+const editTeam1PickerEl = document.getElementById("edit-team1-picker");
+const editTeam2PickerEl = document.getElementById("edit-team2-picker");
+const colorsWarnEl = document.getElementById("colors-warn");
+const cancelColorsBtn = document.getElementById("cancel-colors-btn");
+const confirmColorsBtn = document.getElementById("confirm-colors-btn");
+
+const createTeam1PickerEl = document.getElementById("create-team1-picker");
+const createTeam2PickerEl = document.getElementById("create-team2-picker");
 const drawTeamsBtn = document.getElementById("draw-teams-btn");
 const redrawBtn = document.getElementById("redraw-btn");
 const compareBtn = document.getElementById("compare-btn");
@@ -121,8 +146,14 @@ const newPeladaBtn = document.getElementById("new-pelada-btn");
 
 let authTargetPeladaId = null;
 let authTargetPeladaName = "";
+let authTargetTeam1Color = "blue";
+let authTargetTeam2Color = "yellow";
 let deleteTargetPeladaId = null;
 let deleteTargetPeladaName = "";
+let wizardTeam1Color = "blue";
+let wizardTeam2Color = "yellow";
+let editingTeam1Color = "blue";
+let editingTeam2Color = "yellow";
 let wizardPlayers = [];
 let wizardPlayerRating = 3;
 let newPeladaId = null;
@@ -216,6 +247,9 @@ function updateAdminModeUI() {
   }
   if (compareBtn) {
     compareBtn.classList.toggle("hidden", !isAdminMode);
+  }
+  if (editColorsBtn) {
+    editColorsBtn.classList.toggle("hidden", !isAdminMode);
   }
   if (advancedAttributesSectionEl) {
     advancedAttributesSectionEl.classList.toggle("hidden", !isAdminMode);
@@ -331,6 +365,53 @@ function buildPlayerInitials(name) {
 
 function formatDecimal(value) {
   return Number(value).toFixed(1);
+}
+
+// ============================================================
+// Bib colors
+// ============================================================
+
+function getBibColor(key) {
+  return BIB_COLORS.find(function (c) { return c.key === key; }) || BIB_COLORS[0];
+}
+
+function applyBibGradient(element, colorKey) {
+  const color = getBibColor(colorKey);
+  element.style.background = "linear-gradient(180deg, " + color.light + " 0%, " + color.dark + " 100%)";
+}
+
+function buildBibIconEl(colorKey) {
+  const bib = document.createElement("span");
+  bib.className = "bib-icon";
+  bib.setAttribute("aria-hidden", "true");
+  applyBibGradient(bib, colorKey);
+  return bib;
+}
+
+function renderBibPicker(container, selectedKey, onSelect) {
+  if (!container) return;
+  container.innerHTML = "";
+
+  BIB_COLORS.forEach(function (c) {
+    const swatch = document.createElement("button");
+    swatch.type = "button";
+    swatch.className = "bib-swatch" + (c.key === selectedKey ? " bib-swatch-active" : "");
+    swatch.title = c.label;
+
+    const bib = document.createElement("span");
+    bib.className = "bib-icon";
+    bib.style.width = "20px";
+    bib.style.height = "24px";
+    applyBibGradient(bib, c.key);
+
+    const label = document.createElement("span");
+    label.textContent = c.label;
+
+    swatch.appendChild(bib);
+    swatch.appendChild(label);
+    swatch.addEventListener("click", function () { onSelect(c.key); });
+    container.appendChild(swatch);
+  });
 }
 
 // ============================================================

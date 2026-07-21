@@ -33,16 +33,16 @@ async function performDraw(teamSize) {
   }
 }
 
-function getTeamLabel(teamIndex) {
-  if (teamIndex === 1) return "Azul";
-  if (teamIndex === 2) return "Amarelo";
-  return "de fora";
+function getTeamColorKey(teamIndex) {
+  if (teamIndex === 1) return currentTeam1Color;
+  if (teamIndex === 2) return currentTeam2Color;
+  return null;
 }
 
-function getTeamBibClass(teamIndex) {
-  if (teamIndex === 1) return "bib-blue";
-  if (teamIndex === 2) return "bib-yellow";
-  return "";
+function getTeamLabel(teamIndex) {
+  const colorKey = getTeamColorKey(teamIndex);
+  if (colorKey) return getBibColor(colorKey).label;
+  return "de fora";
 }
 
 function renderTeams(teams) {
@@ -51,7 +51,7 @@ function renderTeams(teams) {
   teams.forEach(function (team, index) {
     const teamNumber = index + 1;
     const label = getTeamLabel(teamNumber);
-    const bibClass = getTeamBibClass(teamNumber);
+    const colorKey = getTeamColorKey(teamNumber);
 
     const card = document.createElement("div");
     card.className = "team-card";
@@ -66,11 +66,8 @@ function renderTeams(teams) {
     nameSpan.textContent = team.name + " - " + label;
     titleWrap.appendChild(nameSpan);
 
-    if (bibClass) {
-      const bibIcon = document.createElement("span");
-      bibIcon.className = "bib-icon " + bibClass;
-      bibIcon.setAttribute("aria-hidden", "true");
-      titleWrap.appendChild(bibIcon);
+    if (colorKey) {
+      titleWrap.appendChild(buildBibIconEl(colorKey));
     }
 
     if (isAdminMode) {

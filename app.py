@@ -6,8 +6,10 @@ from services.team_balancer import balance_teams
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "2.4.1")
+APP_VERSION = os.getenv("APP_VERSION", "2.5.0")
 ADMIN_SECRET = os.getenv("ADMIN_SECRET", "")
+
+VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white", "pink"}
 
 player_storage = PlayerStorage()
 pelada_storage = PeladaStorage()
@@ -73,7 +75,18 @@ def create_pelada():
     if not password:
         abort(400, description="Password cannot be empty")
 
-    pelada = pelada_storage.create_pelada(name=name, password=password)
+    team1_color = data.get("team1_color", "blue")
+    team2_color = data.get("team2_color", "yellow")
+
+    if team1_color not in VALID_BIB_COLORS or team2_color not in VALID_BIB_COLORS:
+        abort(400, description="Invalid bib color")
+
+    pelada = pelada_storage.create_pelada(
+        name=name,
+        password=password,
+        team1_color=team1_color,
+        team2_color=team2_color,
+    )
     return jsonify(pelada), 201
 
 
@@ -97,6 +110,28 @@ def auth_pelada(pelada_id):
         return jsonify({"ok": False, "is_admin": False}), 401
 
     return jsonify({"ok": True, "is_admin": False})
+
+
+@app.route("/api/peladas/<int:pelada_id>/colors", methods=["PATCH"])
+def update_pelada_colors(pelada_id):
+    data = request.get_json(silent=True) or {}
+    admin_secret = data.get("admin_secret", "")
+
+    if not ADMIN_SECRET or admin_secret != ADMIN_SECRET:
+        abort(403, description="Invalid admin secret")
+
+    team1_color = data.get("team1_color")
+    team2_color = data.get("team2_color")
+
+    if team1_color not in VALID_BIB_COLORS or team2_color not in VALID_BIB_COLORS:
+        abort(400, description="Invalid bib color")
+
+    pelada = pelada_storage.update_pelada_colors(pelada_id, team1_color, team2_color)
+
+    if not pelada:
+        abort(404, description="Pelada not found")
+
+    return jsonify(pelada)
 
 
 @app.route("/api/peladas/<int:pelada_id>", methods=["DELETE"])
