@@ -45,6 +45,25 @@ def ensure_schema() -> None:
             """)
 
             cur.execute("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'peladas' AND column_name = 'team1_color'
+                    ) THEN
+                        ALTER TABLE peladas ADD COLUMN team1_color TEXT NOT NULL DEFAULT 'blue';
+                    END IF;
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'peladas' AND column_name = 'team2_color'
+                    ) THEN
+                        ALTER TABLE peladas ADD COLUMN team2_color TEXT NOT NULL DEFAULT 'yellow';
+                    END IF;
+                END
+                $$;
+            """)
+
+            cur.execute("""
                 CREATE TABLE IF NOT EXISTS players (
                     id         SERIAL PRIMARY KEY,
                     pelada_id  INTEGER NOT NULL REFERENCES peladas(id) ON DELETE CASCADE,
@@ -78,6 +97,8 @@ def _row_to_pelada(row) -> Dict:
         "id": row["id"],
         "name": row["name"],
         "player_count": int(row.get("player_count", 0)),
+        "team1_color": row.get("team1_color") or "blue",
+        "team2_color": row.get("team2_color") or "yellow",
     }
 
 
@@ -86,23 +107,26 @@ class PeladaStorage:
         with _get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT p.id, p.name, COUNT(pl.id) AS player_count
+                    SELECT p.id, p.name, p.team1_color, p.team2_color, COUNT(pl.id) AS player_count
                     FROM peladas p
                     LEFT JOIN players pl ON pl.pelada_id = p.id
-                    GROUP BY p.id, p.name
+                    GROUP BY p.id, p.name, p.team1_color, p.team2_color
                     ORDER BY p.id
                 """)
                 return [_row_to_pelada(r) for r in cur.fetchall()]
 
-    def create_pelada(self, name: str, password: str) -> Dict:
+    def create_pelada(self, name: str, password: str, team1_color: str = "blue", team2_color: str = "yellow") -> Dict:
         with _get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO peladas (name, password) VALUES (%s, %s) RETURNING id, name, 0 AS player_count",
-                    (name, password),
+                    """
+                    INSERT INTO peladas (name, password, team1_color, team2_color)
+                    VALUES (%s, %s, %s, %s)
+                    RETURNING id, name, team1_color, team2_color, 0 AS player_count
+                    """,
+                    (name, password, team1_color, team2_color),
                 )
-                row = cur.fetchone()
-                return {"id": row["id"], "name": row["name"], "player_count": 0}
+                return _row_to_pelada(cur.fetchone())
 
     def verify_password(self, pelada_id: int, password: str) -> bool:
         with _get_connection() as conn:
@@ -120,12 +144,27 @@ class PeladaStorage:
         with _get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT p.id, p.name, COUNT(pl.id) AS player_count
+                    SELECT p.id, p.name, p.team1_color, p.team2_color, COUNT(pl.id) AS player_count
                     FROM peladas p
                     LEFT JOIN players pl ON pl.pelada_id = p.id
                     WHERE p.id = %s
-                    GROUP BY p.id, p.name
+                    GROUP BY p.id, p.name, p.team1_color, p.team2_color
                 """, (pelada_id,))
+                row = cur.fetchone()
+                return _row_to_pelada(row) if row else None
+
+    def update_pelada_colors(self, pelada_id: int, team1_color: str, team2_color: str) -> Optional[Dict]:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE peladas
+                    SET team1_color = %s, team2_color = %s
+                    WHERE id = %s
+                    RETURNING id, name, team1_color, team2_color, 0 AS player_count
+                    """,
+                    (team1_color, team2_color, pelada_id),
+                )
                 row = cur.fetchone()
                 return _row_to_pelada(row) if row else None
 

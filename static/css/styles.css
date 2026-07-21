@@ -638,12 +638,42 @@ body {
   background: transparent;
 }
 
-.bib-blue {
-  background: linear-gradient(180deg, #4da3ff 0%, #2d7cff 100%);
+.bib-colors-section {
+  margin-top: 12px;
 }
 
-.bib-yellow {
-  background: linear-gradient(180deg, #ffd94d 0%, #f5be18 100%);
+.bib-picker {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bib-swatch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 6px 8px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bib-swatch span {
+  font-size: 0.64rem;
+  color: var(--text-muted);
+}
+
+.bib-swatch.bib-swatch-active {
+  border-color: var(--accent);
+  background-color: var(--accent-soft);
+}
+
+.bib-swatch.bib-swatch-active span {
+  color: var(--text);
 }
 
 .audit-icon-button {

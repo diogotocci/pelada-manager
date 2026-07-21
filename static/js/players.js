@@ -8,9 +8,11 @@ function showPeladaScreen() {
   loadPeladas();
 }
 
-function showAppScreen(peladaId, peladaName) {
+function showAppScreen(peladaId, peladaName, team1Color, team2Color) {
   currentPeladaId = peladaId;
   currentPeladaName = peladaName;
+  currentTeam1Color = team1Color || "blue";
+  currentTeam2Color = team2Color || "yellow";
 
   peladaScreenEl.classList.add("hidden");
   appContainerEl.classList.remove("hidden");
@@ -75,7 +77,7 @@ async function loadPeladas() {
       card.appendChild(lockIcon);
 
       card.addEventListener("click", function () {
-        openAuthModal(p.id, p.name);
+        openAuthModal(p.id, p.name, p.team1_color, p.team2_color);
       });
 
       peladaListEl.appendChild(card);
@@ -87,9 +89,11 @@ async function loadPeladas() {
   }
 }
 
-function openAuthModal(peladaId, peladaName) {
+function openAuthModal(peladaId, peladaName, team1Color, team2Color) {
   authTargetPeladaId = peladaId;
   authTargetPeladaName = peladaName;
+  authTargetTeam1Color = team1Color || "blue";
+  authTargetTeam2Color = team2Color || "yellow";
   authPeladaNameEl.textContent = peladaName;
   authPasswordInput.value = "";
   authErrorEl.classList.add("hidden");
@@ -127,7 +131,7 @@ async function confirmAuth() {
     }
 
     closeModal(authModalEl);
-    showAppScreen(authTargetPeladaId, authTargetPeladaName);
+    showAppScreen(authTargetPeladaId, authTargetPeladaName, authTargetTeam1Color, authTargetTeam2Color);
   } catch (err) {
     console.error(err);
     authErrorEl.textContent = "Erro ao autenticar.";
@@ -187,8 +191,73 @@ async function confirmDeletePelada() {
 }
 
 // ============================================================
+// Bib colors modal (admin)
+// ============================================================
+
+function renderEditColorPickers() {
+  renderBibPicker(editTeam1PickerEl, editingTeam1Color, function (key) {
+    editingTeam1Color = key;
+    renderEditColorPickers();
+  });
+  renderBibPicker(editTeam2PickerEl, editingTeam2Color, function (key) {
+    editingTeam2Color = key;
+    renderEditColorPickers();
+  });
+  colorsWarnEl.classList.toggle("hidden", editingTeam1Color !== editingTeam2Color);
+}
+
+function openColorsModal() {
+  if (!isAdminMode) return;
+  editingTeam1Color = currentTeam1Color;
+  editingTeam2Color = currentTeam2Color;
+  renderEditColorPickers();
+  openModal(colorsModalEl);
+}
+
+async function confirmColors() {
+  try {
+    const res = await fetchJSONRaw("/api/peladas/" + currentPeladaId + "/colors", {
+      method: "PATCH",
+      body: JSON.stringify({
+        admin_secret: ADMIN_SECRET,
+        team1_color: editingTeam1Color,
+        team2_color: editingTeam2Color,
+      }),
+    });
+
+    if (!res.ok) {
+      showToast("Erro ao salvar cores.");
+      return;
+    }
+
+    currentTeam1Color = editingTeam1Color;
+    currentTeam2Color = editingTeam2Color;
+    closeModal(colorsModalEl);
+    showToast("Cores atualizadas.", "success");
+
+    if (lastDrawnTeams.length > 0) {
+      renderTeams(lastDrawnTeams);
+    }
+  } catch (err) {
+    console.error(err);
+    showToast("Erro ao salvar cores.");
+  }
+}
+
+// ============================================================
 // Create pelada wizard
 // ============================================================
+
+function renderWizardColorPickers() {
+  renderBibPicker(createTeam1PickerEl, wizardTeam1Color, function (key) {
+    wizardTeam1Color = key;
+    renderWizardColorPickers();
+  });
+  renderBibPicker(createTeam2PickerEl, wizardTeam2Color, function (key) {
+    wizardTeam2Color = key;
+    renderWizardColorPickers();
+  });
+}
 
 function openCreateModal() {
   createNameInput.value = "";
@@ -197,6 +266,9 @@ function openCreateModal() {
   createPassErrorEl.classList.add("hidden");
   wizardPlayers = [];
   wizardPlayerRating = 3;
+  wizardTeam1Color = "blue";
+  wizardTeam2Color = "yellow";
+  renderWizardColorPickers();
   renderWizardPlayerList();
   renderStarWidget(createWizardStarWidgetEl, 3, createWizardPlayerRatingInput);
   if (createWizardPlayerRatingInput) createWizardPlayerRatingInput.value = "3";
@@ -294,7 +366,12 @@ async function confirmCreate() {
   try {
     const res = await fetchJSONRaw("/api/peladas", {
       method: "POST",
-      body: JSON.stringify({ name, password }),
+      body: JSON.stringify({
+        name,
+        password,
+        team1_color: wizardTeam1Color,
+        team2_color: wizardTeam2Color,
+      }),
     });
 
     const pelada = await res.json();
@@ -320,7 +397,7 @@ async function confirmCreate() {
     closeModal(createModalEl);
     isAdminMode = true;
     localStorage.setItem("pelada-admin-mode", "true");
-    showAppScreen(newPeladaId, name);
+    showAppScreen(newPeladaId, name, wizardTeam1Color, wizardTeam2Color);
   } catch (err) {
     console.error(err);
     showToast("Erro ao criar pelada.");
@@ -723,6 +800,10 @@ if (backToPeladasBtn) {
 
 if (cancelAuthBtn) { cancelAuthBtn.addEventListener("click", function () { closeModal(authModalEl); }); }
 if (confirmAuthBtn) { confirmAuthBtn.addEventListener("click", confirmAuth); }
+
+if (editColorsBtn) { editColorsBtn.addEventListener("click", openColorsModal); }
+if (cancelColorsBtn) { cancelColorsBtn.addEventListener("click", function () { closeModal(colorsModalEl); }); }
+if (confirmColorsBtn) { confirmColorsBtn.addEventListener("click", confirmColors); }
 
 if (cancelDeletePeladaBtn) {
   cancelDeletePeladaBtn.addEventListener("click", function () {
