@@ -6,7 +6,7 @@ from services.team_balancer import balance_teams
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "2.4.0")
+APP_VERSION = os.getenv("APP_VERSION", "2.4.1")
 ADMIN_SECRET = os.getenv("ADMIN_SECRET", "")
 
 player_storage = PlayerStorage()
