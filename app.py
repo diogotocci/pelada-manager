@@ -6,7 +6,7 @@ from services.team_balancer import balance_teams
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "2.6.0")
+APP_VERSION = os.getenv("APP_VERSION", "2.6.1")
 ADMIN_SECRET = os.getenv("ADMIN_SECRET", "")
 
 VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white", "pink"}
