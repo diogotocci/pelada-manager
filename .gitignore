@@ -13,6 +13,7 @@ __pycache__/
 .env.production.local
 *.json
 !package.json
+!static/manifest.json
 password.txt
 
 data_scripts/*

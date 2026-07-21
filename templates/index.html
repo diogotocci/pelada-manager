@@ -2,12 +2,17 @@
 <html lang="pt-BR" data-theme="dark">
 <head>
   <meta charset="UTF-8">
-  <title>Pelada Balanceada</title>
+  <title>Time Justo</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
 
   <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.png') }}">
   <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='icon-192.png') }}">
-  <meta name="theme-color" content="#000000">
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}?v={{ app_version }}">
+  <meta name="theme-color" content="#0b0c10">
+  <meta name="application-name" content="Time Justo">
+  <meta name="apple-mobile-web-app-title" content="Time Justo">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -30,7 +35,7 @@
   <div id="pelada-screen" class="pelada-screen">
     <div class="pelada-screen-header">
       <div>
-        <h1>Pelada Balanceada</h1>
+        <h1>Time Justo</h1>
         <p>Escolha uma pelada para entrar</p>
       </div>
       <button id="toggle-theme-btn" class="icon-button" aria-label="Alternar tema">
@@ -67,7 +72,7 @@
           <i class="fa-solid fa-arrow-left"></i>
         </button>
         <div>
-          <h1 id="app-header-title">Pelada Balanceada</h1>
+          <h1 id="app-header-title">Time Justo</h1>
           <p id="app-header-sub">Sorteio de times equilibrados</p>
         </div>
       </div>
