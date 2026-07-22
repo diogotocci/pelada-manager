@@ -1,227 +1,548 @@
 // ============================================================
-// Pelada screen
+// Home — lista de peladas
 // ============================================================
 
-function showPeladaScreen() {
-  peladaScreenEl.classList.remove("hidden");
-  appContainerEl.classList.add("hidden");
+let authTargetPelada = null;
+let deleteTargetPelada = null;
+let adminKeyMode = "admin"; // "admin" | "delete-pelada"
+let confirmAction = null;
+
+function goHome() {
+  closeSheets();
+  currentPeladaId = null;
+  currentPeladaName = "";
+  players = [];
+  checkinState = {};
+  lastDrawnTeams = [];
+  localStorage.removeItem("pelada-current-id");
+  localStorage.removeItem("pelada-current-name");
+  showScreen("s-home");
   loadPeladas();
 }
 
-function showAppScreen(peladaId, peladaName, team1Color, team2Color) {
-  currentPeladaId = peladaId;
-  currentPeladaName = peladaName;
-  currentTeam1Color = team1Color || "blue";
-  currentTeam2Color = team2Color || "yellow";
-
-  peladaScreenEl.classList.add("hidden");
-  appContainerEl.classList.remove("hidden");
-
-  if (appHeaderTitleEl) appHeaderTitleEl.textContent = peladaName;
-  if (appHeaderSubEl) appHeaderSubEl.textContent = "Sorteio de times equilibrados";
-
-  localStorage.setItem("pelada-current-id", String(peladaId));
-  localStorage.setItem("pelada-current-name", peladaName);
-
-  players = [];
-  lastDrawnTeams = [];
-  teamsSectionEl.classList.add("hidden");
-  playersListEl.innerHTML = "";
-  playerCountEl.textContent = "Carregando...";
-
-  loadPlayers();
-}
-
 async function loadPeladas() {
-  peladaLoadingEl.classList.remove("hidden");
-  peladaEmptyEl.classList.add("hidden");
-  peladaListEl.innerHTML = "";
+  const loadingEl = $("pelada-loading");
+  const emptyEl = $("pelada-empty");
+  const listEl = $("pelada-list");
+
+  loadingEl.classList.remove("hidden");
+  emptyEl.classList.add("hidden");
+  listEl.innerHTML = "";
 
   try {
     const res = await fetch("/api/peladas");
     const peladas = await res.json();
 
-    peladaLoadingEl.classList.add("hidden");
+    loadingEl.classList.add("hidden");
 
     if (peladas.length === 0) {
-      peladaEmptyEl.classList.remove("hidden");
+      emptyEl.classList.remove("hidden");
       return;
     }
 
     peladas.forEach(function (p) {
-      const card = document.createElement("div");
-      card.className = "pelada-card";
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "row";
 
-      const initials = p.name.trim().split(/\s+/).map(function (w) { return w[0]; }).join("").substring(0, 2).toUpperCase();
+      const avatar = document.createElement("div");
+      avatar.className = "avatar hl";
+      avatar.textContent = buildPlayerInitials(p.name);
 
-      card.innerHTML =
-        '<div class="pelada-card-avatar">' + initials + '</div>' +
-        '<div class="pelada-card-info">' +
-          '<div class="pelada-card-name">' + p.name + '</div>' +
-          '<div class="pelada-card-meta">' + p.player_count + ' jogador(es)</div>' +
-        '</div>';
+      const main = document.createElement("div");
+      main.className = "r-main";
+      main.innerHTML =
+        '<span class="r-name">' + escapeHTML(p.name) + "</span>" +
+        '<span class="r-meta">' + p.player_count + " jogador" + (p.player_count === 1 ? "" : "es") + "</span>";
 
-      const deleteIcon = document.createElement("i");
-      deleteIcon.className = "fa-solid fa-trash pelada-card-delete";
-      deleteIcon.setAttribute("aria-hidden", "true");
-      deleteIcon.title = "Excluir pelada";
-      deleteIcon.addEventListener("click", function (e) {
+      const meta = main.querySelector(".r-meta");
+      meta.appendChild(buildBibEl(p.team1_color, true));
+      meta.appendChild(buildBibEl(p.team2_color, true));
+
+      const deleteBtn = document.createElement("span");
+      deleteBtn.className = "row-action";
+      deleteBtn.setAttribute("role", "button");
+      deleteBtn.setAttribute("aria-label", "Excluir pelada");
+      deleteBtn.title = "Excluir pelada";
+      deleteBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/></svg>';
+      deleteBtn.addEventListener("click", function (e) {
         e.stopPropagation();
-        handleDeletePeladaIconClick(p.id, p.name);
-      });
-      card.appendChild(deleteIcon);
-
-      const lockIcon = document.createElement("i");
-      lockIcon.className = "fa-solid fa-lock pelada-card-lock";
-      lockIcon.setAttribute("aria-hidden", "true");
-      card.appendChild(lockIcon);
-
-      card.addEventListener("click", function () {
-        openAuthModal(p.id, p.name, p.team1_color, p.team2_color);
+        startDeletePelada(p);
       });
 
-      peladaListEl.appendChild(card);
+      const chev = document.createElement("span");
+      chev.className = "chev";
+      chev.innerHTML = '<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>';
+
+      row.appendChild(avatar);
+      row.appendChild(main);
+      row.appendChild(deleteBtn);
+      row.appendChild(chev);
+
+      row.addEventListener("click", function () { openAuthSheet(p); });
+      listEl.appendChild(row);
     });
   } catch (err) {
     console.error("Failed to load peladas:", err);
-    peladaLoadingEl.classList.add("hidden");
+    loadingEl.classList.add("hidden");
     showToast("Erro ao carregar peladas.");
   }
 }
 
-function openAuthModal(peladaId, peladaName, team1Color, team2Color) {
-  authTargetPeladaId = peladaId;
-  authTargetPeladaName = peladaName;
-  authTargetTeam1Color = team1Color || "blue";
-  authTargetTeam2Color = team2Color || "yellow";
-  authPeladaNameEl.textContent = peladaName;
-  authPasswordInput.value = "";
-  authErrorEl.classList.add("hidden");
-  openModal(authModalEl);
-  setTimeout(function () { authPasswordInput.focus(); }, 100);
+// ============================================================
+// Auth
+// ============================================================
+
+function openAuthSheet(pelada) {
+  authTargetPelada = pelada;
+  $("au-name").textContent = pelada.name;
+  $("au-pass").value = "";
+  $("au-err").classList.remove("on");
+  openSheet("auth");
+  setTimeout(function () { $("au-pass").focus(); }, 100);
 }
 
 async function confirmAuth() {
-  const password = authPasswordInput.value.trim();
+  const pelada = authTargetPelada;
+  if (!pelada) return;
+
+  const password = $("au-pass").value.trim();
+  const errEl = $("au-err");
+
   if (!password) {
-    authErrorEl.textContent = "Digite a palavra-passe.";
-    authErrorEl.classList.remove("hidden");
+    errEl.textContent = "Digite a palavra-passe.";
+    errEl.classList.add("on");
     return;
   }
 
   try {
-    const res = await fetchJSONRaw("/api/peladas/" + authTargetPeladaId + "/auth", {
+    const res = await fetchJSONRaw("/api/peladas/" + pelada.id + "/auth", {
       method: "POST",
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ password: password }),
     });
 
     const data = await res.json();
 
     if (!res.ok || !data.ok) {
-      authErrorEl.textContent = "Palavra-passe incorreta.";
-      authErrorEl.classList.remove("hidden");
-      authPasswordInput.value = "";
-      authPasswordInput.focus();
+      errEl.textContent = "Palavra-passe incorreta.";
+      errEl.classList.add("on");
+      $("au-pass").value = "";
+      $("au-pass").focus();
       return;
     }
 
     if (data.is_admin) {
-      isAdminMode = true;
-      localStorage.setItem("pelada-admin-mode", "true");
+      setAdminMode(true);
     }
 
-    closeModal(authModalEl);
-    showAppScreen(authTargetPeladaId, authTargetPeladaName, authTargetTeam1Color, authTargetTeam2Color);
+    closeSheets();
+    enterPelada(pelada);
   } catch (err) {
     console.error(err);
-    authErrorEl.textContent = "Erro ao autenticar.";
-    authErrorEl.classList.remove("hidden");
+    errEl.textContent = "Erro ao autenticar.";
+    errEl.classList.add("on");
   }
 }
 
-function handleDeletePeladaIconClick(peladaId, peladaName) {
-  const secret = prompt("Digite a chave admin:");
-  if (secret == null) return;
+// ============================================================
+// Entrar / sair da pelada
+// ============================================================
 
-  if (secret !== ADMIN_SECRET) {
-    showToast("Chave admin invalida.");
+function enterPelada(pelada) {
+  currentPeladaId = pelada.id;
+  currentPeladaName = pelada.name;
+  currentTeam1Color = pelada.team1_color || "blue";
+  currentTeam2Color = pelada.team2_color || "yellow";
+
+  localStorage.setItem("pelada-current-id", String(pelada.id));
+  localStorage.setItem("pelada-current-name", pelada.name);
+
+  players = [];
+  checkinState = {};
+  lastDrawnTeams = [];
+
+  $("ci-title").textContent = pelada.name;
+  $("sq-title").textContent = pelada.name;
+  $("ci-date").textContent = todayLabel();
+
+  showScreen("s-checkin");
+  renderCheckin();
+  loadPlayers();
+}
+
+async function loadPlayers() {
+  try {
+    players = await fetchJSON("/api/players");
+    checkinState = {};
+    players.forEach(function (p) { checkinState[p.id] = false; });
+    renderCheckin();
+    renderSquad();
+  } catch (err) {
+    console.error("Failed to load players:", err);
+    showToast("Erro ao carregar jogadores.");
+  }
+}
+
+// ============================================================
+// Tabs
+// ============================================================
+
+function setTab(tab) {
+  closeSheets();
+  if (tab === "hoje") {
+    showScreen("s-checkin");
+    renderCheckin();
+  } else {
+    showScreen("s-squad");
+    renderSquad();
+  }
+}
+
+// ============================================================
+// Check-in
+// ============================================================
+
+function getPresentIds() {
+  return Object.keys(checkinState)
+    .filter(function (id) { return checkinState[id]; })
+    .map(function (id) { return parseInt(id, 10); });
+}
+
+function renderCheckin() {
+  const listEl = $("ci-list");
+  if (!listEl) return;
+  listEl.innerHTML = "";
+
+  const presentCount = getPresentIds().length;
+  const total = players.length;
+
+  $("ci-empty").classList.toggle("hidden", total > 0);
+
+  const sorted = players.slice().sort(function (a, b) {
+    return a.name.trim().localeCompare(b.name.trim(), "pt-BR", { sensitivity: "base" });
+  });
+
+  sorted.forEach(function (p) {
+    const isPresent = !!checkinState[p.id];
+
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "row " + (isPresent ? "checked" : "unchecked-dim");
+    row.setAttribute("aria-pressed", String(isPresent));
+
+    const avatar = document.createElement("div");
+    avatar.className = "avatar" + (isPresent ? " hl" : "");
+    avatar.textContent = buildPlayerInitials(p.name);
+
+    const main = document.createElement("div");
+    main.className = "r-main";
+    main.innerHTML = '<span class="r-name">' + escapeHTML(p.name) + "</span>";
+
+    const check = document.createElement("span");
+    check.className = "check";
+    check.innerHTML = '<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>';
+
+    row.appendChild(avatar);
+    row.appendChild(main);
+    row.appendChild(check);
+
+    row.addEventListener("click", function () {
+      checkinState[p.id] = !checkinState[p.id];
+      renderCheckin();
+    });
+
+    listEl.appendChild(row);
+  });
+
+  $("ci-count").textContent = presentCount;
+  $("ci-count-lbl").textContent =
+    "presente" + (presentCount === 1 ? "" : "s") + " · de " + total;
+  $("ci-cta").disabled = presentCount < 2;
+  $("ci-cta-lbl").textContent =
+    presentCount > 1 ? "Sortear times (" + presentCount + ")" : "Sortear times";
+}
+
+function checkAll(value) {
+  players.forEach(function (p) { checkinState[p.id] = value; });
+  renderCheckin();
+}
+
+// ============================================================
+// Elenco
+// ============================================================
+
+function renderSquad() {
+  const listEl = $("sq-list");
+  if (!listEl || currentPeladaId == null) return;
+  listEl.innerHTML = "";
+
+  $("sq-count").textContent =
+    players.length + " jogador" + (players.length === 1 ? "" : "es") + " cadastrado" + (players.length === 1 ? "" : "s");
+  $("sq-empty").classList.toggle("hidden", players.length > 0);
+  $("sq-admin-actions").classList.toggle("hidden", !isAdminMode);
+
+  const sorted = players.slice().sort(function (a, b) {
+    return a.name.trim().localeCompare(b.name.trim(), "pt-BR", { sensitivity: "base" });
+  });
+
+  sorted.forEach(function (p) {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "row";
+
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.textContent = buildPlayerInitials(p.name);
+
+    const main = document.createElement("div");
+    main.className = "r-main";
+    let mainHTML = '<span class="r-name">' + escapeHTML(p.name) + "</span>";
+    if (isAdminMode) {
+      mainHTML +=
+        '<span class="r-meta">' + buildStarsHTML(p.rating) +
+        '<span class="rating-num">' + formatDecimal(p.rating) + "</span></span>";
+    }
+    main.innerHTML = mainHTML;
+
+    row.appendChild(avatar);
+    row.appendChild(main);
+
+    if (isAdminMode) {
+      const chev = document.createElement("span");
+      chev.className = "chev";
+      chev.innerHTML = '<svg viewBox="0 0 24 24"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>';
+      row.appendChild(chev);
+      row.addEventListener("click", function () { openPlayerSheet(p); });
+    }
+
+    listEl.appendChild(row);
+  });
+}
+
+// ============================================================
+// Novo / editar jogador
+// ============================================================
+
+let editingPlayer = null;
+let pfRating = 3;
+let pfAttrs = { marking: 2, stamina: 2, scoring: 2 };
+
+function refreshPlayerSheet() {
+  renderStarInput($("pf-stars"), pfRating, function (value) {
+    pfRating = value;
+    refreshPlayerSheet();
+  });
+  $("pf-adv").classList.toggle("hidden", !isAdminMode);
+  renderSeg($("pf-marking"), pfAttrs.marking, function (v) { pfAttrs.marking = v; refreshPlayerSheet(); });
+  renderSeg($("pf-stamina"), pfAttrs.stamina, function (v) { pfAttrs.stamina = v; refreshPlayerSheet(); });
+  renderSeg($("pf-scoring"), pfAttrs.scoring, function (v) { pfAttrs.scoring = v; refreshPlayerSheet(); });
+}
+
+function openPlayerSheet(player) {
+  editingPlayer = player || null;
+
+  $("pf-title").textContent = player ? "Editar jogador" : "Novo jogador";
+  $("pf-sub").textContent = player ? player.name : "Nome e nível geral";
+  $("pf-name").value = player ? player.name : "";
+  $("pf-err").classList.remove("on");
+  $("pf-delete").classList.toggle("hidden", !player || !isAdminMode);
+
+  pfRating = player ? player.rating : 3;
+  pfAttrs = player
+    ? {
+        marking: getAttributeValue(player, "marking"),
+        stamina: getAttributeValue(player, "stamina"),
+        scoring: getAttributeValue(player, "scoring"),
+      }
+    : { marking: 2, stamina: 2, scoring: 2 };
+
+  refreshPlayerSheet();
+  openSheet("player");
+  if (!player) {
+    setTimeout(function () { $("pf-name").focus(); }, 100);
+  }
+}
+
+async function savePlayer() {
+  const name = $("pf-name").value.trim();
+  const errEl = $("pf-err");
+
+  if (!name) {
+    errEl.textContent = "Dê um nome ao jogador.";
+    errEl.classList.add("on");
     return;
   }
 
-  openDeletePeladaModal(peladaId, peladaName);
-}
-
-function openDeletePeladaModal(peladaId, peladaName) {
-  deleteTargetPeladaId = peladaId;
-  deleteTargetPeladaName = peladaName;
-
-  deletePeladaMessageEl.innerHTML = "";
-  deletePeladaMessageEl.appendChild(document.createTextNode("Tem certeza que deseja excluir a pelada "));
-  const strong = document.createElement("strong");
-  strong.textContent = peladaName;
-  deletePeladaMessageEl.appendChild(strong);
-  deletePeladaMessageEl.appendChild(document.createTextNode("?"));
-
-  openModal(deletePeladaModalEl);
-}
-
-async function confirmDeletePelada() {
-  if (deleteTargetPeladaId == null) return;
+  const payload = { name: name, rating: pfRating };
+  if (isAdminMode) {
+    payload.marking = pfAttrs.marking;
+    payload.stamina = pfAttrs.stamina;
+    payload.scoring = pfAttrs.scoring;
+  }
 
   try {
-    const res = await fetchJSONRaw("/api/peladas/" + deleteTargetPeladaId, {
-      method: "DELETE",
-      body: JSON.stringify({ admin_secret: ADMIN_SECRET }),
-    });
-
-    if (!res.ok) {
-      showToast("Erro ao excluir pelada.");
-      return;
+    if (editingPlayer == null) {
+      const newPlayer = await fetchJSON("/api/players", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      players.push(newPlayer);
+      checkinState[newPlayer.id] = false;
+      showToast(name + " entrou no elenco");
+    } else {
+      const updated = await fetchJSON("/api/players/" + editingPlayer.id, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+      players = players.map(function (p) { return p.id === updated.id ? updated : p; });
+      showToast("Jogador atualizado");
     }
 
-    closeModal(deletePeladaModalEl);
-    loadPeladas();
+    closeSheets();
+    renderSquad();
+    renderCheckin();
   } catch (err) {
     console.error(err);
-    showToast("Erro ao excluir pelada.");
-  } finally {
-    deleteTargetPeladaId = null;
-    deleteTargetPeladaName = "";
+    showToast("Erro ao salvar jogador.");
   }
 }
 
-// ============================================================
-// Bib colors modal (admin)
-// ============================================================
-
-function renderEditColorPickers() {
-  renderBibPicker(editTeam1PickerEl, editingTeam1Color, function (key) {
-    editingTeam1Color = key;
-    renderEditColorPickers();
-  });
-  renderBibPicker(editTeam2PickerEl, editingTeam2Color, function (key) {
-    editingTeam2Color = key;
-    renderEditColorPickers();
-  });
-  colorsWarnEl.classList.toggle("hidden", editingTeam1Color !== editingTeam2Color);
+function askDeletePlayer() {
+  if (!editingPlayer) return;
+  const player = editingPlayer;
+  openConfirmSheet(
+    "Remover jogador",
+    "Tem certeza que deseja remover " + player.name + "?",
+    "Remover",
+    async function () {
+      try {
+        await fetchJSON("/api/players/" + player.id, { method: "DELETE" });
+        players = players.filter(function (p) { return p.id !== player.id; });
+        delete checkinState[player.id];
+        closeSheets();
+        renderSquad();
+        renderCheckin();
+        showToast("Jogador removido");
+      } catch (err) {
+        console.error(err);
+        showToast("Erro ao remover jogador.");
+      }
+    }
+  );
 }
 
-function openColorsModal() {
-  if (!isAdminMode) return;
-  editingTeam1Color = currentTeam1Color;
-  editingTeam2Color = currentTeam2Color;
-  renderEditColorPickers();
-  openModal(colorsModalEl);
+// ============================================================
+// Confirmação genérica
+// ============================================================
+
+function openConfirmSheet(title, message, actionLabel, onConfirm) {
+  $("cf-title").textContent = title;
+  $("cf-msg").textContent = message;
+  $("cf-confirm").textContent = actionLabel;
+  confirmAction = onConfirm;
+  openSheet("confirm");
 }
 
-async function confirmColors() {
+// ============================================================
+// Chave admin (ativar modo admin / excluir pelada)
+// ============================================================
+
+function openAdminKeySheet(mode) {
+  adminKeyMode = mode;
+  $("ak-title").textContent = mode === "admin" ? "Ativar modo admin" : "Excluir pelada";
+  $("ak-sub").textContent = "Digite a chave de administrador";
+  $("ak-pass").value = "";
+  $("ak-err").classList.remove("on");
+  openSheet("adminkey");
+  setTimeout(function () { $("ak-pass").focus(); }, 100);
+}
+
+function confirmAdminKey() {
+  const key = $("ak-pass").value.trim();
+  const errEl = $("ak-err");
+
+  if (!key) {
+    errEl.textContent = "Digite a chave admin.";
+    errEl.classList.add("on");
+    return;
+  }
+
+  if (key !== ADMIN_SECRET) {
+    errEl.textContent = "Chave admin inválida.";
+    errEl.classList.add("on");
+    $("ak-pass").value = "";
+    $("ak-pass").focus();
+    return;
+  }
+
+  if (adminKeyMode === "admin") {
+    setAdminMode(true);
+    openSheet("menu");
+    renderMenuSheet();
+    showToast("Modo admin ativado");
+    return;
+  }
+
+  // delete-pelada
+  const pelada = deleteTargetPelada;
+  if (!pelada) { closeSheets(); return; }
+  openConfirmSheet(
+    "Excluir pelada",
+    "Excluir " + pelada.name + "? Essa ação é irreversível e remove todos os jogadores.",
+    "Excluir",
+    async function () {
+      try {
+        const res = await fetchJSONRaw("/api/peladas/" + pelada.id, {
+          method: "DELETE",
+          body: JSON.stringify({ admin_secret: ADMIN_SECRET }),
+        });
+        if (!res.ok) {
+          showToast("Erro ao excluir pelada.");
+          return;
+        }
+        closeSheets();
+        showToast("Pelada excluída");
+        loadPeladas();
+      } catch (err) {
+        console.error(err);
+        showToast("Erro ao excluir pelada.");
+      } finally {
+        deleteTargetPelada = null;
+      }
+    }
+  );
+}
+
+function startDeletePelada(pelada) {
+  deleteTargetPelada = pelada;
+  openAdminKeySheet("delete-pelada");
+}
+
+// ============================================================
+// Ajustes (menu)
+// ============================================================
+
+function renderMenuSheet() {
+  $("mn-name").textContent = currentPeladaName || "Ajustes";
+  const theme = document.documentElement.getAttribute("data-theme") || "light";
+  $("mn-theme").classList.toggle("on", theme === "dark");
+  refreshAdminUI();
+
+  if (isAdminMode && currentPeladaId != null) {
+    renderSwatches($("mn-c1"), currentTeam1Color, function (key) { saveColors(key, currentTeam2Color); });
+    renderSwatches($("mn-c2"), currentTeam2Color, function (key) { saveColors(currentTeam1Color, key); });
+    $("mn-same").classList.toggle("on", currentTeam1Color === currentTeam2Color);
+  }
+}
+
+async function saveColors(team1Color, team2Color) {
   try {
     const res = await fetchJSONRaw("/api/peladas/" + currentPeladaId + "/colors", {
       method: "PATCH",
       body: JSON.stringify({
         admin_secret: ADMIN_SECRET,
-        team1_color: editingTeam1Color,
-        team2_color: editingTeam2Color,
+        team1_color: team1Color,
+        team2_color: team2Color,
       }),
     });
 
@@ -230,147 +551,147 @@ async function confirmColors() {
       return;
     }
 
-    currentTeam1Color = editingTeam1Color;
-    currentTeam2Color = editingTeam2Color;
-    closeModal(colorsModalEl);
-    showToast("Cores atualizadas.", "success");
-
-    if (lastDrawnTeams.length > 0) {
-      renderTeams(lastDrawnTeams);
-    }
+    currentTeam1Color = team1Color;
+    currentTeam2Color = team2Color;
+    renderMenuSheet();
+    if (lastDrawnTeams.length > 0) renderTeams(lastDrawnTeams);
   } catch (err) {
     console.error(err);
     showToast("Erro ao salvar cores.");
   }
 }
 
+function toggleAdmin() {
+  if (!isAdminMode) {
+    openAdminKeySheet("admin");
+    return;
+  }
+  setAdminMode(false);
+  renderMenuSheet();
+  showToast("Modo admin desativado");
+}
+
 // ============================================================
-// Create pelada wizard
+// Nova pelada (wizard)
 // ============================================================
 
-function renderWizardColorPickers() {
-  renderBibPicker(createTeam1PickerEl, wizardTeam1Color, function (key) {
-    wizardTeam1Color = key;
-    renderWizardColorPickers();
+let wizard = { c1: "blue", c2: "yellow", rating: 3, players: [] };
+
+function openWizard() {
+  wizard = { c1: "blue", c2: "yellow", rating: 3, players: [] };
+  $("wz-name").value = "";
+  $("wz-pass").value = "";
+  $("wz-pass2").value = "";
+  $("wz-err").classList.remove("on");
+  $("wz-player").value = "";
+  renderWizardSwatches();
+  renderWizardStars();
+  renderWizardPlayers();
+  showScreen("s-wiz1");
+}
+
+function renderWizardSwatches() {
+  renderSwatches($("wz-c1"), wizard.c1, function (key) { wizard.c1 = key; renderWizardSwatches(); });
+  renderSwatches($("wz-c2"), wizard.c2, function (key) { wizard.c2 = key; renderWizardSwatches(); });
+}
+
+function renderWizardStars() {
+  renderStarInput($("wz-stars"), wizard.rating, function (value) {
+    wizard.rating = value;
+    renderWizardStars();
   });
-  renderBibPicker(createTeam2PickerEl, wizardTeam2Color, function (key) {
-    wizardTeam2Color = key;
-    renderWizardColorPickers();
-  });
 }
 
-function openCreateModal() {
-  createNameInput.value = "";
-  createPassInput.value = "";
-  createPass2Input.value = "";
-  createPassErrorEl.classList.add("hidden");
-  wizardPlayers = [];
-  wizardPlayerRating = 3;
-  wizardTeam1Color = "blue";
-  wizardTeam2Color = "yellow";
-  renderWizardColorPickers();
-  renderWizardPlayerList();
-  renderStarWidget(createWizardStarWidgetEl, 3, createWizardPlayerRatingInput);
-  if (createWizardPlayerRatingInput) createWizardPlayerRatingInput.value = "3";
-  showCreateStep(1);
-  openModal(createModalEl);
-}
-
-function showCreateStep(step) {
-  createStep1El.classList.toggle("hidden", step !== 1);
-  createStep2El.classList.toggle("hidden", step !== 2);
-}
-
-function validateCreateStep1() {
-  const name = createNameInput.value.trim();
-  const pass = createPassInput.value.trim();
-  const pass2 = createPass2Input.value.trim();
+function wizardNext() {
+  const name = $("wz-name").value.trim();
+  const pass = $("wz-pass").value;
+  const pass2 = $("wz-pass2").value;
+  const errEl = $("wz-err");
 
   if (!name) {
-    createPassErrorEl.textContent = "Informe o nome da pelada.";
-    createPassErrorEl.classList.remove("hidden");
-    return false;
+    errEl.textContent = "Dê um nome à pelada.";
+    errEl.classList.add("on");
+    return;
   }
-
-  if (!pass) {
-    createPassErrorEl.textContent = "Informe a palavra-passe.";
-    createPassErrorEl.classList.remove("hidden");
-    return false;
+  if (!pass.trim()) {
+    errEl.textContent = "Defina uma palavra-passe.";
+    errEl.classList.add("on");
+    return;
   }
-
   if (pass !== pass2) {
-    createPassErrorEl.textContent = "As palavras-passe nao coincidem.";
-    createPassErrorEl.classList.remove("hidden");
-    return false;
+    errEl.textContent = "As senhas não coincidem.";
+    errEl.classList.add("on");
+    return;
   }
 
-  createPassErrorEl.classList.add("hidden");
-  return true;
+  errEl.classList.remove("on");
+  showScreen("s-wiz2");
+  setTimeout(function () { $("wz-player").focus(); }, 100);
 }
 
-function renderWizardPlayerList() {
-  wizardPlayersListEl.innerHTML = "";
-  wizardPlayers.forEach(function (p, idx) {
+function renderWizardPlayers() {
+  const listEl = $("wz-plist");
+  listEl.innerHTML = "";
+
+  wizard.players.forEach(function (p, index) {
     const row = document.createElement("div");
-    row.className = "wizard-player-row";
+    row.className = "row";
 
     const avatar = document.createElement("div");
-    avatar.className = "wizard-player-avatar";
+    avatar.className = "avatar";
     avatar.textContent = buildPlayerInitials(p.name);
 
-    const nameEl = document.createElement("span");
-    nameEl.className = "wizard-player-name";
-    nameEl.textContent = p.name;
-
-    const starsEl = document.createElement("span");
-    starsEl.className = "wizard-player-stars";
-    starsEl.innerHTML = buildStarsHTML(p.rating);
+    const main = document.createElement("div");
+    main.className = "r-main";
+    main.innerHTML =
+      '<span class="r-name">' + escapeHTML(p.name) + "</span>" +
+      '<span class="r-meta">' + buildStarsHTML(p.rating) + "</span>";
 
     const removeBtn = document.createElement("button");
-    removeBtn.className = "wizard-player-remove";
-    removeBtn.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
+    removeBtn.type = "button";
+    removeBtn.className = "row-action";
     removeBtn.setAttribute("aria-label", "Remover jogador");
+    removeBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>';
     removeBtn.addEventListener("click", function () {
-      wizardPlayers.splice(idx, 1);
-      renderWizardPlayerList();
+      wizard.players.splice(index, 1);
+      renderWizardPlayers();
     });
 
     row.appendChild(avatar);
-    row.appendChild(nameEl);
-    row.appendChild(starsEl);
+    row.appendChild(main);
     row.appendChild(removeBtn);
-    wizardPlayersListEl.appendChild(row);
+    listEl.appendChild(row);
   });
 
-  wizardPlayerCountEl.textContent = wizardPlayers.length + " jogador(es) adicionado(s)";
+  $("wz-plist-lbl").textContent =
+    wizard.players.length + " jogador" + (wizard.players.length === 1 ? "" : "es");
 }
 
-function addWizardPlayer() {
-  const name = createWizardPlayerNameInput.value.trim();
+function wizardAddPlayer() {
+  const input = $("wz-player");
+  const name = input.value.trim();
   if (!name) return;
 
-  const rating = parseFloat(createWizardPlayerRatingInput.value || "3");
-  wizardPlayers.push({ name, rating });
-  createWizardPlayerNameInput.value = "";
-  wizardPlayerRating = 3;
-  renderStarWidget(createWizardStarWidgetEl, 3, createWizardPlayerRatingInput);
-  if (createWizardPlayerRatingInput) createWizardPlayerRatingInput.value = "3";
-  renderWizardPlayerList();
-  createWizardPlayerNameInput.focus();
+  wizard.players.push({ name: name, rating: wizard.rating });
+  input.value = "";
+  wizard.rating = 3;
+  renderWizardStars();
+  renderWizardPlayers();
+  input.focus();
 }
 
-async function confirmCreate() {
-  const name = createNameInput.value.trim();
-  const password = createPassInput.value.trim();
+async function wizardCreate() {
+  const name = $("wz-name").value.trim();
+  const password = $("wz-pass").value.trim();
 
   try {
     const res = await fetchJSONRaw("/api/peladas", {
       method: "POST",
       body: JSON.stringify({
-        name,
-        password,
-        team1_color: wizardTeam1Color,
-        team2_color: wizardTeam2Color,
+        name: name,
+        password: password,
+        team1_color: wizard.c1,
+        team2_color: wizard.c2,
       }),
     });
 
@@ -381,23 +702,25 @@ async function confirmCreate() {
       return;
     }
 
-    newPeladaId = pelada.id;
-
-    for (const p of wizardPlayers) {
+    for (const p of wizard.players) {
       await fetch("/api/players", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Pelada-Id": String(newPeladaId),
+          "X-Pelada-Id": String(pelada.id),
         },
         body: JSON.stringify({ name: p.name, rating: p.rating }),
       });
     }
 
-    closeModal(createModalEl);
-    isAdminMode = true;
-    localStorage.setItem("pelada-admin-mode", "true");
-    showAppScreen(newPeladaId, name, wizardTeam1Color, wizardTeam2Color);
+    setAdminMode(true);
+    showToast("Pelada criada");
+    enterPelada({
+      id: pelada.id,
+      name: name,
+      team1_color: wizard.c1,
+      team2_color: wizard.c2,
+    });
   } catch (err) {
     console.error(err);
     showToast("Erro ao criar pelada.");
@@ -405,435 +728,86 @@ async function confirmCreate() {
 }
 
 // ============================================================
-// Players
+// Event listeners
 // ============================================================
 
-async function loadPlayers() {
-  try {
-    players = await fetchJSON("/api/players");
-    renderPlayers();
-    // Delay ensures the app screen is fully painted before the modal appears.
-    // Required for Safari/iOS WebKit which may block DOM updates mid-async chain.
-    setTimeout(function () {
-      openCheckinModal();
-    }, 300);
-  } catch (err) {
-    console.error("Failed to load players:", err);
-    playerCountEl.textContent = "Erro ao carregar jogadores.";
-    showToast("Erro ao carregar jogadores.");
-  }
-}
+document.addEventListener("DOMContentLoaded", function () {
+  loadTheme();
+  loadAdminMode();
 
-function renderPlayers() {
-  playersListEl.innerHTML = "";
-
-  const total = players.length;
-  const activeCount = players.filter(function (p) { return p.active; }).length;
-
-  if (total === 0) {
-    playerCountEl.textContent = "Nenhum jogador cadastrado ainda.";
-    return;
-  }
-
-  playerCountEl.textContent = total + " jogador(es) · " + activeCount + " selecionado(s)";
-
-  const sortedPlayers = [...players].sort(function (a, b) {
-    return a.name.trim().localeCompare(b.name.trim(), "pt-BR", { sensitivity: "base" });
+  // Home
+  document.querySelectorAll(".theme-btn").forEach(function (btn) {
+    btn.addEventListener("click", toggleTheme);
   });
-
-  sortedPlayers.forEach(function (p) {
-    const row = document.createElement("div");
-    row.className = "player-row";
-    row.dataset.id = p.id;
-
-    const avatar = document.createElement("div");
-    avatar.className = "player-avatar" + (p.active ? " player-avatar-active" : "");
-    avatar.textContent = buildPlayerInitials(p.name);
-
-    const info = document.createElement("div");
-    info.className = "player-info" + (isAdminMode ? "" : " player-info-centered");
-
-    const nameSpan = document.createElement("span");
-    nameSpan.className = "player-name";
-    nameSpan.textContent = p.name;
-
-    info.appendChild(nameSpan);
-
-    if (isAdminMode) {
-      const starsRow = document.createElement("div");
-      starsRow.className = "player-stars-row";
-
-      const starsSpan = document.createElement("span");
-      starsSpan.className = "player-stars";
-      starsSpan.innerHTML = buildStarsHTML(p.rating);
-
-      const ratingText = document.createElement("span");
-      ratingText.className = "player-rating-text";
-      ratingText.textContent = p.rating.toFixed(1);
-
-      starsRow.appendChild(starsSpan);
-      starsRow.appendChild(ratingText);
-      info.appendChild(starsRow);
-    }
-
-    const actions = document.createElement("div");
-    actions.className = "player-actions";
-
-    const switchLabel = document.createElement("label");
-    switchLabel.className = "switch";
-
-    const switchInput = document.createElement("input");
-    switchInput.type = "checkbox";
-    switchInput.className = "toggle-active";
-    switchInput.checked = p.active;
-
-    const slider = document.createElement("span");
-    slider.className = "slider";
-
-    switchLabel.appendChild(switchInput);
-    switchLabel.appendChild(slider);
-    actions.appendChild(switchLabel);
-
-    if (isAdminMode) {
-      const editBtn = document.createElement("button");
-      editBtn.className = "btn-icon edit-player";
-      editBtn.innerHTML = '<i class="fa-solid fa-pen"></i>';
-
-      const deleteBtn = document.createElement("button");
-      deleteBtn.className = "btn-icon delete-player";
-      deleteBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
-
-      actions.appendChild(editBtn);
-      actions.appendChild(deleteBtn);
-    }
-
-    row.appendChild(avatar);
-    row.appendChild(info);
-    row.appendChild(actions);
-    playersListEl.appendChild(row);
-  });
-}
-
-function resetAdvancedAttributes() {
-  playerMarkingInput.value = "2";
-  playerStaminaInput.value = "2";
-  playerScoringInput.value = "2";
-}
-
-function openNewPlayerModal() {
-  currentEditingId = null;
-  playerModalTitleEl.textContent = "Novo jogador";
-  playerIdInput.value = "";
-  playerNameInput.value = "";
-  playerRatingInput.value = "0";
-  resetAdvancedAttributes();
-  renderStarWidget(starWidgetEl, 0, playerRatingInput);
-  updateAdminModeUI();
-  openModal(playerModalEl);
-  playerNameInput.focus();
-}
-
-function openEditPlayerModal(player) {
-  currentEditingId = player.id;
-  playerModalTitleEl.textContent = "Editar jogador";
-  playerIdInput.value = player.id;
-  playerNameInput.value = player.name;
-  playerRatingInput.value = player.rating.toString();
-  playerMarkingInput.value = getAttributeValue(player, "marking").toString();
-  playerStaminaInput.value = getAttributeValue(player, "stamina").toString();
-  playerScoringInput.value = getAttributeValue(player, "scoring").toString();
-  renderStarWidget(starWidgetEl, player.rating, playerRatingInput);
-  updateAdminModeUI();
-  openModal(playerModalEl);
-  playerNameInput.focus();
-}
-
-async function handlePlayerSubmit(e) {
-  e.preventDefault();
-
-  const name = playerNameInput.value.trim();
-  const rating = parseFloat(playerRatingInput.value || "0");
-
-  if (!name) {
-    alert("Nome nao pode ser vazio.");
-    return;
-  }
-
-  const payload = { name, rating };
-
-  if (isAdminMode) {
-    payload.marking = parseInt(playerMarkingInput.value || "2", 10);
-    payload.stamina = parseInt(playerStaminaInput.value || "2", 10);
-    payload.scoring = parseInt(playerScoringInput.value || "2", 10);
-  }
-
-  try {
-    if (currentEditingId == null) {
-      const newPlayer = await fetchJSON("/api/players", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-      players.push(newPlayer);
-      renderPlayers();
-      closeModal(playerModalEl);
-      return;
-    }
-
-    const updatedPlayer = await fetchJSON("/api/players/" + currentEditingId, {
-      method: "PUT",
-      body: JSON.stringify(payload),
-    });
-
-    players = players.map(function (p) { return p.id === updatedPlayer.id ? updatedPlayer : p; });
-    renderPlayers();
-    closeModal(playerModalEl);
-  } catch (err) {
-    console.error(err);
-    showToast("Erro ao salvar jogador.");
-  }
-}
-
-async function handlePlayerListClick(e) {
-  const target = e.target;
-  const row = target.closest(".player-row");
-  if (!row) return;
-
-  const id = parseInt(row.dataset.id, 10);
-
-  if (target.classList.contains("toggle-active")) {
-    try {
-      const updated = await fetchJSON("/api/players/" + id + "/toggle-active", { method: "PATCH" });
-      players = players.map(function (p) { return p.id === updated.id ? updated : p; });
-      renderPlayers();
-    } catch (err) {
-      console.error(err);
-      showToast("Erro ao atualizar jogador.");
-    }
-    return;
-  }
-
-  if (target.closest(".edit-player")) {
-    const player = players.find(function (p) { return p.id === id; });
-    if (player) openEditPlayerModal(player);
-    return;
-  }
-
-  if (target.closest(".delete-player")) {
-    deleteTargetId = id;
-    openModal(confirmModalEl);
-  }
-}
-
-async function deletePlayer() {
-  if (deleteTargetId == null) return;
-
-  try {
-    await fetchJSON("/api/players/" + deleteTargetId, { method: "DELETE" });
-    players = players.filter(function (p) { return p.id !== deleteTargetId; });
-    renderPlayers();
-  } catch (err) {
-    console.error(err);
-    showToast("Erro ao remover jogador.");
-  } finally {
-    deleteTargetId = null;
-    closeModal(confirmModalEl);
-  }
-}
-
-async function clearAllPlayers() {
-  if (!players.some(function (p) { return p.active; })) {
-    alert("Nenhum jogador esta selecionado.");
-    return;
-  }
-
-  const confirmed = confirm("Deseja desmarcar todos os jogadores?");
-  if (!confirmed) return;
-
-  try {
-    await fetchJSON("/api/players/deactivate-all", { method: "PATCH" });
-    players = players.map(function (p) { return Object.assign({}, p, { active: false }); });
-    renderPlayers();
-  } catch (err) {
-    console.error(err);
-    showToast("Erro ao desmarcar jogadores.");
-  }
-}
-
-// ============================================================
-// Check-in modal
-// ============================================================
-
-function buildCheckinSessionDateText() {
-  const now = new Date();
-  const days = ["Domingo", "Segunda", "Terca", "Quarta", "Quinta", "Sexta", "Sabado"];
-  const months = ["janeiro", "fevereiro", "marco", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
-  return days[now.getDay()] + ", " + now.getDate() + " de " + months[now.getMonth()] + " - marque quem esta presente";
-}
-
-function buildCheckinAvatarInitials(name) {
-  return buildPlayerInitials(name);
-}
-
-function getCheckinPresentCount() {
-  return Object.values(checkinState).filter(Boolean).length;
-}
-
-function updateCheckinMeta() {
-  const total = players.length;
-  const present = getCheckinPresentCount();
-  checkinTotalLabelEl.textContent = total + " cadastrado(s)";
-  checkinPresentBadgeEl.textContent = present + " presente(s)";
-  confirmCheckinLabelEl.textContent = present > 0 ? "Sortear times (" + present + ")" : "Sortear times";
-  confirmCheckinBtn.disabled = present < 2;
-}
-
-function renderCheckinList() {
-  checkinPlayersListEl.innerHTML = "";
-
-  const sorted = [...players].sort(function (a, b) {
-    return a.name.trim().localeCompare(b.name.trim(), "pt-BR", { sensitivity: "base" });
-  });
-
-  sorted.forEach(function (p) {
-    const isPresent = !!checkinState[p.id];
-
-    const row = document.createElement("div");
-    row.className = "checkin-row" + (isPresent ? " checkin-active" : "");
-
-    const avatar = document.createElement("div");
-    avatar.className = "checkin-avatar";
-    avatar.textContent = buildCheckinAvatarInitials(p.name);
-
-    const info = document.createElement("div");
-    info.className = "checkin-info";
-
-    const nameEl = document.createElement("p");
-    nameEl.className = "checkin-name";
-    nameEl.textContent = p.name;
-
-    info.appendChild(nameEl);
-
-    const check = document.createElement("div");
-    check.className = "checkin-check" + (isPresent ? " checkin-checked" : "");
-    if (isPresent) {
-      check.innerHTML = '<i class="fa-solid fa-check"></i>';
-    }
-
-    row.appendChild(avatar);
-    row.appendChild(info);
-    row.appendChild(check);
-
-    row.addEventListener("click", function () {
-      checkinState[p.id] = !checkinState[p.id];
-      renderCheckinList();
-      updateCheckinMeta();
-    });
-
-    checkinPlayersListEl.appendChild(row);
-  });
-}
-
-function openCheckinModal() {
-  if (players.length === 0) return;
-
-  checkinState = {};
-  players.forEach(function (p) { checkinState[p.id] = false; });
-
-  checkinSessionDateEl.textContent = buildCheckinSessionDateText();
-  renderCheckinList();
-  updateCheckinMeta();
-  openModal(checkinModalEl);
-}
-
-async function confirmCheckin() {
-  const presentIds = Object.entries(checkinState)
-    .filter(function (entry) { return entry[1]; })
-    .map(function (entry) { return parseInt(entry[0], 10); });
-
-  if (presentIds.length < 2) {
-    alert("Selecione pelo menos 2 jogadores para sortear.");
-    return;
-  }
-
-  try {
-    const updatedList = await fetchJSON("/api/players/set-active-batch", {
-      method: "PATCH",
-      body: JSON.stringify({ active_ids: presentIds }),
-    });
-
-    players = updatedList;
-    renderPlayers();
-    closeModal(checkinModalEl);
-    teamSizeInput.value = lastTeamSize.toString();
-    openModal(drawModalEl);
-  } catch (err) {
-    console.error(err);
-    showToast("Erro ao confirmar presencas.");
-  }
-}
-
-// ============================================================
-// Event listeners — Players
-// ============================================================
-
-if (playerFormEl) { playerFormEl.addEventListener("submit", handlePlayerSubmit); }
-if (cancelPlayerBtn) { cancelPlayerBtn.addEventListener("click", function () { closeModal(playerModalEl); }); }
-if (playersListEl) { playersListEl.addEventListener("click", handlePlayerListClick); }
-if (cancelDeleteBtn) { cancelDeleteBtn.addEventListener("click", function () { deleteTargetId = null; closeModal(confirmModalEl); }); }
-if (confirmDeleteBtn) { confirmDeleteBtn.addEventListener("click", deletePlayer); }
-if (fabAddPlayerBtn) { fabAddPlayerBtn.addEventListener("click", openNewPlayerModal); }
-if (clearAllBtn) { clearAllBtn.addEventListener("click", clearAllPlayers); }
-if (cancelCheckinBtn) { cancelCheckinBtn.addEventListener("click", function () { closeModal(checkinModalEl); }); }
-if (confirmCheckinBtn) { confirmCheckinBtn.addEventListener("click", confirmCheckin); }
-
-if (backToPeladasBtn) {
-  backToPeladasBtn.addEventListener("click", function () {
-    currentPeladaId = null;
-    currentPeladaName = "";
-    isAdminMode = false;
-    localStorage.removeItem("pelada-admin-mode");
-    localStorage.removeItem("pelada-current-id");
-    localStorage.removeItem("pelada-current-name");
-    showPeladaScreen();
-  });
-}
-
-if (cancelAuthBtn) { cancelAuthBtn.addEventListener("click", function () { closeModal(authModalEl); }); }
-if (confirmAuthBtn) { confirmAuthBtn.addEventListener("click", confirmAuth); }
-
-if (editColorsBtn) { editColorsBtn.addEventListener("click", openColorsModal); }
-if (cancelColorsBtn) { cancelColorsBtn.addEventListener("click", function () { closeModal(colorsModalEl); }); }
-if (confirmColorsBtn) { confirmColorsBtn.addEventListener("click", confirmColors); }
-
-if (cancelDeletePeladaBtn) {
-  cancelDeletePeladaBtn.addEventListener("click", function () {
-    deleteTargetPeladaId = null;
-    closeModal(deletePeladaModalEl);
-  });
-}
-if (confirmDeletePeladaBtn) { confirmDeletePeladaBtn.addEventListener("click", confirmDeletePelada); }
-
-if (authPasswordInput) {
-  authPasswordInput.addEventListener("keydown", function (e) {
+  $("new-pelada-btn").addEventListener("click", openWizard);
+
+  // Auth
+  $("au-cancel").addEventListener("click", function () { closeSheets(); });
+  $("au-confirm").addEventListener("click", confirmAuth);
+  $("au-pass").addEventListener("keydown", function (e) {
     if (e.key === "Enter") { e.preventDefault(); confirmAuth(); }
   });
-}
 
-if (newPeladaBtn) { newPeladaBtn.addEventListener("click", openCreateModal); }
-if (cancelCreateBtn) { cancelCreateBtn.addEventListener("click", function () { closeModal(createModalEl); }); }
+  // Check-in
+  $("ci-back").addEventListener("click", goHome);
+  $("ci-menu-btn").addEventListener("click", function () { renderMenuSheet(); openSheet("menu"); });
+  $("ci-mark-all").addEventListener("click", function () { checkAll(true); });
+  $("ci-clear").addEventListener("click", function () { checkAll(false); });
 
-if (nextCreateBtn) {
-  nextCreateBtn.addEventListener("click", function () {
-    if (validateCreateStep1()) showCreateStep(2);
+  // Tabs
+  document.querySelectorAll(".tab").forEach(function (tab) {
+    tab.addEventListener("click", function () { setTab(tab.dataset.tab); });
   });
-}
 
-if (backCreateBtn) { backCreateBtn.addEventListener("click", function () { showCreateStep(1); }); }
-if (confirmCreateBtn) { confirmCreateBtn.addEventListener("click", confirmCreate); }
-if (addWizardPlayerBtn) { addWizardPlayerBtn.addEventListener("click", addWizardPlayer); }
+  // Elenco
+  $("sq-back").addEventListener("click", goHome);
+  $("sq-menu-btn").addEventListener("click", function () { renderMenuSheet(); openSheet("menu"); });
+  $("sq-add-btn").addEventListener("click", function () { openPlayerSheet(null); });
 
-if (createWizardPlayerNameInput) {
-  createWizardPlayerNameInput.addEventListener("keydown", function (e) {
-    if (e.key === "Enter") { e.preventDefault(); addWizardPlayer(); }
+  // Jogador
+  $("pf-cancel").addEventListener("click", function () { closeSheets(); });
+  $("pf-save").addEventListener("click", savePlayer);
+  $("pf-delete").addEventListener("click", askDeletePlayer);
+
+  // Confirmação
+  $("cf-cancel").addEventListener("click", function () { closeSheets(); });
+  $("cf-confirm").addEventListener("click", function () {
+    if (confirmAction) confirmAction();
   });
-}
+
+  // Chave admin
+  $("ak-cancel").addEventListener("click", function () {
+    if (adminKeyMode === "admin") {
+      renderMenuSheet();
+      openSheet("menu");
+    } else {
+      deleteTargetPelada = null;
+      closeSheets();
+    }
+  });
+  $("ak-confirm").addEventListener("click", confirmAdminKey);
+  $("ak-pass").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); confirmAdminKey(); }
+  });
+
+  // Ajustes
+  $("mn-theme").addEventListener("click", toggleTheme);
+  $("mn-admin").addEventListener("click", toggleAdmin);
+  $("mn-leave").addEventListener("click", goHome);
+  $("mn-done").addEventListener("click", function () { closeSheets(); });
+
+  // Wizard
+  $("wz-close").addEventListener("click", goHome);
+  $("wz-back").addEventListener("click", function () { showScreen("s-wiz1"); });
+  $("wz-next").addEventListener("click", wizardNext);
+  $("wz-add").addEventListener("click", wizardAddPlayer);
+  $("wz-create").addEventListener("click", wizardCreate);
+  $("wz-player").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); wizardAddPlayer(); }
+  });
+
+  // Veil fecha sheets
+  $("veil").addEventListener("click", function () { closeSheets(); });
+
+  loadPeladas();
+});

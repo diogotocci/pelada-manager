@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR" data-theme="dark">
+<html lang="pt-BR" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <title>Time Justo</title>
@@ -8,16 +8,15 @@
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}?v={{ app_version }}">
   <link rel="apple-touch-icon" sizes="192x192" href="{{ url_for('static', filename='icon-192.png') }}?v={{ app_version }}">
   <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}?v={{ app_version }}">
-  <meta name="theme-color" content="#0b0c10">
+  <meta name="theme-color" content="#f7f8f6">
   <meta name="application-name" content="Time Justo">
   <meta name="apple-mobile-web-app-title" content="Time Justo">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v={{ app_version }}">
 
   <style>
@@ -30,393 +29,418 @@
 <body>
 
   <!-- ============================================================
-       Pelada selection screen
+       01 · Home — lista de peladas
        ============================================================ -->
-  <div id="pelada-screen" class="pelada-screen">
-    <div class="pelada-screen-header">
-      <div>
-        <h1>Time Justo</h1>
-        <p>Escolha uma pelada para entrar</p>
-      </div>
-      <button id="toggle-theme-btn" class="icon-button" aria-label="Alternar tema">
-        <i class="fa-solid fa-moon"></i>
-      </button>
-    </div>
-
-    <div class="pelada-screen-body">
-      <p id="pelada-loading" class="muted-text" style="text-align:center;padding:1rem">Carregando...</p>
-      <p id="pelada-empty" class="muted-text hidden" style="text-align:center;padding:1rem">Nenhuma pelada cadastrada ainda.</p>
-      <div id="pelada-list" class="pelada-list"></div>
-    </div>
-
-    <footer class="pelada-screen-footer app-footer">
-      <div>Versão {{ app_version }}</div>
-      <div class="footer-credit">
-        <span>Developed by <strong>Diogo Tocci</strong></span>
-        <img src="{{ url_for('static', filename='flamengo-shield.png') }}" alt="Escudo do Flamengo" class="footer-flamengo-shield">
-      </div>
-    </footer>
-
-    <button id="new-pelada-btn" class="fab-button" aria-label="Nova pelada" title="Nova pelada">
-      <i class="fa-solid fa-plus"></i>
-    </button>
-  </div>
-
-  <!-- ============================================================
-       Main app
-       ============================================================ -->
-  <div id="app-container" class="app-container hidden">
-    <header class="app-header">
-      <div style="display:flex;align-items:center;gap:10px">
-        <button id="back-to-peladas-btn" class="icon-button" aria-label="Voltar para peladas" title="Voltar">
-          <i class="fa-solid fa-arrow-left"></i>
-        </button>
+  <section class="screen on" id="s-home">
+    <div class="frame">
+      <div class="big-title">
         <div>
-          <h1 id="app-header-title">Time Justo</h1>
-          <p id="app-header-sub">Sorteio de times equilibrados</p>
+          <h1>Time Justo</h1>
+          <p>Suas peladas</p>
         </div>
+        <button class="icon-btn theme-btn" id="theme-btn-home" aria-label="Alternar tema"></button>
       </div>
-
-      <div class="header-actions">
-        <button id="admin-mode-btn" class="icon-button" aria-label="Modo admin" title="Modo admin">
-          <i class="fa-solid fa-gear"></i>
+      <div class="scroll">
+        <p class="eyebrow">Peladas</p>
+        <p id="pelada-loading" class="empty">Carregando...</p>
+        <p id="pelada-empty" class="empty hidden">Nenhuma pelada cadastrada ainda.<br>Crie a primeira abaixo.</p>
+        <div class="card rowlist" id="pelada-list"></div>
+        <div class="spacer-md"></div>
+        <button class="btn btn-ghost" id="new-pelada-btn">
+          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          Nova pelada
         </button>
-
-        <button id="edit-colors-btn" class="icon-button hidden" aria-label="Cores dos coletes" title="Cores dos coletes">
-          <i class="fa-solid fa-shirt"></i>
-        </button>
-
-        <button id="compare-btn" class="secondary-button hidden">
-          <i class="fa-solid fa-table"></i>
-          Comparar jogadores
-        </button>
-
-        <button id="clear-all-btn" class="secondary-button">
-          <i class="fa-solid fa-user-minus"></i>
-          Desmarcar todos
-        </button>
-
-        <button id="draw-teams-btn" class="primary-button">
-          <i class="fa-solid fa-shuffle"></i>
-          Sortear times
-        </button>
+        <div class="spacer-lg"></div>
       </div>
-    </header>
-
-    <main>
-      <section class="card">
-        <div class="card-header">
-          <h2>Jogadores</h2>
-          <span id="player-count" class="muted-text"></span>
-        </div>
-        <div id="players-list" class="players-list"></div>
-      </section>
-
-      <section id="teams-section" class="card hidden">
-        <div class="card-header">
-          <h2>Times sorteados</h2>
-          <button id="redraw-btn" class="secondary-button">
-            <i class="fa-solid fa-rotate-right"></i>
-            Sortear novamente
-          </button>
-        </div>
-        <div id="teams-result"></div>
-      </section>
-    </main>
-
-    <footer class="app-footer">
-      <div>Versão {{ app_version }}</div>
-      <div class="footer-credit">
-        <span>Developed by <strong>Diogo Tocci</strong></span>
-        <img src="{{ url_for('static', filename='flamengo-shield.png') }}" alt="Escudo do Flamengo" class="footer-flamengo-shield">
-      </div>
-    </footer>
-
-    <button id="fab-add-player" class="fab-button" aria-label="Adicionar jogador">
-      <i class="fa-solid fa-plus"></i>
-    </button>
-  </div>
+      <footer class="app-foot">
+        Versão {{ app_version }} · feito por <b>Diogo Tocci</b>
+        <img src="{{ url_for('static', filename='flamengo-shield.png') }}" alt="Escudo do Flamengo" class="foot-shield">
+      </footer>
+    </div>
+  </section>
 
   <!-- ============================================================
-       Auth modal
+       03 · Hoje — check-in
        ============================================================ -->
-  <div id="auth-modal" class="modal hidden">
-    <div class="modal-backdrop"></div>
-    <div class="modal-content small">
-      <h3 id="auth-pelada-name">Pelada</h3>
-      <p class="muted-text" style="margin-bottom:12px">Digite a palavra-passe para entrar</p>
-
-      <label class="form-label" for="auth-password-input">Palavra-passe</label>
-      <input id="auth-password-input" class="form-input" type="password" placeholder="••••••••" autocomplete="off">
-
-      <p id="auth-error" class="error-text hidden" style="margin-top:6px"></p>
-
-      <div class="modal-actions">
-        <button type="button" class="secondary-button" id="cancel-auth-btn">Cancelar</button>
-        <button type="button" class="primary-button" id="confirm-auth-btn">Entrar</button>
+  <section class="screen" id="s-checkin">
+    <div class="frame">
+      <div class="appbar">
+        <button class="icon-btn" id="ci-back" aria-label="Voltar">
+          <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="grow">
+          <h1 id="ci-title">Pelada</h1>
+          <p class="sub" id="ci-date"></p>
+        </div>
+        <button class="icon-btn" id="ci-menu-btn" aria-label="Ajustes">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.5-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.5 2 1.5A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.5 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.5-2-1.5c.1-.4.1-.8.1-1.2z"/></svg>
+        </button>
       </div>
+      <div class="scroll">
+        <div class="count-hero">
+          <span class="big" id="ci-count">0</span>
+          <span class="lbl" id="ci-count-lbl"></span>
+        </div>
+        <div class="quick-actions">
+          <button class="btn btn-ghost btn-sm" id="ci-mark-all">Marcar todos</button>
+          <button class="btn btn-ghost btn-sm" id="ci-clear">Limpar</button>
+        </div>
+        <p class="eyebrow">Quem está aí?</p>
+        <p class="empty hidden" id="ci-empty">Ninguém no elenco ainda.<br>Adicione jogadores na aba Elenco.</p>
+        <div class="card rowlist" id="ci-list"></div>
+        <div class="spacer-lg"></div>
+      </div>
+      <div class="cta-bar">
+        <button class="btn btn-primary" id="ci-cta" disabled>
+          <svg viewBox="0 0 24 24"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
+          <span id="ci-cta-lbl">Sortear times</span>
+        </button>
+      </div>
+      <nav class="tabbar">
+        <button class="tab on" data-tab="hoje">
+          <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>
+          Hoje
+        </button>
+        <button class="tab" data-tab="elenco">
+          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Elenco
+        </button>
+      </nav>
     </div>
-  </div>
+  </section>
 
   <!-- ============================================================
-       Bib colors modal
+       05 · Times sorteados
        ============================================================ -->
-  <div id="colors-modal" class="modal hidden">
-    <div class="modal-backdrop"></div>
-    <div class="modal-content small">
-      <h3>Cores dos coletes</h3>
-      <label class="form-label">Colete do Time 1</label>
-      <div id="edit-team1-picker" class="bib-picker"></div>
-      <label class="form-label" style="margin-top:10px">Colete do Time 2</label>
-      <div id="edit-team2-picker" class="bib-picker"></div>
-      <p id="colors-warn" class="muted-text hidden" style="margin-top:8px">Os dois times estao com a mesma cor.</p>
-      <div class="modal-actions">
-        <button type="button" class="secondary-button" id="cancel-colors-btn">Cancelar</button>
-        <button type="button" class="primary-button" id="confirm-colors-btn">Salvar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ============================================================
-       Delete pelada modal
-       ============================================================ -->
-  <div id="delete-pelada-modal" class="modal hidden">
-    <div class="modal-backdrop"></div>
-    <div class="modal-content small">
-      <h3>Excluir pelada</h3>
-      <p id="delete-pelada-message" style="margin-bottom:4px"></p>
-      <p class="muted-text" style="margin-top:0">Essa acao e irreversivel e remove todos os jogadores associados.</p>
-      <div class="modal-actions">
-        <button type="button" class="secondary-button" id="cancel-delete-pelada-btn">Cancelar</button>
-        <button type="button" class="danger-button" id="confirm-delete-pelada-btn">Excluir</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ============================================================
-       Create pelada modal (wizard)
-       ============================================================ -->
-  <div id="create-pelada-modal" class="modal hidden">
-    <div class="modal-backdrop"></div>
-    <div class="modal-content">
-
-      <!-- Step 1 -->
-      <div id="create-step-1">
-        <h3>Nova pelada</h3>
-        <p class="muted-text" style="margin-bottom:14px">Passo 1 de 2 — informacoes basicas</p>
-
-        <div class="wizard-steps">
-          <div class="wizard-step wizard-step-active"></div>
-          <div class="wizard-step"></div>
+  <section class="screen" id="s-teams">
+    <div class="frame">
+      <div class="appbar">
+        <button class="icon-btn" id="tm-back" aria-label="Voltar">
+          <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="grow">
+          <h1>Times de hoje</h1>
+          <p class="sub" id="tm-sub"></p>
         </div>
-
-        <label class="form-label" for="create-pelada-name">Nome da pelada</label>
-        <input id="create-pelada-name" class="form-input" type="text" placeholder="Ex: Pelada do bairro" style="margin-bottom:12px">
-
-        <label class="form-label" for="create-pelada-pass">Palavra-passe</label>
-        <input id="create-pelada-pass" class="form-input" type="password" placeholder="Defina uma senha de acesso" style="margin-bottom:12px" autocomplete="new-password">
-
-        <label class="form-label" for="create-pelada-pass2">Confirmar palavra-passe</label>
-        <input id="create-pelada-pass2" class="form-input" type="password" placeholder="Repita a senha" autocomplete="new-password">
-
-        <div class="bib-colors-section">
-          <label class="form-label">Colete do Time 1</label>
-          <div id="create-team1-picker" class="bib-picker"></div>
-          <label class="form-label" style="margin-top:10px">Colete do Time 2</label>
-          <div id="create-team2-picker" class="bib-picker"></div>
-        </div>
-
-        <p id="create-pass-error" class="error-text hidden" style="margin-top:6px"></p>
-
-        <div class="modal-actions">
-          <button type="button" class="secondary-button" id="cancel-create-btn">Cancelar</button>
-          <button type="button" class="primary-button" id="next-create-btn">Proximo</button>
-        </div>
+        <button class="icon-btn hidden" id="tm-audit-btn" aria-label="Auditoria do sorteio">
+          <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+        </button>
       </div>
-
-      <!-- Step 2 -->
-      <div id="create-step-2" class="hidden">
-        <h3>Nova pelada</h3>
-        <p class="muted-text" style="margin-bottom:14px">Passo 2 de 2 — adicione os jogadores</p>
-
-        <div class="wizard-steps">
-          <div class="wizard-step wizard-step-active"></div>
-          <div class="wizard-step wizard-step-active"></div>
-        </div>
-
-        <div class="wizard-add-player">
-          <input id="wizard-player-name" class="form-input" type="text" placeholder="Nome do jogador" style="margin-bottom:10px">
-
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
-            <div>
-              <label class="form-label" style="margin-bottom:4px">Nivel</label>
-              <div id="wizard-star-widget" class="star-widget" data-rating="3"></div>
-              <input type="hidden" id="wizard-player-rating" value="3">
-            </div>
-            <button type="button" class="primary-button" id="add-wizard-player-btn" style="margin-top:18px">
-              <i class="fa-solid fa-plus"></i> Adicionar
-            </button>
-          </div>
-        </div>
-
-        <div id="wizard-players-list" class="wizard-players-list"></div>
-        <p id="wizard-player-count" class="muted-text" style="font-size:0.78rem;margin-bottom:4px">0 jogador(es) adicionado(s)</p>
-        <p class="muted-text" style="font-size:0.75rem;margin-bottom:8px">Pode adicionar mais depois</p>
-
-        <div class="modal-actions">
-          <button type="button" class="secondary-button" id="back-create-btn">Voltar</button>
-          <button type="button" class="primary-button" id="confirm-create-btn">Criar pelada</button>
-        </div>
+      <div class="scroll">
+        <div class="card balance" id="tm-balance"></div>
+        <div id="tm-cards"></div>
+        <div class="spacer-lg"></div>
       </div>
-
-    </div>
-  </div>
-
-  <!-- ============================================================
-       Player modal
-       ============================================================ -->
-  <div id="player-modal" class="modal hidden">
-    <div class="modal-backdrop"></div>
-    <div class="modal-content">
-      <h3 id="player-modal-title">Novo jogador</h3>
-      <form id="player-form">
-        <input type="hidden" id="player-id">
-        <label class="form-label" for="player-name">Nome</label>
-        <input id="player-name" class="form-input" type="text" required>
-        <label class="form-label">Nivel geral (estrelas)</label>
-        <div id="star-widget" class="star-widget" data-rating="0"></div>
-        <input type="hidden" id="player-rating" value="0">
-
-        <div id="advanced-attributes-section" class="advanced-attributes hidden">
-          <div class="advanced-header">
-            <span>Atributos avancados</span>
-            <small>Visivel apenas no modo admin</small>
-          </div>
-          <div class="attribute-grid">
-            <label class="attribute-field" for="player-marking">
-              <span>Marca</span>
-              <select id="player-marking" class="form-input compact-select">
-                <option value="1">1 estrela</option>
-                <option value="2" selected>2 estrelas</option>
-                <option value="3">3 estrelas</option>
-              </select>
-            </label>
-            <label class="attribute-field" for="player-stamina">
-              <span>Corre</span>
-              <select id="player-stamina" class="form-input compact-select">
-                <option value="1">1 estrela</option>
-                <option value="2" selected>2 estrelas</option>
-                <option value="3">3 estrelas</option>
-              </select>
-            </label>
-            <label class="attribute-field" for="player-scoring">
-              <span>Faz gol</span>
-              <select id="player-scoring" class="form-input compact-select">
-                <option value="1">1 estrela</option>
-                <option value="2" selected>2 estrelas</option>
-                <option value="3">3 estrelas</option>
-              </select>
-            </label>
-          </div>
-        </div>
-
-        <div class="modal-actions">
-          <button type="button" class="secondary-button" id="cancel-player-btn">Cancelar</button>
-          <button type="submit" class="primary-button">Salvar</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Confirm delete modal -->
-  <div id="confirm-modal" class="modal hidden">
-    <div class="modal-backdrop"></div>
-    <div class="modal-content small">
-      <h3>Remover jogador</h3>
-      <p>Tem certeza que deseja remover este jogador?</p>
-      <div class="modal-actions">
-        <button type="button" class="secondary-button" id="cancel-delete-btn">Cancelar</button>
-        <button type="button" class="danger-button" id="confirm-delete-btn">Remover</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Draw teams modal -->
-  <div id="draw-modal" class="modal hidden">
-    <div class="modal-backdrop"></div>
-    <div class="modal-content small">
-      <h3>Sortear times</h3>
-      <label class="form-label" for="team-size-input">Quantos jogadores por time?</label>
-      <input id="team-size-input" class="form-input" type="number" min="1" value="5">
-      <div class="modal-actions">
-        <button type="button" class="secondary-button" id="cancel-draw-btn">Cancelar</button>
-        <button type="button" class="primary-button" id="confirm-draw-btn">Sortear</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Compare modal -->
-  <div id="compare-modal" class="modal hidden">
-    <div class="modal-backdrop"></div>
-    <div class="modal-content">
-      <h3>Comparar jogadores</h3>
-      <div id="compare-content"></div>
-      <div class="modal-actions">
-        <button type="button" class="secondary-button" id="close-compare-btn">Fechar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Audit modal -->
-  <div id="audit-modal" class="modal hidden">
-    <div class="modal-backdrop"></div>
-    <div class="modal-content audit-modal-content">
-      <button type="button" class="modal-close-button" aria-label="Fechar auditoria" title="Fechar"
-        onclick="document.getElementById('audit-modal').classList.add('hidden')">
-        <i class="fa-solid fa-xmark"></i>
-      </button>
-      <h3>Auditoria do sorteio</h3>
-      <p class="muted-text audit-description">Esta visao mostra os totais e atributos usados para avaliar o equilibrio dos times.</p>
-      <div id="audit-content" class="audit-content"></div>
-      <div class="modal-actions">
-        <button type="button" class="secondary-button" id="close-audit-btn">Fechar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Check-in modal -->
-  <div id="checkin-modal" class="modal hidden">
-    <div class="modal-backdrop"></div>
-    <div class="modal-content checkin-modal-content">
-      <h3>Iniciar pelada</h3>
-      <p id="checkin-session-date" class="muted-text checkin-description"></p>
-      <div class="checkin-meta-bar">
-        <span id="checkin-total-label" class="muted-text"></span>
-        <span id="checkin-present-badge" class="checkin-present-badge"></span>
-      </div>
-      <div id="checkin-players-list" class="checkin-players-list"></div>
-      <div class="modal-actions">
-        <button type="button" class="secondary-button" id="cancel-checkin-btn">Cancelar</button>
-        <button type="button" class="primary-button" id="confirm-checkin-btn">
-          <i class="fa-solid fa-shuffle"></i>
-          <span id="confirm-checkin-label">Sortear times</span>
+      <div class="cta-bar">
+        <button class="btn btn-ghost" id="tm-redraw">
+          <svg viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.5 15"/></svg>
+          Sortear de novo
         </button>
       </div>
     </div>
+  </section>
+
+  <!-- ============================================================
+       06 · Elenco
+       ============================================================ -->
+  <section class="screen" id="s-squad">
+    <div class="frame">
+      <div class="appbar">
+        <button class="icon-btn" id="sq-back" aria-label="Voltar">
+          <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="grow">
+          <h1 id="sq-title">Elenco</h1>
+          <p class="sub" id="sq-count"></p>
+        </div>
+        <button class="icon-btn" id="sq-menu-btn" aria-label="Ajustes">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.5-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.5 2 1.5A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.5 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.5-2-1.5c.1-.4.1-.8.1-1.2z"/></svg>
+        </button>
+      </div>
+      <div class="scroll">
+        <div class="quick-actions hidden" id="sq-admin-actions">
+          <button class="btn btn-ghost btn-sm" id="sq-compare-btn">Comparar por nível</button>
+        </div>
+        <p class="eyebrow">Jogadores</p>
+        <p class="empty hidden" id="sq-empty">Ninguém no elenco ainda.<br>Adicione o primeiro jogador.</p>
+        <div class="card rowlist" id="sq-list"></div>
+        <div class="spacer-lg"></div>
+      </div>
+      <div class="cta-bar">
+        <button class="btn btn-primary" id="sq-add-btn">
+          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          Adicionar jogador
+        </button>
+      </div>
+      <nav class="tabbar">
+        <button class="tab" data-tab="hoje">
+          <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>
+          Hoje
+        </button>
+        <button class="tab on" data-tab="elenco">
+          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Elenco
+        </button>
+      </nav>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       08 · Nova pelada — passo 1
+       ============================================================ -->
+  <section class="screen" id="s-wiz1">
+    <div class="frame">
+      <div class="appbar">
+        <button class="icon-btn" id="wz-close" aria-label="Fechar">
+          <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+        <div class="grow">
+          <h1>Nova pelada</h1>
+          <p class="sub">Passo 1 de 2 — informações</p>
+        </div>
+      </div>
+      <div class="wiz-progress"><i class="on"></i><i></i></div>
+      <div class="scroll">
+        <div class="field">
+          <label for="wz-name">Nome da pelada</label>
+          <input type="text" id="wz-name" placeholder="Ex.: Pelada do bairro">
+        </div>
+        <div class="field">
+          <label for="wz-pass">Palavra-passe</label>
+          <input type="password" id="wz-pass" placeholder="Senha de acesso do grupo" autocomplete="new-password">
+        </div>
+        <div class="field">
+          <label for="wz-pass2">Confirmar palavra-passe</label>
+          <input type="password" id="wz-pass2" placeholder="Repita a senha" autocomplete="new-password">
+          <p class="err" id="wz-err"></p>
+        </div>
+        <p class="eyebrow">Colete do time 1</p>
+        <div class="swatches" id="wz-c1"></div>
+        <p class="eyebrow">Colete do time 2</p>
+        <div class="swatches" id="wz-c2"></div>
+        <div class="spacer-lg"></div>
+      </div>
+      <div class="cta-bar">
+        <button class="btn btn-primary" id="wz-next">Próximo</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       08 · Nova pelada — passo 2
+       ============================================================ -->
+  <section class="screen" id="s-wiz2">
+    <div class="frame">
+      <div class="appbar">
+        <button class="icon-btn" id="wz-back" aria-label="Voltar">
+          <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="grow">
+          <h1>Nova pelada</h1>
+          <p class="sub">Passo 2 de 2 — jogadores</p>
+        </div>
+      </div>
+      <div class="wiz-progress"><i class="on"></i><i class="on"></i></div>
+      <div class="scroll">
+        <div class="field">
+          <label for="wz-player">Nome do jogador</label>
+          <input type="text" id="wz-player" placeholder="Digite e toque em adicionar">
+        </div>
+        <div class="seg-row">
+          <span class="seg-lbl">Nível</span>
+          <div class="star-input" id="wz-stars"></div>
+        </div>
+        <button class="btn btn-ghost" id="wz-add">
+          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          Adicionar à lista
+        </button>
+        <p class="eyebrow" id="wz-plist-lbl">0 jogadores</p>
+        <div class="card rowlist" id="wz-plist"></div>
+        <p class="hint" style="padding:8px 2px">Dá para adicionar mais gente depois, no Elenco.</p>
+        <div class="spacer-lg"></div>
+      </div>
+      <div class="cta-bar">
+        <button class="btn btn-primary" id="wz-create">Criar pelada</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       Sheets
+       ============================================================ -->
+  <div class="veil" id="veil"></div>
+
+  <!-- 02 · Entrar na pelada -->
+  <div class="sheet" id="sh-auth" role="dialog" aria-modal="true">
+    <div class="grab"></div>
+    <h3 id="au-name">Pelada</h3>
+    <p class="s-sub">Digite a palavra-passe do grupo para entrar</p>
+    <div class="s-body">
+      <div class="field">
+        <label for="au-pass">Palavra-passe</label>
+        <input type="password" id="au-pass" placeholder="••••••••" autocomplete="off">
+        <p class="err" id="au-err"></p>
+      </div>
+    </div>
+    <div class="s-actions">
+      <button class="btn btn-ghost" id="au-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="au-confirm">Entrar</button>
+    </div>
   </div>
 
-  <script>window.ADMIN_SECRET = "{{ admin_secret }}";</script>
+  <!-- 04 · Configurar sorteio -->
+  <div class="sheet" id="sh-draw" role="dialog" aria-modal="true">
+    <div class="grab"></div>
+    <h3>Sortear times</h3>
+    <p class="s-sub">Quantos jogadores por time?</p>
+    <div class="s-body">
+      <div class="stepper">
+        <button class="st-btn" id="dr-minus" aria-label="Menos">−</button>
+        <span class="st-val" id="dr-size">5</span>
+        <button class="st-btn" id="dr-plus" aria-label="Mais">+</button>
+      </div>
+      <p class="stepper-sub" id="dr-summary"></p>
+    </div>
+    <div class="s-actions">
+      <button class="btn btn-ghost" id="dr-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="dr-confirm">Sortear</button>
+    </div>
+  </div>
+
+  <!-- 07 · Novo / editar jogador -->
+  <div class="sheet" id="sh-player" role="dialog" aria-modal="true">
+    <div class="grab"></div>
+    <h3 id="pf-title">Novo jogador</h3>
+    <p class="s-sub" id="pf-sub">Nome e nível geral</p>
+    <div class="s-body">
+      <div class="field">
+        <label for="pf-name">Nome</label>
+        <input type="text" id="pf-name" placeholder="Nome ou apelido">
+        <p class="err" id="pf-err"></p>
+      </div>
+      <div class="field">
+        <label>Nível geral</label>
+        <div class="star-input" id="pf-stars"></div>
+        <p class="hint">Toque de novo na mesma estrela para meia estrela.</p>
+      </div>
+      <div id="pf-adv" class="hidden">
+        <p class="eyebrow" style="margin-top:6px">Atributos · só no modo admin</p>
+        <div class="seg-row"><span class="seg-lbl">Marca</span><div class="seg" id="pf-marking"></div></div>
+        <div class="seg-row"><span class="seg-lbl">Corre</span><div class="seg" id="pf-stamina"></div></div>
+        <div class="seg-row"><span class="seg-lbl">Faz gol</span><div class="seg" id="pf-scoring"></div></div>
+      </div>
+      <button class="btn btn-danger hidden" id="pf-delete" style="margin-top:10px">Remover jogador</button>
+    </div>
+    <div class="s-actions">
+      <button class="btn btn-ghost" id="pf-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="pf-save">Salvar</button>
+    </div>
+  </div>
+
+  <!-- 09 · Ajustes -->
+  <div class="sheet" id="sh-menu" role="dialog" aria-modal="true">
+    <div class="grab"></div>
+    <h3 id="mn-name">Ajustes</h3>
+    <p class="s-sub">Configurações desta pelada</p>
+    <div class="s-body">
+      <div class="seg-row" style="padding:12px 0">
+        <div>
+          <span class="seg-lbl">Tema escuro</span>
+          <p class="hint" style="margin:2px 0 0">Alterna entre claro e escuro</p>
+        </div>
+        <button class="switch" id="mn-theme" role="switch" aria-label="Tema escuro"></button>
+      </div>
+      <div class="seg-row" style="padding:12px 0">
+        <div>
+          <span class="seg-lbl">Modo admin</span>
+          <p class="hint" style="margin:2px 0 0">Mostra níveis, edição e auditoria · pede a chave admin</p>
+        </div>
+        <button class="switch" id="mn-admin" role="switch" aria-label="Modo admin"></button>
+      </div>
+      <div id="mn-colors-section" class="hidden">
+        <p class="eyebrow">Colete do time 1</p>
+        <div class="swatches" id="mn-c1"></div>
+        <p class="eyebrow">Colete do time 2</p>
+        <div class="swatches" id="mn-c2"></div>
+        <p class="err" id="mn-same">Os dois times estão com a mesma cor.</p>
+      </div>
+      <div class="spacer-md"></div>
+      <button class="btn btn-danger" id="mn-leave">Sair da pelada</button>
+      <p class="app-foot" style="padding-bottom:0">Time Justo · versão {{ app_version }}</p>
+    </div>
+    <div class="s-actions">
+      <button class="btn btn-primary" id="mn-done">Pronto</button>
+    </div>
+  </div>
+
+  <!-- Chave admin (ativar modo admin / excluir pelada) -->
+  <div class="sheet" id="sh-adminkey" role="dialog" aria-modal="true">
+    <div class="grab"></div>
+    <h3 id="ak-title">Ativar modo admin</h3>
+    <p class="s-sub" id="ak-sub">Digite a chave de administrador</p>
+    <div class="s-body">
+      <div class="field">
+        <label for="ak-pass">Chave admin</label>
+        <input type="password" id="ak-pass" placeholder="••••••••" autocomplete="off">
+        <p class="err" id="ak-err"></p>
+      </div>
+    </div>
+    <div class="s-actions">
+      <button class="btn btn-ghost" id="ak-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="ak-confirm">Confirmar</button>
+    </div>
+  </div>
+
+  <!-- Confirmação genérica (remover jogador / excluir pelada) -->
+  <div class="sheet" id="sh-confirm" role="dialog" aria-modal="true">
+    <div class="grab"></div>
+    <h3 id="cf-title">Confirmar</h3>
+    <p class="s-sub" id="cf-msg"></p>
+    <div class="s-actions">
+      <button class="btn btn-ghost" id="cf-cancel">Cancelar</button>
+      <button class="btn btn-danger-solid" id="cf-confirm">Confirmar</button>
+    </div>
+  </div>
+
+  <!-- Auditoria -->
+  <div class="sheet" id="sh-audit" role="dialog" aria-modal="true">
+    <div class="grab"></div>
+    <h3>Auditoria do sorteio</h3>
+    <p class="s-sub">Totais usados para equilibrar os times</p>
+    <div class="s-body" id="audit-body"></div>
+    <div class="s-actions">
+      <button class="btn btn-ghost" id="audit-close">Fechar</button>
+    </div>
+  </div>
+
+  <!-- Comparar -->
+  <div class="sheet" id="sh-compare" role="dialog" aria-modal="true">
+    <div class="grab"></div>
+    <h3>Comparar por nível</h3>
+    <p class="s-sub">Jogadores agrupados por estrelas</p>
+    <div class="s-body" id="compare-body"></div>
+    <div class="s-actions">
+      <button class="btn btn-ghost" id="compare-close">Fechar</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <script>
+    window.ADMIN_SECRET = "{{ admin_secret }}";
+    window.APP_VERSION = "{{ app_version }}";
+  </script>
   <script src="{{ url_for('static', filename='js/ui.js') }}?v={{ app_version }}"></script>
   <script src="{{ url_for('static', filename='js/api.js') }}?v={{ app_version }}"></script>
   <script src="{{ url_for('static', filename='js/players.js') }}?v={{ app_version }}"></script>
   <script src="{{ url_for('static', filename='js/teams.js') }}?v={{ app_version }}"></script>
-  
+
   <!-- Vercel Web Analytics -->
   <script>
     window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
   </script>
   <script defer src="/_vercel/insights/script.js"></script>
-  
+
   <!-- Vercel Speed Insights -->
   <script>
     window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };

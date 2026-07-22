@@ -1,14 +1,53 @@
 // ============================================================
-// Draw
+// Configurar sorteio (sheet)
 // ============================================================
 
-function openDrawModal() {
-  if (!players.some(function (p) { return p.active; })) {
-    alert("Nenhum jogador ativo para sortear.");
+function openDrawSheet() {
+  renderDrawSheet();
+  openSheet("draw");
+}
+
+function renderDrawSheet() {
+  $("dr-size").textContent = lastTeamSize;
+
+  const present = getPresentIds().length;
+  const inTeams = Math.min(present, lastTeamSize * 2);
+  const bench = present - inTeams;
+
+  $("dr-summary").textContent =
+    present + " presentes → 2 times de até " + lastTeamSize +
+    (bench > 0 ? " · " + bench + " de fora aguardando" : "");
+}
+
+function stepTeamSize(delta) {
+  lastTeamSize = Math.max(1, Math.min(11, lastTeamSize + delta));
+  renderDrawSheet();
+}
+
+// ============================================================
+// Sorteio
+// ============================================================
+
+async function confirmDraw() {
+  const presentIds = getPresentIds();
+
+  if (presentIds.length < 2) {
+    showToast("Selecione pelo menos 2 jogadores.");
     return;
   }
-  teamSizeInput.value = lastTeamSize.toString();
-  openModal(drawModalEl);
+
+  try {
+    players = await fetchJSON("/api/players/set-active-batch", {
+      method: "PATCH",
+      body: JSON.stringify({ active_ids: presentIds }),
+    });
+
+    await performDraw(lastTeamSize);
+    closeSheets();
+  } catch (err) {
+    console.error(err);
+    showToast("Erro ao confirmar presenças.");
+  }
 }
 
 async function performDraw(teamSize) {
@@ -22,185 +61,204 @@ async function performDraw(teamSize) {
     lastDrawnTeams = data.teams;
 
     renderTeams(lastDrawnTeams);
-    teamsSectionEl.classList.remove("hidden");
-
-    setTimeout(function () {
-      teamsSectionEl.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 50);
+    showScreen("s-teams");
   } catch (err) {
     console.error(err);
     showToast("Erro ao sortear times.");
   }
 }
 
-function getTeamColorKey(teamIndex) {
-  if (teamIndex === 1) return currentTeam1Color;
-  if (teamIndex === 2) return currentTeam2Color;
+function redraw() {
+  if (!players.some(function (p) { return p.active; })) {
+    showToast("Nenhum jogador ativo para sortear.");
+    return;
+  }
+  performDraw(lastTeamSize);
+  showToast("Times sorteados de novo");
+}
+
+// ============================================================
+// Tela de times
+// ============================================================
+
+function getTeamColorKey(teamNumber) {
+  if (teamNumber === 1) return currentTeam1Color;
+  if (teamNumber === 2) return currentTeam2Color;
   return null;
 }
 
-function getTeamLabel(teamIndex) {
-  const colorKey = getTeamColorKey(teamIndex);
-  if (colorKey) return getBibColor(colorKey).label;
-  return "de fora";
+function teamTotal(team) {
+  return (team.players || []).reduce(function (sum, p) { return sum + Number(p.rating || 0); }, 0);
 }
 
 function renderTeams(teams) {
-  teamsResultEl.innerHTML = "";
+  const cardsEl = $("tm-cards");
+  const balanceEl = $("tm-balance");
+  if (!cardsEl) return;
+
+  $("tm-sub").textContent = todayLabel();
+  $("tm-audit-btn").classList.toggle("hidden", !isAdminMode);
+
+  cardsEl.innerHTML = "";
+  balanceEl.innerHTML = "";
+
+  if (!teams || teams.length === 0) return;
+
+  // Placar de equilíbrio (dois primeiros times)
+  const color1 = getBibColor(currentTeam1Color);
+  const color2 = getBibColor(currentTeam2Color);
+
+  if (teams.length >= 2) {
+    balanceEl.innerHTML =
+      '<div class="side"><div class="val">' + formatDecimal(teamTotal(teams[0])) + ' ★</div><div class="who">' + escapeHTML(color1.label) + "</div></div>" +
+      '<span class="vs">VS</span>' +
+      '<div class="side"><div class="val">' + formatDecimal(teamTotal(teams[1])) + ' ★</div><div class="who">' + escapeHTML(color2.label) + "</div></div>";
+  }
 
   teams.forEach(function (team, index) {
     const teamNumber = index + 1;
-    const label = getTeamLabel(teamNumber);
     const colorKey = getTeamColorKey(teamNumber);
+    const isBench = colorKey == null;
 
     const card = document.createElement("div");
-    card.className = "team-card";
+    card.className = "card team-card";
 
-    const header = document.createElement("div");
-    header.className = "team-header";
+    const head = document.createElement("div");
+    head.className = "team-head";
 
-    const titleWrap = document.createElement("div");
-    titleWrap.className = "team-title-wrap";
-
-    const nameSpan = document.createElement("span");
-    nameSpan.textContent = team.name + " - " + label;
-    titleWrap.appendChild(nameSpan);
-
-    if (colorKey) {
-      titleWrap.appendChild(buildBibIconEl(colorKey));
+    if (!isBench) {
+      head.appendChild(buildBibEl(colorKey, false));
     }
 
-    if (isAdminMode) {
-      const auditButton = document.createElement("button");
-      auditButton.className = "audit-icon-button";
-      auditButton.title = "Ver auditoria do sorteio";
-      auditButton.setAttribute("aria-label", "Ver auditoria do sorteio");
-      auditButton.innerHTML = '<i class="fa-solid fa-chart-simple"></i>';
-      auditButton.addEventListener("click", function () { openAuditModal(); });
-      titleWrap.appendChild(auditButton);
+    const nameEl = document.createElement("span");
+    nameEl.className = "t-name";
+    if (isBench) {
+      nameEl.textContent = "De fora · próximos";
+      nameEl.style.color = "var(--muted)";
+    } else {
+      nameEl.textContent = team.name + " · " + getBibColor(colorKey).label;
     }
 
-    const ratingSpan = document.createElement("span");
-    ratingSpan.className = "team-rating";
-    ratingSpan.textContent = "Total: " + team.total_rating.toFixed(1) + " ★";
+    const totalEl = document.createElement("span");
+    totalEl.className = "t-total";
+    const count = (team.players || []).length;
+    totalEl.textContent = isBench
+      ? String(count)
+      : count + " na linha" + (isAdminMode ? " · " + formatDecimal(teamTotal(team)) + " ★" : "");
 
-    header.appendChild(titleWrap);
-    header.appendChild(ratingSpan);
+    head.appendChild(nameEl);
+    head.appendChild(totalEl);
 
-    const table = document.createElement("table");
-    table.className = "team-table";
+    const body = document.createElement("div");
+    body.className = "team-players";
 
-    const thead = document.createElement("thead");
-    thead.innerHTML = "<tr><th>Jogador</th></tr>";
-    table.appendChild(thead);
-
-    const tbody = document.createElement("tbody");
-
-    const sortedPlayers = [...team.players].sort(function (a, b) {
+    const sortedPlayers = (team.players || []).slice().sort(function (a, b) {
       return a.name.trim().localeCompare(b.name.trim(), "pt-BR", { sensitivity: "base" });
     });
 
     sortedPlayers.forEach(function (p) {
-      const tr = document.createElement("tr");
-      const nameTd = document.createElement("td");
-      nameTd.textContent = p.name;
-      tr.appendChild(nameTd);
-      tbody.appendChild(tr);
+      const rowEl = document.createElement("div");
+      rowEl.className = "tp";
+
+      const avatar = document.createElement("div");
+      avatar.className = "avatar sm";
+      avatar.textContent = buildPlayerInitials(p.name);
+
+      const nm = document.createElement("span");
+      nm.className = "nm";
+      nm.textContent = p.name;
+
+      rowEl.appendChild(avatar);
+      rowEl.appendChild(nm);
+
+      if (isAdminMode && !isBench) {
+        const stars = document.createElement("span");
+        stars.innerHTML = buildStarsHTML(p.rating);
+        rowEl.appendChild(stars);
+      }
+
+      body.appendChild(rowEl);
     });
 
-    table.appendChild(tbody);
-    card.appendChild(header);
-    card.appendChild(table);
-    teamsResultEl.appendChild(card);
+    card.appendChild(head);
+    card.appendChild(body);
+    cardsEl.appendChild(card);
   });
 }
 
 // ============================================================
-// Audit
+// Auditoria
 // ============================================================
 
 function getTeamAuditStats(team) {
   const teamPlayers = team.players || [];
   const playerCount = teamPlayers.length || 1;
-  const totalRating = teamPlayers.reduce(function (sum, p) { return sum + Number(p.rating || 0); }, 0);
-  const totalMarking = teamPlayers.reduce(function (sum, p) { return sum + getAttributeValue(p, "marking"); }, 0);
-  const totalStamina = teamPlayers.reduce(function (sum, p) { return sum + getAttributeValue(p, "stamina"); }, 0);
-  const totalScoring = teamPlayers.reduce(function (sum, p) { return sum + getAttributeValue(p, "scoring"); }, 0);
+  const totalRating = teamTotal(team);
+  const sum = function (attr) {
+    return teamPlayers.reduce(function (acc, p) { return acc + getAttributeValue(p, attr); }, 0);
+  };
   return {
-    totalRating, totalMarking, totalStamina, totalScoring,
+    totalRating: totalRating,
     averageRating: totalRating / playerCount,
-    averageMarking: totalMarking / playerCount,
-    averageStamina: totalStamina / playerCount,
-    averageScoring: totalScoring / playerCount,
+    marking: sum("marking"),
+    stamina: sum("stamina"),
+    scoring: sum("scoring"),
   };
 }
 
-function renderAuditView() {
-  auditContentEl.innerHTML = "";
+function renderAudit() {
+  const bodyEl = $("audit-body");
+  bodyEl.innerHTML = "";
 
   if (!lastDrawnTeams.length) {
-    auditContentEl.innerHTML = '<p class="muted-text">Nenhum sorteio disponivel para auditar.</p>';
+    bodyEl.innerHTML = '<p class="empty">Nenhum sorteio disponível para auditar.</p>';
     return;
   }
 
-  const summary = document.createElement("div");
-  summary.className = "audit-summary-grid";
-
-  lastDrawnTeams.forEach(function (team, index) {
-    const teamNumber = index + 1;
-    const label = getTeamLabel(teamNumber);
+  let html = '<div class="audit-grid">';
+  lastDrawnTeams.slice(0, 2).forEach(function (team, index) {
+    const colorKey = getTeamColorKey(index + 1);
+    const label = colorKey ? getBibColor(colorKey).label : "De fora";
     const stats = getTeamAuditStats(team);
-    const summaryCard = document.createElement("div");
-    summaryCard.className = "audit-summary-card";
-    summaryCard.innerHTML =
-      "<strong>" + team.name + " - " + label + "</strong>" +
-      "<span>Rating: " + formatDecimal(stats.totalRating) + " total · " + formatDecimal(stats.averageRating) + " media</span>" +
-      "<span>Marca: " + stats.totalMarking + " total · " + formatDecimal(stats.averageMarking) + " media</span>" +
-      "<span>Gol: " + stats.totalScoring + " total · " + formatDecimal(stats.averageScoring) + " media</span>" +
-      "<span>Corre: " + stats.totalStamina + " total · " + formatDecimal(stats.averageStamina) + " media</span>";
-    summary.appendChild(summaryCard);
+    html +=
+      '<div class="audit-cell"><b>' + escapeHTML(team.name) + " · " + escapeHTML(label) + "</b>" +
+      "<span>Rating " + formatDecimal(stats.totalRating) + " · média " + formatDecimal(stats.averageRating) + "</span>" +
+      "<span>Marca " + stats.marking + " · Gol " + stats.scoring + " · Corre " + stats.stamina + "</span></div>";
   });
-
-  auditContentEl.appendChild(summary);
+  html += "</div>";
 
   lastDrawnTeams.forEach(function (team, index) {
-    const teamNumber = index + 1;
-    const label = getTeamLabel(teamNumber);
-    const stats = getTeamAuditStats(team);
-    const teamCard = document.createElement("div");
-    teamCard.className = "audit-team-card";
+    const colorKey = getTeamColorKey(index + 1);
+    const label = colorKey ? getBibColor(colorKey).label : "De fora";
 
-    const sortedPlayers = [...team.players].sort(function (a, b) {
-      return a.name.trim().localeCompare(b.name.trim(), "pt-BR", { sensitivity: "base" });
+    const sortedPlayers = (team.players || []).slice().sort(function (a, b) {
+      return b.rating - a.rating;
     });
 
-    teamCard.innerHTML =
-      '<div class="audit-team-header"><strong>' + team.name + " - " + label + "</strong><span>Total: " + formatDecimal(stats.totalRating) + " ★</span></div>" +
-      '<div class="audit-metrics"><span>Marca ' + stats.totalMarking + "</span><span>Gol " + stats.totalScoring + "</span><span>Corre " + stats.totalStamina + "</span></div>" +
-      '<table class="audit-table"><thead><tr><th>Jogador</th><th>Rating</th><th>Marca</th><th>Gol</th><th>Corre</th></tr></thead><tbody>' +
-      sortedPlayers.map(function (p) {
-        return "<tr><td>" + p.name + "</td><td>" + formatDecimal(p.rating) + "</td><td>" + getAttributeValue(p, "marking") + "</td><td>" + getAttributeValue(p, "scoring") + "</td><td>" + getAttributeValue(p, "stamina") + "</td></tr>";
-      }).join("") +
-      "</tbody></table>";
-
-    auditContentEl.appendChild(teamCard);
+    html += '<p class="eyebrow">' + escapeHTML(team.name) + " · " + escapeHTML(label) + "</p>";
+    html += '<table class="audit-table"><thead><tr><th>Jogador</th><th>★</th><th>Marca</th><th>Gol</th><th>Corre</th></tr></thead><tbody>';
+    sortedPlayers.forEach(function (p) {
+      html +=
+        "<tr><td>" + escapeHTML(p.name) + "</td><td>" + formatDecimal(p.rating) + "</td><td>" +
+        getAttributeValue(p, "marking") + "</td><td>" + getAttributeValue(p, "scoring") + "</td><td>" +
+        getAttributeValue(p, "stamina") + "</td></tr>";
+    });
+    html += "</tbody></table>";
   });
-}
 
-function openAuditModal() {
-  if (!isAdminMode) { alert("Ative o modo admin para ver a auditoria."); return; }
-  renderAuditView();
-  openModal(auditModalEl);
+  bodyEl.innerHTML = html;
 }
 
 // ============================================================
-// Compare
+// Comparar por nível
 // ============================================================
 
-function renderCompareTable() {
-  compareContentEl.innerHTML = "";
+function renderCompare() {
+  const bodyEl = $("compare-body");
+  bodyEl.innerHTML = "";
+
   if (players.length === 0) {
-    compareContentEl.innerHTML = '<p class="muted-text">Nenhum jogador cadastrado.</p>';
+    bodyEl.innerHTML = '<p class="empty">Nenhum jogador cadastrado.</p>';
     return;
   }
 
@@ -208,79 +266,44 @@ function renderCompareTable() {
   players.forEach(function (p) {
     const key = p.rating.toFixed(1);
     if (!groups[key]) groups[key] = [];
-    groups[key].push(p);
+    groups[key].push(p.name);
   });
 
-  const sortedRatings = Object.keys(groups).map(function (r) { return parseFloat(r); }).sort(function (a, b) { return b - a; });
+  const ratings = Object.keys(groups)
+    .map(function (r) { return parseFloat(r); })
+    .sort(function (a, b) { return b - a; });
 
-  const table = document.createElement("table");
-  table.className = "team-table";
-  const thead = document.createElement("thead");
-  thead.innerHTML = "<tr><th>Estrelas</th><th>Jogadores</th></tr>";
-  table.appendChild(thead);
-
-  const tbody = document.createElement("tbody");
-  sortedRatings.forEach(function (rating) {
-    const key = rating.toFixed(1);
-    const names = groups[key].map(function (p) { return p.name; }).sort(function (a, b) {
+  let html = '<table class="audit-table"><thead><tr><th style="width:90px">Nível</th><th style="text-align:left">Jogadores</th></tr></thead><tbody>';
+  ratings.forEach(function (rating) {
+    const names = groups[rating.toFixed(1)].slice().sort(function (a, b) {
       return a.trim().localeCompare(b.trim(), "pt-BR", { sensitivity: "base" });
     });
-    const tr = document.createElement("tr");
-    const ratingTd = document.createElement("td");
-    const playersTd = document.createElement("td");
-    ratingTd.textContent = key + " ★";
-    playersTd.textContent = names.join(", ");
-    tr.appendChild(ratingTd);
-    tr.appendChild(playersTd);
-    tbody.appendChild(tr);
+    html +=
+      '<tr><td style="text-align:left;white-space:nowrap">' + buildStarsHTML(rating) + "</td>" +
+      '<td style="text-align:left">' + names.map(escapeHTML).join(", ") + "</td></tr>";
   });
+  html += "</tbody></table>";
 
-  table.appendChild(tbody);
-  compareContentEl.appendChild(table);
+  bodyEl.innerHTML = html;
 }
 
 // ============================================================
-// Event listeners — Teams
-// ============================================================
-
-if (drawTeamsBtn) { drawTeamsBtn.addEventListener("click", openDrawModal); }
-
-if (redrawBtn) {
-  redrawBtn.addEventListener("click", function () {
-    if (!players.some(function (p) { return p.active; })) { alert("Nenhum jogador ativo para sortear."); return; }
-    performDraw(lastTeamSize);
-  });
-}
-
-if (cancelDrawBtn) { cancelDrawBtn.addEventListener("click", function () { closeModal(drawModalEl); }); }
-
-if (confirmDrawBtn) {
-  confirmDrawBtn.addEventListener("click", function () {
-    const size = parseInt(teamSizeInput.value || "0", 10);
-    if (!size || size <= 0) { alert("Informe um numero valido de jogadores por time."); return; }
-    closeModal(drawModalEl);
-    performDraw(size);
-  });
-}
-
-if (compareBtn) {
-  compareBtn.addEventListener("click", function () {
-    if (players.length === 0) { alert("Nenhum jogador cadastrado para comparar."); return; }
-    renderCompareTable();
-    openModal(compareModalEl);
-  });
-}
-
-if (closeCompareBtn) { closeCompareBtn.addEventListener("click", function () { closeModal(compareModalEl); }); }
-if (closeAuditBtn) { closeAuditBtn.addEventListener("click", function () { closeModal(auditModalEl); }); }
-
-// ============================================================
-// Init
+// Event listeners
 // ============================================================
 
 document.addEventListener("DOMContentLoaded", function () {
-  loadTheme();
-  loadAdminMode();
-  renderStarWidget(starWidgetEl, 0, playerRatingInput);
-  showPeladaScreen();
+  $("ci-cta").addEventListener("click", openDrawSheet);
+
+  $("dr-minus").addEventListener("click", function () { stepTeamSize(-1); });
+  $("dr-plus").addEventListener("click", function () { stepTeamSize(1); });
+  $("dr-cancel").addEventListener("click", function () { closeSheets(); });
+  $("dr-confirm").addEventListener("click", confirmDraw);
+
+  $("tm-back").addEventListener("click", function () { showScreen("s-checkin"); renderCheckin(); });
+  $("tm-redraw").addEventListener("click", redraw);
+  $("tm-audit-btn").addEventListener("click", function () { renderAudit(); openSheet("audit"); });
+  $("audit-close").addEventListener("click", function () { closeSheets(); });
+
+  $("sq-compare-btn").addEventListener("click", function () { renderCompare(); openSheet("compare"); });
+  $("compare-close").addEventListener("click", function () { closeSheets(); });
 });

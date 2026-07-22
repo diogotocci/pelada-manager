@@ -4,8 +4,8 @@
   "description": "Sorteio de times equilibrados para a sua pelada",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0b0c10",
-  "theme_color": "#0b0c10",
+  "background_color": "#f7f8f6",
+  "theme_color": "#f7f8f6",
   "icons": [
     {
       "src": "/static/icon-192.png",
