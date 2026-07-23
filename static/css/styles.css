@@ -602,6 +602,21 @@ input { font: inherit; }
 .swatch .inner { position: absolute; inset: 3px; border-radius: inherit; border: 1px solid rgba(0, 0, 0, .15); }
 .swatch.on { border-color: var(--ink); }
 
+.weekdays { display: flex; gap: 6px; flex-wrap: wrap; padding: 4px 0; }
+.wd {
+  flex: 1;
+  min-width: 40px;
+  padding: 9px 4px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: .8rem;
+  font-weight: 600;
+  text-align: center;
+}
+.wd.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
 /* Wizard */
 .wiz-progress { display: flex; gap: 6px; padding: 4px 18px 14px; flex: none; }
 .wiz-progress i { height: 4px; border-radius: 2px; flex: 1; background: var(--line); }

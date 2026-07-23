@@ -96,7 +96,7 @@ function renderTeams(teams) {
   const balanceEl = $("tm-balance");
   if (!cardsEl) return;
 
-  $("tm-sub").textContent = todayLabel();
+  $("tm-sub").textContent = gameDateLabel();
   $("tm-audit-btn").classList.toggle("hidden", !isAdminMode);
 
   cardsEl.innerHTML = "";
@@ -250,6 +250,67 @@ function renderAudit() {
 }
 
 // ============================================================
+// Compartilhar times
+// ============================================================
+
+function buildShareText() {
+  const lines = [];
+  lines.push("⚽ Times — " + currentPeladaName);
+  lines.push(gameDateLabel());
+  lines.push("");
+
+  lastDrawnTeams.forEach(function (team, index) {
+    const colorKey = getTeamColorKey(index + 1);
+    const sorted = (team.players || []).slice().sort(function (a, b) {
+      return a.name.trim().localeCompare(b.name.trim(), "pt-BR", { sensitivity: "base" });
+    });
+
+    if (colorKey == null) {
+      lines.push("🪑 De fora");
+    } else {
+      const color = getBibColor(colorKey);
+      lines.push(color.emoji + " " + color.label + " (" + sorted.length + ")");
+    }
+
+    sorted.forEach(function (p) { lines.push("• " + p.name); });
+    lines.push("");
+  });
+
+  lines.push("timejusto.xyz");
+  return lines.join("\n");
+}
+
+async function shareTeams() {
+  if (!lastDrawnTeams.length) {
+    showToast("Sorteie os times primeiro.");
+    return;
+  }
+
+  const text = buildShareText();
+
+  if (navigator.share) {
+    try {
+      await navigator.share({ text: text });
+    } catch (err) {
+      if (err && err.name === "AbortError") return;
+      copyShareText(text);
+    }
+  } else {
+    copyShareText(text);
+  }
+}
+
+function copyShareText(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text)
+      .then(function () { showToast("Escalação copiada"); })
+      .catch(function () { showToast("Não foi possível compartilhar."); });
+  } else {
+    showToast("Não foi possível compartilhar.");
+  }
+}
+
+// ============================================================
 // Comparar por nível
 // ============================================================
 
@@ -301,6 +362,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   $("tm-back").addEventListener("click", function () { showScreen("s-checkin"); renderCheckin(); });
   $("tm-redraw").addEventListener("click", redraw);
+  $("tm-share").addEventListener("click", shareTeams);
   $("tm-audit-btn").addEventListener("click", function () { renderAudit(); openSheet("audit"); });
   $("audit-close").addEventListener("click", function () { closeSheets(); });
 

@@ -6,7 +6,7 @@ from services.team_balancer import balance_teams
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "2.6.1")
+APP_VERSION = os.getenv("APP_VERSION", "2.7.0")
 ADMIN_SECRET = os.getenv("ADMIN_SECRET", "")
 
 VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white", "pink"}
@@ -34,6 +34,22 @@ def _get_pelada_id() -> int:
 
 def _is_valid_attribute(value: int) -> bool:
     return 1 <= value <= 3
+
+
+def _parse_weekday(value):
+    """
+    Validate an optional game_weekday value. Returns the int (0-6, Sunday-based
+    to match JS Date.getDay()) or None. Aborts with 400 when invalid.
+    """
+    if value is None:
+        return None
+    try:
+        weekday = int(value)
+    except (ValueError, TypeError):
+        abort(400, description="Invalid weekday")
+    if not 0 <= weekday <= 6:
+        abort(400, description="Weekday must be between 0 and 6")
+    return weekday
 
 
 # ============================================================
@@ -81,11 +97,14 @@ def create_pelada():
     if team1_color not in VALID_BIB_COLORS or team2_color not in VALID_BIB_COLORS:
         abort(400, description="Invalid bib color")
 
+    game_weekday = _parse_weekday(data.get("game_weekday"))
+
     pelada = pelada_storage.create_pelada(
         name=name,
         password=password,
         team1_color=team1_color,
         team2_color=team2_color,
+        game_weekday=game_weekday,
     )
     return jsonify(pelada), 201
 
@@ -127,6 +146,24 @@ def update_pelada_colors(pelada_id):
         abort(400, description="Invalid bib color")
 
     pelada = pelada_storage.update_pelada_colors(pelada_id, team1_color, team2_color)
+
+    if not pelada:
+        abort(404, description="Pelada not found")
+
+    return jsonify(pelada)
+
+
+@app.route("/api/peladas/<int:pelada_id>/weekday", methods=["PATCH"])
+def update_pelada_weekday(pelada_id):
+    data = request.get_json(silent=True) or {}
+    admin_secret = data.get("admin_secret", "")
+
+    if not ADMIN_SECRET or admin_secret != ADMIN_SECRET:
+        abort(403, description="Invalid admin secret")
+
+    game_weekday = _parse_weekday(data.get("game_weekday"))
+
+    pelada = pelada_storage.set_weekday(pelada_id, game_weekday)
 
     if not pelada:
         abort(404, description="Pelada not found")

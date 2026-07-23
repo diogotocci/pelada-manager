@@ -63,6 +63,34 @@ def ensure_schema() -> None:
                 $$;
             """)
 
+            # game_weekday: day the pelada is played on.
+            # Convention matches JS Date.getDay(): 0=Sunday ... 6=Saturday.
+            # Nullable — when unset, sharing falls back to the current date.
+            cur.execute("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'peladas' AND column_name = 'game_weekday'
+                    ) THEN
+                        ALTER TABLE peladas ADD COLUMN game_weekday SMALLINT;
+                    END IF;
+                END
+                $$;
+            """)
+
+            # One-time backfill for the two known peladas. Guarded by IS NULL
+            # so it only seeds the initial value and never overrides a later
+            # edit made through the admin UI. Saturday = 6, Monday = 1.
+            cur.execute(
+                "UPDATE peladas SET game_weekday = 6 WHERE game_weekday IS NULL AND name ILIKE %s",
+                ("%fumageiro%",),
+            )
+            cur.execute(
+                "UPDATE peladas SET game_weekday = 1 WHERE game_weekday IS NULL AND name ILIKE %s",
+                ("%batista%",),
+            )
+
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS players (
                     id         SERIAL PRIMARY KEY,
@@ -93,12 +121,14 @@ def _row_to_player(row) -> Player:
 
 
 def _row_to_pelada(row) -> Dict:
+    weekday = row.get("game_weekday")
     return {
         "id": row["id"],
         "name": row["name"],
         "player_count": int(row.get("player_count", 0)),
         "team1_color": row.get("team1_color") or "blue",
         "team2_color": row.get("team2_color") or "yellow",
+        "game_weekday": int(weekday) if weekday is not None else None,
     }
 
 
@@ -107,24 +137,24 @@ class PeladaStorage:
         with _get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT p.id, p.name, p.team1_color, p.team2_color, COUNT(pl.id) AS player_count
+                    SELECT p.id, p.name, p.team1_color, p.team2_color, p.game_weekday, COUNT(pl.id) AS player_count
                     FROM peladas p
                     LEFT JOIN players pl ON pl.pelada_id = p.id
-                    GROUP BY p.id, p.name, p.team1_color, p.team2_color
+                    GROUP BY p.id, p.name, p.team1_color, p.team2_color, p.game_weekday
                     ORDER BY p.id
                 """)
                 return [_row_to_pelada(r) for r in cur.fetchall()]
 
-    def create_pelada(self, name: str, password: str, team1_color: str = "blue", team2_color: str = "yellow") -> Dict:
+    def create_pelada(self, name: str, password: str, team1_color: str = "blue", team2_color: str = "yellow", game_weekday: Optional[int] = None) -> Dict:
         with _get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO peladas (name, password, team1_color, team2_color)
-                    VALUES (%s, %s, %s, %s)
-                    RETURNING id, name, team1_color, team2_color, 0 AS player_count
+                    INSERT INTO peladas (name, password, team1_color, team2_color, game_weekday)
+                    VALUES (%s, %s, %s, %s, %s)
+                    RETURNING id, name, team1_color, team2_color, game_weekday, 0 AS player_count
                     """,
-                    (name, password, team1_color, team2_color),
+                    (name, password, team1_color, team2_color, game_weekday),
                 )
                 return _row_to_pelada(cur.fetchone())
 
@@ -144,11 +174,11 @@ class PeladaStorage:
         with _get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT p.id, p.name, p.team1_color, p.team2_color, COUNT(pl.id) AS player_count
+                    SELECT p.id, p.name, p.team1_color, p.team2_color, p.game_weekday, COUNT(pl.id) AS player_count
                     FROM peladas p
                     LEFT JOIN players pl ON pl.pelada_id = p.id
                     WHERE p.id = %s
-                    GROUP BY p.id, p.name, p.team1_color, p.team2_color
+                    GROUP BY p.id, p.name, p.team1_color, p.team2_color, p.game_weekday
                 """, (pelada_id,))
                 row = cur.fetchone()
                 return _row_to_pelada(row) if row else None
@@ -161,9 +191,24 @@ class PeladaStorage:
                     UPDATE peladas
                     SET team1_color = %s, team2_color = %s
                     WHERE id = %s
-                    RETURNING id, name, team1_color, team2_color, 0 AS player_count
+                    RETURNING id, name, team1_color, team2_color, game_weekday, 0 AS player_count
                     """,
                     (team1_color, team2_color, pelada_id),
+                )
+                row = cur.fetchone()
+                return _row_to_pelada(row) if row else None
+
+    def set_weekday(self, pelada_id: int, game_weekday: Optional[int]) -> Optional[Dict]:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE peladas
+                    SET game_weekday = %s
+                    WHERE id = %s
+                    RETURNING id, name, team1_color, team2_color, game_weekday, 0 AS player_count
+                    """,
+                    (game_weekday, pelada_id),
                 )
                 row = cur.fetchone()
                 return _row_to_pelada(row) if row else None
