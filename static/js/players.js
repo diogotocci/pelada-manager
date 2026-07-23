@@ -161,6 +161,7 @@ function enterPelada(pelada) {
   currentPeladaName = pelada.name;
   currentTeam1Color = pelada.team1_color || "blue";
   currentTeam2Color = pelada.team2_color || "yellow";
+  currentPeladaWeekday = pelada.game_weekday != null ? pelada.game_weekday : null;
 
   localStorage.setItem("pelada-current-id", String(pelada.id));
   localStorage.setItem("pelada-current-name", pelada.name);
@@ -537,9 +538,34 @@ function renderMenuSheet() {
   refreshAdminUI();
 
   if (isAdminMode && currentPeladaId != null) {
+    renderWeekdayPicker($("mn-weekday"), currentPeladaWeekday, function (value) { saveWeekday(value); });
     renderSwatches($("mn-c1"), currentTeam1Color, function (key) { saveColors(key, currentTeam2Color); });
     renderSwatches($("mn-c2"), currentTeam2Color, function (key) { saveColors(currentTeam1Color, key); });
     $("mn-same").classList.toggle("on", currentTeam1Color === currentTeam2Color);
+  }
+}
+
+async function saveWeekday(weekday) {
+  try {
+    const res = await fetchJSONRaw("/api/peladas/" + currentPeladaId + "/weekday", {
+      method: "PATCH",
+      body: JSON.stringify({
+        admin_secret: ADMIN_SECRET,
+        game_weekday: weekday,
+      }),
+    });
+
+    if (!res.ok) {
+      showToast("Erro ao salvar o dia.");
+      return;
+    }
+
+    currentPeladaWeekday = weekday;
+    renderMenuSheet();
+    showToast("Dia da pelada salvo");
+  } catch (err) {
+    console.error(err);
+    showToast("Erro ao salvar o dia.");
   }
 }
 
@@ -583,19 +609,27 @@ function toggleAdmin() {
 // Nova pelada (wizard)
 // ============================================================
 
-let wizard = { c1: "blue", c2: "yellow", rating: 3, players: [] };
+let wizard = { c1: "blue", c2: "yellow", weekday: null, rating: 3, players: [] };
 
 function openWizard() {
-  wizard = { c1: "blue", c2: "yellow", rating: 3, players: [] };
+  wizard = { c1: "blue", c2: "yellow", weekday: null, rating: 3, players: [] };
   $("wz-name").value = "";
   $("wz-pass").value = "";
   $("wz-pass2").value = "";
   $("wz-err").classList.remove("on");
   $("wz-player").value = "";
+  renderWizardWeekday();
   renderWizardSwatches();
   renderWizardStars();
   renderWizardPlayers();
   showScreen("s-wiz1");
+}
+
+function renderWizardWeekday() {
+  renderWeekdayPicker($("wz-weekday"), wizard.weekday, function (value) {
+    wizard.weekday = value;
+    renderWizardWeekday();
+  });
 }
 
 function renderWizardSwatches() {
@@ -700,6 +734,7 @@ async function wizardCreate() {
         password: password,
         team1_color: wizard.c1,
         team2_color: wizard.c2,
+        game_weekday: wizard.weekday,
       }),
     });
 
@@ -728,6 +763,7 @@ async function wizardCreate() {
       name: name,
       team1_color: wizard.c1,
       team2_color: wizard.c2,
+      game_weekday: wizard.weekday,
     });
   } catch (err) {
     console.error(err);

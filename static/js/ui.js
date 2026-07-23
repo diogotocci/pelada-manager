@@ -7,6 +7,7 @@ let currentPeladaId = null;
 let currentPeladaName = "";
 let currentTeam1Color = "blue";
 let currentTeam2Color = "yellow";
+let currentPeladaWeekday = null;
 let isAdminMode = false;
 
 let checkinState = {};
@@ -16,14 +17,25 @@ let lastDrawnTeams = [];
 const ADMIN_SECRET = window.ADMIN_SECRET || "";
 
 const BIB_COLORS = [
-  { key: "blue", label: "Azul", light: "#4da3ff", dark: "#2d7cff" },
-  { key: "yellow", label: "Amarelo", light: "#ffd94d", dark: "#f5be18" },
-  { key: "green", label: "Verde", light: "#4ade80", dark: "#16a34a" },
-  { key: "red", label: "Vermelho", light: "#f87171", dark: "#dc2626" },
-  { key: "orange", label: "Laranja", light: "#fb923c", dark: "#ea580c" },
-  { key: "black", label: "Preto", light: "#4b5563", dark: "#111827" },
-  { key: "white", label: "Branco", light: "#f9fafb", dark: "#d1d5db" },
-  { key: "pink", label: "Rosa", light: "#f472b6", dark: "#db2777" },
+  { key: "blue", label: "Azul", light: "#4da3ff", dark: "#2d7cff", emoji: "🔵" },
+  { key: "yellow", label: "Amarelo", light: "#ffd94d", dark: "#f5be18", emoji: "🟡" },
+  { key: "green", label: "Verde", light: "#4ade80", dark: "#16a34a", emoji: "🟢" },
+  { key: "red", label: "Vermelho", light: "#f87171", dark: "#dc2626", emoji: "🔴" },
+  { key: "orange", label: "Laranja", light: "#fb923c", dark: "#ea580c", emoji: "🟠" },
+  { key: "black", label: "Preto", light: "#4b5563", dark: "#111827", emoji: "⚫" },
+  { key: "white", label: "Branco", light: "#f9fafb", dark: "#d1d5db", emoji: "⚪" },
+  { key: "pink", label: "Rosa", light: "#f472b6", dark: "#db2777", emoji: "🩷" },
+];
+
+// Weekday values follow JS Date.getDay(): 0=Sunday ... 6=Saturday.
+const WEEKDAYS = [
+  { value: 0, short: "Dom", long: "Domingo" },
+  { value: 1, short: "Seg", long: "Segunda" },
+  { value: 2, short: "Ter", long: "Terça" },
+  { value: 3, short: "Qua", long: "Quarta" },
+  { value: 4, short: "Qui", long: "Quinta" },
+  { value: 5, short: "Sex", long: "Sexta" },
+  { value: 6, short: "Sáb", long: "Sábado" },
 ];
 
 // ============================================================
@@ -260,9 +272,42 @@ function escapeHTML(text) {
     .replace(/"/g, "&quot;");
 }
 
-function todayLabel() {
-  const now = new Date();
+function dateLabel(date) {
   const days = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
   const months = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
-  return days[now.getDay()] + ", " + now.getDate() + " de " + months[now.getMonth()];
+  return days[date.getDay()] + ", " + date.getDate() + " de " + months[date.getMonth()];
+}
+
+function todayLabel() {
+  return dateLabel(new Date());
+}
+
+// Next occurrence of a weekday (0-6). Today if today already matches, so a
+// draw done on game day keeps that day; a draw done earlier jumps ahead.
+// Falls back to today when the pelada has no configured weekday.
+function nextGameDate(weekday) {
+  const now = new Date();
+  if (weekday == null) return now;
+  const diff = (weekday - now.getDay() + 7) % 7;
+  const target = new Date(now);
+  target.setDate(now.getDate() + diff);
+  return target;
+}
+
+function gameDateLabel() {
+  return dateLabel(nextGameDate(currentPeladaWeekday));
+}
+
+function renderWeekdayPicker(container, selectedValue, onSelect) {
+  if (!container) return;
+  container.innerHTML = "";
+  WEEKDAYS.forEach(function (w) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "wd" + (w.value === selectedValue ? " on" : "");
+    btn.textContent = w.short;
+    btn.setAttribute("aria-label", w.long);
+    btn.addEventListener("click", function () { onSelect(w.value); });
+    container.appendChild(btn);
+  });
 }
