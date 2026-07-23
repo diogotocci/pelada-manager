@@ -62,19 +62,21 @@ async function performDraw(teamSize) {
 
     renderTeams(lastDrawnTeams);
     showScreen("s-teams");
+    return true;
   } catch (err) {
     console.error(err);
     showToast("Erro ao sortear times.");
+    return false;
   }
 }
 
-function redraw() {
+async function redraw() {
   if (!players.some(function (p) { return p.active; })) {
     showToast("Nenhum jogador ativo para sortear.");
     return;
   }
-  performDraw(lastTeamSize);
-  showToast("Times sorteados de novo");
+  const ok = await performDraw(lastTeamSize);
+  if (ok) showToast("Times sorteados de novo");
 }
 
 // ============================================================
