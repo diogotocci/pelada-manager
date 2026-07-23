@@ -41,9 +41,11 @@ async function loadPeladas() {
     }
 
     peladas.forEach(function (p) {
-      const row = document.createElement("button");
-      row.type = "button";
+      const row = document.createElement("div");
       row.className = "row";
+      row.setAttribute("role", "button");
+      row.setAttribute("tabindex", "0");
+      row.setAttribute("aria-label", "Entrar na pelada " + p.name);
 
       const avatar = document.createElement("div");
       avatar.className = "avatar hl";
@@ -59,9 +61,9 @@ async function loadPeladas() {
       meta.appendChild(buildBibEl(p.team1_color, true));
       meta.appendChild(buildBibEl(p.team2_color, true));
 
-      const deleteBtn = document.createElement("span");
+      const deleteBtn = document.createElement("button");
+      deleteBtn.type = "button";
       deleteBtn.className = "row-action";
-      deleteBtn.setAttribute("role", "button");
       deleteBtn.setAttribute("aria-label", "Excluir pelada");
       deleteBtn.title = "Excluir pelada";
       deleteBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/></svg>';
@@ -80,6 +82,12 @@ async function loadPeladas() {
       row.appendChild(chev);
 
       row.addEventListener("click", function () { openAuthSheet(p); });
+      row.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openAuthSheet(p);
+        }
+      });
       listEl.appendChild(row);
     });
   } catch (err) {
