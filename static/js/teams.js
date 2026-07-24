@@ -11,12 +11,23 @@ function renderDrawSheet() {
   $("dr-size").textContent = lastTeamSize;
 
   const present = getPresentIds().length;
-  const inTeams = Math.min(present, lastTeamSize * 2);
-  const bench = present - inTeams;
+  const needed = lastTeamSize * 2;
+  const enough = present >= needed;
 
-  $("dr-summary").textContent =
-    present + " presentes → 2 times de até " + lastTeamSize +
-    (bench > 0 ? " · " + bench + " de fora aguardando" : "");
+  const summaryEl = $("dr-summary");
+  $("dr-confirm").disabled = !enough;
+
+  if (!enough) {
+    summaryEl.textContent =
+      lastTeamSize + " por time precisa de " + needed + " presentes — você tem " + present + ".";
+    summaryEl.style.color = "var(--danger)";
+  } else {
+    const bench = present - needed;
+    summaryEl.textContent =
+      present + " presentes → 2 times de " + lastTeamSize +
+      (bench > 0 ? " · " + bench + " de fora aguardando" : "");
+    summaryEl.style.color = "";
+  }
 }
 
 function stepTeamSize(delta) {
@@ -30,9 +41,10 @@ function stepTeamSize(delta) {
 
 async function confirmDraw() {
   const presentIds = getPresentIds();
+  const needed = lastTeamSize * 2;
 
-  if (presentIds.length < 2) {
-    showToast("Selecione pelo menos 2 jogadores.");
+  if (presentIds.length < needed) {
+    showToast("Precisa de " + needed + " presentes para " + lastTeamSize + " por time.");
     return;
   }
 
