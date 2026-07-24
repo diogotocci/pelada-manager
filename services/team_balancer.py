@@ -3,6 +3,18 @@ from typing import Dict, List
 
 from models import Player
 
+# Goalkeeper compensation tuning.
+# A fixed keeper only "counts" toward balance for how much better they are than
+# a makeshift keeper (a rotating outfielder). Below the baseline they add nothing.
+GK_BASELINE = 2.5
+GK_FOOT_BONUS = {1: 0.0, 2: 0.5, 3: 1.0}
+
+
+def _gk_advantage(player: Player) -> float:
+    footwork = getattr(player, "gk_footwork", 1)
+    effective = player.rating + GK_FOOT_BONUS.get(footwork, 0.0)
+    return max(0.0, effective - GK_BASELINE)
+
 
 def balance_teams(players: List[Player], team_size: int) -> List[Dict]:
     """
@@ -12,6 +24,9 @@ def balance_teams(players: List[Player], team_size: int) -> List[Dict]:
     - marking distribution;
     - scoring distribution;
     - stamina distribution;
+    - fixed goalkeepers (one per playing team, occupying a court slot; their
+      "advantage above a baseline" seeds the team so the outfield fills to
+      compensate a weaker/absent keeper on the other side);
     - controlled random swaps for redraw variation.
     """
     if team_size <= 0:
@@ -21,15 +36,30 @@ def balance_teams(players: List[Player], team_size: int) -> List[Dict]:
     if total_players == 0:
         return []
 
-    teams = _create_empty_teams(total_players, team_size)
+    keepers = [p for p in players if getattr(p, "is_goalkeeper", False)]
+    outfielders = [p for p in players if not getattr(p, "is_goalkeeper", False)]
+
+    # Only the two playing teams get a dedicated keeper. Extra keepers (3rd+)
+    # are treated as outfielders.
+    assigned_keepers = keepers[:2]
+    outfielders = outfielders + keepers[2:]
+
+    teams = _create_empty_teams(len(outfielders), team_size, assigned_keepers)
+
+    # Seed each playing team with its keeper (occupies a slot, contributes its
+    # advantage to the balance target, but not to the displayed outfield total).
+    for index, keeper in enumerate(assigned_keepers):
+        if index < len(teams):
+            teams[index]["players"].append(keeper)
+            teams[index]["seed"] = _gk_advantage(keeper)
 
     sorted_players = sorted(
-        players,
+        outfielders,
         key=lambda p: (-p.rating, random.random()),
     )
 
     for player in sorted_players:
-        candidates = [t for t in teams if len(t["players"]) < t["capacity"]]
+        candidates = [t for t in teams if _outfield_count(t) < t["capacity"]]
 
         best_team = min(
             candidates,
@@ -45,36 +75,65 @@ def balance_teams(players: List[Player], team_size: int) -> List[Dict]:
     return teams
 
 
-def _create_empty_teams(total_players: int, team_size: int) -> List[Dict]:
-    full_teams = total_players // team_size
-    remainder = total_players % team_size
-    team_count = full_teams + (1 if remainder > 0 else 0)
+def _outfield_count(team: Dict) -> int:
+    return sum(1 for p in team["players"] if not getattr(p, "is_goalkeeper", False))
 
+
+def _create_empty_teams(outfield_count: int, team_size: int, keepers: List[Player]) -> List[Dict]:
+    num_keepers = len(keepers)
+
+    if num_keepers == 0:
+        # Original behaviour: split all players into teams of team_size, with a
+        # smaller final team for the remainder.
+        full_teams = outfield_count // team_size
+        remainder = outfield_count % team_size
+        team_count = full_teams + (1 if remainder > 0 else 0)
+
+        teams = []
+        for index in range(team_count):
+            capacity = team_size if index < full_teams else (remainder if remainder > 0 else team_size)
+            teams.append({"players": [], "total_rating": 0.0, "capacity": capacity, "seed": 0.0})
+        return teams
+
+    # With keepers: two playing teams (one keeper each, up to two), each keeper
+    # occupying a court slot so its outfield capacity is team_size - 1. Extra
+    # outfielders overflow into bench teams of full size.
     teams = []
+    for index in range(2):
+        has_keeper = index < num_keepers
+        teams.append({
+            "players": [],
+            "total_rating": 0.0,
+            "capacity": max(0, team_size - (1 if has_keeper else 0)),
+            "seed": 0.0,
+        })
 
-    for index in range(team_count):
-        if index < full_teams:
-            capacity = team_size
-        else:
-            capacity = remainder if remainder > 0 else team_size
-
-        teams.append(
-            {
-                "players": [],
-                "total_rating": 0.0,
-                "capacity": capacity,
-            }
-        )
+    # Overflow outfielders go to bench teams: full-size teams plus a final
+    # smaller one for the remainder, so the two playing teams stay full.
+    playing_capacity = sum(t["capacity"] for t in teams)
+    overflow = max(0, outfield_count - playing_capacity)
+    full_bench = overflow // team_size
+    rem_bench = overflow % team_size
+    for _ in range(full_bench):
+        teams.append({"players": [], "total_rating": 0.0, "capacity": team_size, "seed": 0.0})
+    if rem_bench > 0:
+        teams.append({"players": [], "total_rating": 0.0, "capacity": rem_bench, "seed": 0.0})
 
     return teams
 
 
+def _outfielders(players: List[Player]) -> List[Player]:
+    return [p for p in players if not getattr(p, "is_goalkeeper", False)]
+
+
 def _team_score_if_added(team: Dict, player: Player, all_teams: List[Dict]) -> float:
-    simulated_players = team["players"] + [player]
+    # Only outfielders drive the spread/attribute penalties; the keeper's
+    # contribution is captured by the team "seed".
+    simulated_players = _outfielders(team["players"]) + [player]
     simulated_total = team["total_rating"] + player.rating
 
     projected_totals = [
-        simulated_total if t is team else t["total_rating"]
+        (simulated_total + team.get("seed", 0.0)) if t is team else (t["total_rating"] + t.get("seed", 0.0))
         for t in all_teams
     ]
 
@@ -127,11 +186,15 @@ def _apply_attribute_aware_swaps(teams: List[Dict], max_attempts: int = 90) -> N
         t1 = teams[team_indices[0]]
         t2 = teams[team_indices[1]]
 
-        if not t1["players"] or not t2["players"]:
+        # Only outfielders may be swapped; keepers are locked to their team.
+        i1 = [k for k, p in enumerate(t1["players"]) if not getattr(p, "is_goalkeeper", False)]
+        i2 = [k for k, p in enumerate(t2["players"]) if not getattr(p, "is_goalkeeper", False)]
+
+        if not i1 or not i2:
             continue
 
-        i = random.randrange(len(t1["players"]))
-        j = random.randrange(len(t2["players"]))
+        i = random.choice(i1)
+        j = random.choice(i2)
 
         p1 = t1["players"][i]
         p2 = t2["players"][j]
@@ -152,12 +215,12 @@ def _apply_attribute_aware_swaps(teams: List[Dict], max_attempts: int = 90) -> N
 
 
 def _overall_balance_score(teams: List[Dict]) -> float:
-    totals = [team["total_rating"] for team in teams]
+    totals = [team["total_rating"] + team.get("seed", 0.0) for team in teams]
     rating_spread = max(totals) - min(totals)
 
-    marking_totals = [_sum_attribute(team["players"], "marking") for team in teams]
-    scoring_totals = [_sum_attribute(team["players"], "scoring") for team in teams]
-    stamina_totals = [_sum_attribute(team["players"], "stamina") for team in teams]
+    marking_totals = [_sum_attribute(_outfielders(team["players"]), "marking") for team in teams]
+    scoring_totals = [_sum_attribute(_outfielders(team["players"]), "scoring") for team in teams]
+    stamina_totals = [_sum_attribute(_outfielders(team["players"]), "stamina") for team in teams]
 
     marking_spread = max(marking_totals) - min(marking_totals)
     scoring_spread = max(scoring_totals) - min(scoring_totals)
@@ -166,7 +229,7 @@ def _overall_balance_score(teams: List[Dict]) -> float:
     concentrated_extremes = 0.0
 
     for team in teams:
-        players = team["players"]
+        players = _outfielders(team["players"])
 
         concentrated_extremes += max(0, _count_players_at_or_above(players, 4.5) - 1) * 5.0
         concentrated_extremes += max(0, _count_players_at_or_below(players, 2.5) - 1) * 5.0
@@ -212,5 +275,10 @@ def _rating_variance(players: List[Player]) -> float:
 
 
 def _recalculate_totals(teams: List[Dict]) -> None:
+    # Displayed/compared total is the outfield rating sum; the keeper's effect
+    # lives in the team "seed", not in this total.
     for team in teams:
-        team["total_rating"] = sum(player.rating for player in team["players"])
+        team["total_rating"] = sum(
+            player.rating for player in team["players"]
+            if not getattr(player, "is_goalkeeper", False)
+        )

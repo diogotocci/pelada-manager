@@ -221,6 +221,8 @@ input { font: inherit; }
 .avatar.hl { background: var(--accent-soft); color: var(--accent); }
 .avatar.sm { width: 30px; height: 30px; font-size: .68rem; }
 
+.gk-glove { font-size: .9em; vertical-align: -1px; }
+
 .empty {
   padding: 36px 20px;
   text-align: center;

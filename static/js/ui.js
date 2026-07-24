@@ -260,6 +260,12 @@ function buildPlayerInitials(name) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+function gkGloveHTML(player) {
+  return player && player.is_goalkeeper
+    ? ' <span class="gk-glove" title="Goleiro fixo" aria-label="Goleiro fixo">🧤</span>'
+    : "";
+}
+
 function formatDecimal(value) {
   return Number(value).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }

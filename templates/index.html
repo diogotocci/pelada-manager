@@ -323,16 +323,32 @@
         <input type="text" id="pf-name" placeholder="Nome ou apelido">
         <p class="err" id="pf-err"></p>
       </div>
+      <div class="seg-row" style="padding:2px 0 14px">
+        <div style="display:flex;align-items:center;gap:9px;">
+          <span style="font-size:1.15rem">🧤</span>
+          <div>
+            <span class="seg-lbl">É goleiro fixo</span>
+            <p class="hint" style="margin:2px 0 0">Muda os atributos e o balanceamento</p>
+          </div>
+        </div>
+        <button class="switch" id="pf-gk" role="switch" aria-label="É goleiro fixo"></button>
+      </div>
       <div class="field">
-        <label>Nível geral</label>
+        <label id="pf-stars-label">Nível geral</label>
         <div class="star-input" id="pf-stars"></div>
         <p class="hint">Toque de novo na mesma estrela para meia estrela.</p>
       </div>
-      <div id="pf-adv" class="hidden">
-        <p class="eyebrow" style="margin-top:6px">Atributos · só no modo admin</p>
-        <div class="seg-row"><span class="seg-lbl">Marca</span><div class="seg" id="pf-marking"></div></div>
-        <div class="seg-row"><span class="seg-lbl">Corre</span><div class="seg" id="pf-stamina"></div></div>
-        <div class="seg-row"><span class="seg-lbl">Faz gol</span><div class="seg" id="pf-scoring"></div></div>
+      <div id="pf-adv">
+        <p class="eyebrow" id="pf-adv-label" style="margin-top:6px">Atributos</p>
+        <div id="pf-adv-outfield">
+          <div class="seg-row"><span class="seg-lbl">Marca</span><div class="seg" id="pf-marking"></div></div>
+          <div class="seg-row"><span class="seg-lbl">Corre</span><div class="seg" id="pf-stamina"></div></div>
+          <div class="seg-row"><span class="seg-lbl">Faz gol</span><div class="seg" id="pf-scoring"></div></div>
+        </div>
+        <div id="pf-adv-gk" class="hidden">
+          <div class="seg-row"><span class="seg-lbl">Joga com o pé</span><div class="seg" id="pf-footwork"></div></div>
+          <p class="hint">Goleiro-linha (pé 3) pesa mais no equilíbrio dos times.</p>
+        </div>
       </div>
       <button class="btn btn-danger hidden" id="pf-delete" style="margin-top:10px">Remover jogador</button>
     </div>

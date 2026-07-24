@@ -245,7 +245,7 @@ function renderCheckin() {
 
     const main = document.createElement("div");
     main.className = "r-main";
-    main.innerHTML = '<span class="r-name">' + escapeHTML(p.name) + "</span>";
+    main.innerHTML = '<span class="r-name">' + escapeHTML(p.name) + gkGloveHTML(p) + "</span>";
 
     const check = document.createElement("span");
     check.className = "check";
@@ -305,11 +305,13 @@ function renderSquad() {
 
     const main = document.createElement("div");
     main.className = "r-main";
-    let mainHTML = '<span class="r-name">' + escapeHTML(p.name) + "</span>";
+    let mainHTML = '<span class="r-name">' + escapeHTML(p.name) + gkGloveHTML(p) + "</span>";
     if (isAdminMode) {
       mainHTML +=
         '<span class="r-meta">' + buildStarsHTML(p.rating) +
-        '<span class="rating-num">' + formatDecimal(p.rating) + "</span></span>";
+        '<span class="rating-num">' + formatDecimal(p.rating) + "</span>" +
+        (p.is_goalkeeper ? '<span class="rating-num">· pé ' + Number(p.gk_footwork != null ? p.gk_footwork : 1) + "</span>" : "") +
+        "</span>";
     }
     main.innerHTML = mainHTML;
 
@@ -334,36 +336,59 @@ function renderSquad() {
 
 let editingPlayer = null;
 let pfRating = 3;
-let pfAttrs = { marking: 2, stamina: 2, scoring: 2 };
+let pfIsGK = false;
+let pfAttrs = { marking: 2, stamina: 2, scoring: 2, footwork: 1 };
 
 function refreshPlayerSheet() {
   renderStarInput($("pf-stars"), pfRating, function (value) {
     pfRating = value;
     refreshPlayerSheet();
   });
-  $("pf-adv").classList.toggle("hidden", !isAdminMode);
-  renderSeg($("pf-marking"), pfAttrs.marking, function (v) { pfAttrs.marking = v; refreshPlayerSheet(); });
-  renderSeg($("pf-stamina"), pfAttrs.stamina, function (v) { pfAttrs.stamina = v; refreshPlayerSheet(); });
-  renderSeg($("pf-scoring"), pfAttrs.scoring, function (v) { pfAttrs.scoring = v; refreshPlayerSheet(); });
+
+  $("pf-gk").classList.toggle("on", pfIsGK);
+  $("pf-stars-label").textContent = pfIsGK ? "Defesa · nível geral" : "Nível geral";
+  // Attributes are open at registration; on an existing player only admin edits.
+  $("pf-adv-label").textContent = editingPlayer ? "Atributos · só no modo admin" : "Atributos";
+
+  $("pf-adv-outfield").classList.toggle("hidden", pfIsGK);
+  $("pf-adv-gk").classList.toggle("hidden", !pfIsGK);
+
+  if (pfIsGK) {
+    renderSeg($("pf-footwork"), pfAttrs.footwork, function (v) { pfAttrs.footwork = v; refreshPlayerSheet(); });
+  } else {
+    renderSeg($("pf-marking"), pfAttrs.marking, function (v) { pfAttrs.marking = v; refreshPlayerSheet(); });
+    renderSeg($("pf-stamina"), pfAttrs.stamina, function (v) { pfAttrs.stamina = v; refreshPlayerSheet(); });
+    renderSeg($("pf-scoring"), pfAttrs.scoring, function (v) { pfAttrs.scoring = v; refreshPlayerSheet(); });
+  }
+}
+
+function togglePlayerGK() {
+  pfIsGK = !pfIsGK;
+  refreshPlayerSheet();
 }
 
 function openPlayerSheet(player) {
   editingPlayer = player || null;
 
   $("pf-title").textContent = player ? "Editar jogador" : "Novo jogador";
-  $("pf-sub").textContent = player ? player.name : "Nome e nível geral";
   $("pf-name").value = player ? player.name : "";
   $("pf-err").classList.remove("on");
   $("pf-delete").classList.toggle("hidden", !player || !isAdminMode);
 
+  pfIsGK = player ? !!player.is_goalkeeper : false;
   pfRating = player ? player.rating : 3;
   pfAttrs = player
     ? {
         marking: getAttributeValue(player, "marking"),
         stamina: getAttributeValue(player, "stamina"),
         scoring: getAttributeValue(player, "scoring"),
+        footwork: Number(player.gk_footwork != null ? player.gk_footwork : 1),
       }
-    : { marking: 2, stamina: 2, scoring: 2 };
+    : { marking: 2, stamina: 2, scoring: 2, footwork: 1 };
+
+  $("pf-sub").textContent = player
+    ? player.name
+    : (pfIsGK ? "Goleiro fixo · defesa e jogo de pé" : "Nome e nível geral");
 
   refreshPlayerSheet();
   openSheet("player");
@@ -382,8 +407,10 @@ async function savePlayer() {
     return;
   }
 
-  const payload = { name: name, rating: pfRating };
-  if (isAdminMode) {
+  const payload = { name: name, rating: pfRating, is_goalkeeper: pfIsGK };
+  if (pfIsGK) {
+    payload.gk_footwork = pfAttrs.footwork;
+  } else {
     payload.marking = pfAttrs.marking;
     payload.stamina = pfAttrs.stamina;
     payload.scoring = pfAttrs.scoring;
@@ -812,6 +839,7 @@ document.addEventListener("DOMContentLoaded", function () {
   $("pf-cancel").addEventListener("click", function () { closeSheets(); });
   $("pf-save").addEventListener("click", savePlayer);
   $("pf-delete").addEventListener("click", askDeletePlayer);
+  $("pf-gk").addEventListener("click", togglePlayerGK);
 
   // Confirmação
   $("cf-cancel").addEventListener("click", function () { closeSheets(); });
