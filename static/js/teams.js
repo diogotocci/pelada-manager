@@ -89,8 +89,16 @@ function getTeamColorKey(teamNumber) {
   return null;
 }
 
+function teamOutfielders(team) {
+  return (team.players || []).filter(function (p) { return !p.is_goalkeeper; });
+}
+
+function teamGoalkeeper(team) {
+  return (team.players || []).find(function (p) { return p.is_goalkeeper; }) || null;
+}
+
 function teamTotal(team) {
-  return (team.players || []).reduce(function (sum, p) { return sum + Number(p.rating || 0); }, 0);
+  return teamOutfielders(team).reduce(function (sum, p) { return sum + Number(p.rating || 0); }, 0);
 }
 
 function renderTeams(teams) {
@@ -141,9 +149,12 @@ function renderTeams(teams) {
       nameEl.textContent = team.name + " · " + getBibColor(colorKey).label;
     }
 
+    const keeper = teamGoalkeeper(team);
+    const outfielders = teamOutfielders(team);
+
     const totalEl = document.createElement("span");
     totalEl.className = "t-total";
-    const count = (team.players || []).length;
+    const count = isBench ? (team.players || []).length : outfielders.length;
     totalEl.textContent = isBench
       ? String(count)
       : count + " na linha" + (isAdminMode ? " · " + formatDecimal(teamTotal(team)) + " ★" : "");
@@ -154,7 +165,32 @@ function renderTeams(teams) {
     const body = document.createElement("div");
     body.className = "team-players";
 
-    const sortedPlayers = (team.players || []).slice().sort(function (a, b) {
+    // Keeper first, on its own row, marked with the glove.
+    if (keeper && !isBench) {
+      const rowEl = document.createElement("div");
+      rowEl.className = "tp";
+
+      const avatar = document.createElement("div");
+      avatar.className = "avatar sm hl";
+      avatar.textContent = buildPlayerInitials(keeper.name);
+
+      const nm = document.createElement("span");
+      nm.className = "nm";
+      nm.innerHTML = escapeHTML(keeper.name) + gkGloveHTML(keeper);
+
+      rowEl.appendChild(avatar);
+      rowEl.appendChild(nm);
+
+      if (isAdminMode) {
+        const stars = document.createElement("span");
+        stars.innerHTML = buildStarsHTML(keeper.rating);
+        rowEl.appendChild(stars);
+      }
+
+      body.appendChild(rowEl);
+    }
+
+    const sortedPlayers = outfielders.slice().sort(function (a, b) {
       return a.name.trim().localeCompare(b.name.trim(), "pt-BR", { sensitivity: "base" });
     });
 
@@ -193,11 +229,11 @@ function renderTeams(teams) {
 // ============================================================
 
 function getTeamAuditStats(team) {
-  const teamPlayers = team.players || [];
-  const playerCount = teamPlayers.length || 1;
+  const outfielders = teamOutfielders(team);
+  const playerCount = outfielders.length || 1;
   const totalRating = teamTotal(team);
   const sum = function (attr) {
-    return teamPlayers.reduce(function (acc, p) { return acc + getAttributeValue(p, attr); }, 0);
+    return outfielders.reduce(function (acc, p) { return acc + getAttributeValue(p, attr); }, 0);
   };
   return {
     totalRating: totalRating,
@@ -233,11 +269,20 @@ function renderAudit() {
     const colorKey = getTeamColorKey(index + 1);
     const label = colorKey ? getBibColor(colorKey).label : "De fora";
 
-    const sortedPlayers = (team.players || []).slice().sort(function (a, b) {
+    const sortedPlayers = teamOutfielders(team).slice().sort(function (a, b) {
       return b.rating - a.rating;
     });
 
     html += '<p class="eyebrow">' + escapeHTML(team.name) + " · " + escapeHTML(label) + "</p>";
+
+    const keeper = teamGoalkeeper(team);
+    if (keeper) {
+      html +=
+        '<p class="hint" style="margin:-2px 2px 6px">🧤 Goleiro: ' + escapeHTML(keeper.name) +
+        " · defesa " + formatDecimal(keeper.rating) +
+        " · pé " + Number(keeper.gk_footwork != null ? keeper.gk_footwork : 1) + "</p>";
+    }
+
     html += '<table class="audit-table"><thead><tr><th>Jogador</th><th>★</th><th>Marca</th><th>Gol</th><th>Corre</th></tr></thead><tbody>';
     sortedPlayers.forEach(function (p) {
       html +=
@@ -263,17 +308,25 @@ function buildShareText() {
 
   lastDrawnTeams.forEach(function (team, index) {
     const colorKey = getTeamColorKey(index + 1);
-    const sorted = (team.players || []).slice().sort(function (a, b) {
+    const keeper = teamGoalkeeper(team);
+    const sorted = teamOutfielders(team).slice().sort(function (a, b) {
       return a.name.trim().localeCompare(b.name.trim(), "pt-BR", { sensitivity: "base" });
     });
 
     if (colorKey == null) {
       lines.push("🪑 De fora");
-    } else {
-      const color = getBibColor(colorKey);
-      lines.push(color.emoji + " " + color.label + " (" + sorted.length + ")");
+      (team.players || []).slice().sort(function (a, b) {
+        return a.name.trim().localeCompare(b.name.trim(), "pt-BR", { sensitivity: "base" });
+      }).forEach(function (p) { lines.push("• " + p.name); });
+      lines.push("");
+      return;
     }
 
+    const color = getBibColor(colorKey);
+    lines.push(color.emoji + " " + color.label + " (" + sorted.length + ")");
+    if (keeper) {
+      lines.push("🧤 " + keeper.name);
+    }
     sorted.forEach(function (p) { lines.push("• " + p.name); });
     lines.push("");
   });

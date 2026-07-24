@@ -105,6 +105,27 @@ def ensure_schema() -> None:
                 )
             """)
 
+            # Goalkeeper support: a fixed keeper flag and a footwork attribute
+            # (1-3, how well the keeper plays with the feet / as a line goalie).
+            cur.execute("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'players' AND column_name = 'is_goalkeeper'
+                    ) THEN
+                        ALTER TABLE players ADD COLUMN is_goalkeeper BOOLEAN NOT NULL DEFAULT FALSE;
+                    END IF;
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'players' AND column_name = 'gk_footwork'
+                    ) THEN
+                        ALTER TABLE players ADD COLUMN gk_footwork SMALLINT NOT NULL DEFAULT 1;
+                    END IF;
+                END
+                $$;
+            """)
+
         conn.commit()
 
 
@@ -117,6 +138,8 @@ def _row_to_player(row) -> Player:
         marking=int(row["marking"]),
         stamina=int(row["stamina"]),
         scoring=int(row["scoring"]),
+        is_goalkeeper=bool(row.get("is_goalkeeper", False)),
+        gk_footwork=int(row["gk_footwork"]) if row.get("gk_footwork") is not None else 1,
     )
 
 
@@ -242,16 +265,18 @@ class PlayerStorage:
         marking: int = 2,
         stamina: int = 2,
         scoring: int = 2,
+        is_goalkeeper: bool = False,
+        gk_footwork: int = 1,
     ) -> Player:
         with _get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO players (pelada_id, name, rating, active, marking, stamina, scoring)
-                    VALUES (%s, %s, %s, TRUE, %s, %s, %s)
+                    INSERT INTO players (pelada_id, name, rating, active, marking, stamina, scoring, is_goalkeeper, gk_footwork)
+                    VALUES (%s, %s, %s, TRUE, %s, %s, %s, %s, %s)
                     RETURNING *
                     """,
-                    (pelada_id, name, rating, marking, stamina, scoring),
+                    (pelada_id, name, rating, marking, stamina, scoring, is_goalkeeper, gk_footwork),
                 )
                 return _row_to_player(cur.fetchone())
 
@@ -264,21 +289,25 @@ class PlayerStorage:
         marking: Optional[int] = None,
         stamina: Optional[int] = None,
         scoring: Optional[int] = None,
+        is_goalkeeper: Optional[bool] = None,
+        gk_footwork: Optional[int] = None,
     ) -> Optional[Player]:
         with _get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
                     UPDATE players
-                    SET name    = %s,
-                        rating  = %s,
-                        marking = COALESCE(%s, marking),
-                        stamina = COALESCE(%s, stamina),
-                        scoring = COALESCE(%s, scoring)
+                    SET name          = %s,
+                        rating        = %s,
+                        marking       = COALESCE(%s, marking),
+                        stamina       = COALESCE(%s, stamina),
+                        scoring       = COALESCE(%s, scoring),
+                        is_goalkeeper = COALESCE(%s, is_goalkeeper),
+                        gk_footwork   = COALESCE(%s, gk_footwork)
                     WHERE id = %s AND pelada_id = %s
                     RETURNING *
                     """,
-                    (name, rating, marking, stamina, scoring, player_id, pelada_id),
+                    (name, rating, marking, stamina, scoring, is_goalkeeper, gk_footwork, player_id, pelada_id),
                 )
                 row = cur.fetchone()
                 return _row_to_player(row) if row else None

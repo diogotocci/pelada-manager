@@ -6,7 +6,7 @@ from services.team_balancer import balance_teams
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "2.7.3")
+APP_VERSION = os.getenv("APP_VERSION", "2.8.0")
 
 ADMIN_SECRET = os.getenv("ADMIN_SECRET", "")
 
@@ -212,6 +212,8 @@ def create_player():
     marking = int(data.get("marking", 2))
     stamina = int(data.get("stamina", 2))
     scoring = int(data.get("scoring", 2))
+    is_goalkeeper = bool(data.get("is_goalkeeper", False))
+    gk_footwork = int(data.get("gk_footwork", 1))
 
     if not name:
         abort(400, description="Name cannot be empty")
@@ -228,6 +230,9 @@ def create_player():
     if not _is_valid_attribute(scoring):
         abort(400, description="Scoring must be between 1 and 3")
 
+    if not _is_valid_attribute(gk_footwork):
+        abort(400, description="Footwork must be between 1 and 3")
+
     player = player_storage.add_player(
         pelada_id=pelada_id,
         name=name,
@@ -235,6 +240,8 @@ def create_player():
         marking=marking,
         stamina=stamina,
         scoring=scoring,
+        is_goalkeeper=is_goalkeeper,
+        gk_footwork=gk_footwork,
     )
 
     return jsonify(player.to_dict()), 201
@@ -265,6 +272,11 @@ def update_player(player_id):
     marking = data.get("marking")
     stamina = data.get("stamina")
     scoring = data.get("scoring")
+    gk_footwork = data.get("gk_footwork")
+
+    is_goalkeeper = data.get("is_goalkeeper")
+    if is_goalkeeper is not None:
+        is_goalkeeper = bool(is_goalkeeper)
 
     if marking is not None:
         marking = int(marking)
@@ -281,6 +293,11 @@ def update_player(player_id):
         if not _is_valid_attribute(scoring):
             abort(400, description="Scoring must be between 1 and 3")
 
+    if gk_footwork is not None:
+        gk_footwork = int(gk_footwork)
+        if not _is_valid_attribute(gk_footwork):
+            abort(400, description="Footwork must be between 1 and 3")
+
     updated_player = player_storage.update_player(
         pelada_id=pelada_id,
         player_id=player_id,
@@ -289,6 +306,8 @@ def update_player(player_id):
         marking=marking,
         stamina=stamina,
         scoring=scoring,
+        is_goalkeeper=is_goalkeeper,
+        gk_footwork=gk_footwork,
     )
 
     if not updated_player:
