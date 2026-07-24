@@ -114,15 +114,18 @@ function renderTeams(teams) {
 
   if (!teams || teams.length === 0) return;
 
-  // Placar de equilíbrio (dois primeiros times)
-  const color1 = getBibColor(currentTeam1Color);
-  const color2 = getBibColor(currentTeam2Color);
-
-  if (teams.length >= 2) {
+  // Placar de equilíbrio: só no modo admin, para não revelar as notas dos
+  // jogadores quando há poucos presentes.
+  if (isAdminMode && teams.length >= 2) {
+    const color1 = getBibColor(currentTeam1Color);
+    const color2 = getBibColor(currentTeam2Color);
+    balanceEl.classList.remove("hidden");
     balanceEl.innerHTML =
       '<div class="side"><div class="val">' + formatDecimal(teamTotal(teams[0])) + ' ★</div><div class="who">' + escapeHTML(color1.label) + "</div></div>" +
       '<span class="vs">VS</span>' +
       '<div class="side"><div class="val">' + formatDecimal(teamTotal(teams[1])) + ' ★</div><div class="who">' + escapeHTML(color2.label) + "</div></div>";
+  } else {
+    balanceEl.classList.add("hidden");
   }
 
   teams.forEach(function (team, index) {
@@ -154,7 +157,8 @@ function renderTeams(teams) {
 
     const totalEl = document.createElement("span");
     totalEl.className = "t-total";
-    const count = isBench ? (team.players || []).length : outfielders.length;
+    // Count everyone on court, keeper included (display only).
+    const count = (team.players || []).length;
     totalEl.textContent = isBench
       ? String(count)
       : count + " na linha" + (isAdminMode ? " · " + formatDecimal(teamTotal(team)) + " ★" : "");
