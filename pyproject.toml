@@ -1,0 +1,16 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+# Conservative set: pyflakes (real errors) + import/statement/syntax checks.
+# Avoids noisy stylistic churn on code that was never linted.
+select = ["E4", "E7", "E9", "F"]
+
+[tool.ruff.lint.per-file-ignores]
+# The Vercel entrypoint re-exports the WSGI app; it's "unused" only locally.
+"api/index.py" = ["F401"]

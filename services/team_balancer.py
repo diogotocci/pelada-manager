@@ -1,4 +1,5 @@
 import random
+from dataclasses import replace
 from typing import Dict, List
 
 from models import Player
@@ -40,9 +41,10 @@ def balance_teams(players: List[Player], team_size: int) -> List[Dict]:
     outfielders = [p for p in players if not getattr(p, "is_goalkeeper", False)]
 
     # Only the two playing teams get a dedicated keeper. Extra keepers (3rd+)
-    # are treated as outfielders.
+    # play as outfielders — demote a copy (never mutate the input) so they are
+    # distributed and displayed like any line player.
     assigned_keepers = keepers[:2]
-    outfielders = outfielders + keepers[2:]
+    outfielders = outfielders + [replace(k, is_goalkeeper=False) for k in keepers[2:]]
 
     teams = _create_empty_teams(len(outfielders), team_size, assigned_keepers)
 

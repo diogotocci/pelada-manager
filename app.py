@@ -6,7 +6,7 @@ from services.team_balancer import balance_teams
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "3.2.6")
+APP_VERSION = os.getenv("APP_VERSION", "3.2.7")
 
 ADMIN_SECRET = os.getenv("ADMIN_SECRET", "")
 
@@ -22,7 +22,10 @@ ANDROID_CERT_FINGERPRINT = os.getenv("ANDROID_CERT_FINGERPRINT", "")
 player_storage = PlayerStorage()
 pelada_storage = PeladaStorage()
 
-ensure_schema()
+# Only touch the database when a connection is configured (always on Vercel).
+# Keeps `import app` side-effect-free for tests/CI that run without a DB.
+if os.getenv("DATABASE_URL"):
+    ensure_schema()
 
 
 def _get_pelada_id() -> int:
