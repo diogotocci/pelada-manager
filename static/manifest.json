@@ -6,7 +6,10 @@
   "scope": "/",
   "start_url": "/",
   "lang": "pt-BR",
+  "dir": "ltr",
   "display": "standalone",
+  "orientation": "portrait",
+  "categories": ["sports"],
   "background_color": "#f7f8f6",
   "theme_color": "#f7f8f6",
   "icons": [
