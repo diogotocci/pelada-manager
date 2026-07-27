@@ -6,15 +6,16 @@ from services.team_balancer import balance_teams
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "3.2.4")
+APP_VERSION = os.getenv("APP_VERSION", "3.2.5")
 
 ADMIN_SECRET = os.getenv("ADMIN_SECRET", "")
 
 VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white", "pink"}
 
-# Android TWA (app gerado no PWABuilder). O fingerprint SHA-256 sai ao gerar
-# a chave de assinatura; defina-o na env var ANDROID_CERT_FINGERPRINT no Vercel
-# (ex.: "AB:CD:12:...") para o app verificar o domínio e esconder a barra de URL.
+# Android TWA (app gerado no PWABuilder). Defina os fingerprints SHA-256 na env
+# var ANDROID_CERT_FINGERPRINT no Vercel para o app verificar o domínio e
+# esconder a barra de URL. Aceita vários separados por vírgula — normalmente a
+# chave de upload (PWABuilder) E a chave do Play App Signing (Play Console).
 ANDROID_PACKAGE_NAME = os.getenv("ANDROID_PACKAGE_NAME", "xyz.timejusto.twa")
 ANDROID_CERT_FINGERPRINT = os.getenv("ANDROID_CERT_FINGERPRINT", "")
 
@@ -87,8 +88,9 @@ def service_worker():
 @app.route("/.well-known/assetlinks.json")
 def assetlinks():
     # Digital Asset Links for the Android TWA. Empty fingerprints until
-    # ANDROID_CERT_FINGERPRINT is set (from PWABuilder's signing key).
-    fingerprints = [ANDROID_CERT_FINGERPRINT] if ANDROID_CERT_FINGERPRINT else []
+    # ANDROID_CERT_FINGERPRINT is set. Supports a comma-separated list so both
+    # the upload key and the Play App Signing key can be verified.
+    fingerprints = [f.strip() for f in ANDROID_CERT_FINGERPRINT.split(",") if f.strip()]
     return jsonify([{
         "relation": ["delegate_permission/common.handle_all_urls"],
         "target": {
