@@ -1,16 +1,22 @@
 import os
-from flask import Flask, render_template, jsonify, request, abort
+from flask import Flask, render_template, jsonify, request, abort, Response
 
 from storage.postgres_storage import PlayerStorage, PeladaStorage, ensure_schema
 from services.team_balancer import balance_teams
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "3.2.2")
+APP_VERSION = os.getenv("APP_VERSION", "3.2.3")
 
 ADMIN_SECRET = os.getenv("ADMIN_SECRET", "")
 
 VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white", "pink"}
+
+# Android TWA (app gerado no PWABuilder). O fingerprint SHA-256 sai ao gerar
+# a chave de assinatura; defina-o na env var ANDROID_CERT_FINGERPRINT no Vercel
+# (ex.: "AB:CD:12:...") para o app verificar o domínio e esconder a barra de URL.
+ANDROID_PACKAGE_NAME = os.getenv("ANDROID_PACKAGE_NAME", "xyz.timejusto.twa")
+ANDROID_CERT_FINGERPRINT = os.getenv("ANDROID_CERT_FINGERPRINT", "")
 
 player_storage = PlayerStorage()
 pelada_storage = PeladaStorage()
@@ -64,6 +70,33 @@ def index():
         app_version=APP_VERSION,
         admin_secret=ADMIN_SECRET,
     )
+
+
+@app.route("/sw.js")
+def service_worker():
+    # Served from the root so its scope covers the whole site. Rendered from
+    # templates/ (bundled on Vercel) so the cache name carries APP_VERSION.
+    # no-cache so a new worker is picked up promptly on deploy.
+    body = render_template("sw.js", app_version=APP_VERSION)
+    response = Response(body, mimetype="application/javascript")
+    response.headers["Service-Worker-Allowed"] = "/"
+    response.headers["Cache-Control"] = "no-cache, max-age=0"
+    return response
+
+
+@app.route("/.well-known/assetlinks.json")
+def assetlinks():
+    # Digital Asset Links for the Android TWA. Empty fingerprints until
+    # ANDROID_CERT_FINGERPRINT is set (from PWABuilder's signing key).
+    fingerprints = [ANDROID_CERT_FINGERPRINT] if ANDROID_CERT_FINGERPRINT else []
+    return jsonify([{
+        "relation": ["delegate_permission/common.handle_all_urls"],
+        "target": {
+            "namespace": "android_app",
+            "package_name": ANDROID_PACKAGE_NAME,
+            "sha256_cert_fingerprints": fingerprints,
+        },
+    }])
 
 
 # ============================================================
