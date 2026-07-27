@@ -469,5 +469,16 @@
     window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
   </script>
   <script defer src="/_vercel/speed-insights/script.js"></script>
+
+  <!-- Service worker (network-first, para o PWA / app Android via TWA) -->
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("/sw.js").catch(function (err) {
+          console.warn("Service worker não registrou:", err);
+        });
+      });
+    }
+  </script>
 </body>
 </html>
