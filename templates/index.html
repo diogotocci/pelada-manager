@@ -29,35 +29,32 @@
 <body>
 
   <!-- ============================================================
-       Intro animada (1x por sessão) — cresce do ícone até a tela
-       cheia dividida, com a bola girando no centro.
+       Intro animada (1x por sessão) — "chutão": a bola cai e quica no
+       centro; no impacto, o azul e o amarelo entram das laterais.
        ============================================================ -->
   <div id="intro" class="intro" aria-hidden="true">
-    <div class="intro-split">
-      <div class="intro-h intro-hl"></div>
-      <div class="intro-h intro-hr"></div>
-      <div class="intro-seam"></div>
-    </div>
-    <div class="intro-ballwrap">
-      <div class="intro-ballscale">
-        <div class="intro-ballspin">
-          <svg viewBox="-26 -26 52 52" width="100%" height="100%" aria-hidden="true">
-            <defs><clipPath id="tj-intro-clip"><circle r="20.6"></circle></clipPath></defs>
-            <circle r="22" fill="#fff"></circle>
-            <g clip-path="url(#tj-intro-clip)">
-              <path d="M0 -8.5 L8.08 -2.63 L5 6.88 L-5 6.88 L-8.08 -2.63 Z" fill="#0f172a"></path>
-              <path d="M0 -8.5 L0 -13.5 M8.08 -2.63 L12.8 -4.16 M5 6.88 L7.9 10.9 M-5 6.88 L-7.9 10.9 M-8.08 -2.63 L-12.8 -4.16" stroke="#0f172a" stroke-width="2.4" stroke-linecap="round" fill="none"></path>
-              <g transform="translate(0 -19) rotate(180)"><path d="M0 -8 L7.6 -2.5 L4.7 6.5 L-4.7 6.5 L-7.6 -2.5 Z" fill="#0f172a"></path></g>
-              <g transform="translate(18.07 -5.87) rotate(252)"><path d="M0 -8 L7.6 -2.5 L4.7 6.5 L-4.7 6.5 L-7.6 -2.5 Z" fill="#0f172a"></path></g>
-              <g transform="translate(11.17 15.37) rotate(324)"><path d="M0 -8 L7.6 -2.5 L4.7 6.5 L-4.7 6.5 L-7.6 -2.5 Z" fill="#0f172a"></path></g>
-              <g transform="translate(-11.17 15.37) rotate(36)"><path d="M0 -8 L7.6 -2.5 L4.7 6.5 L-4.7 6.5 L-7.6 -2.5 Z" fill="#0f172a"></path></g>
-              <g transform="translate(-18.07 -5.87) rotate(108)"><path d="M0 -8 L7.6 -2.5 L4.7 6.5 L-4.7 6.5 L-7.6 -2.5 Z" fill="#0f172a"></path></g>
-            </g>
-            <circle r="22" fill="none" stroke="#0f172a" stroke-width="3.4"></circle>
-          </svg>
-        </div>
+    <div class="intro-blue"></div>
+    <div class="intro-yellow"></div>
+    <div class="intro-seam"></div>
+    <div class="intro-ball">
+      <div class="intro-ballspin">
+        <svg viewBox="-26 -26 52 52" width="100%" height="100%" aria-hidden="true">
+          <defs><clipPath id="tj-intro-clip"><circle r="20.6"></circle></clipPath></defs>
+          <circle r="22" fill="#fff"></circle>
+          <g clip-path="url(#tj-intro-clip)">
+            <path d="M0 -8.5 L8.08 -2.63 L5 6.88 L-5 6.88 L-8.08 -2.63 Z" fill="#0f172a"></path>
+            <path d="M0 -8.5 L0 -13.5 M8.08 -2.63 L12.8 -4.16 M5 6.88 L7.9 10.9 M-5 6.88 L-7.9 10.9 M-8.08 -2.63 L-12.8 -4.16" stroke="#0f172a" stroke-width="2.4" stroke-linecap="round" fill="none"></path>
+            <g transform="translate(0 -19) rotate(180)"><path d="M0 -8 L7.6 -2.5 L4.7 6.5 L-4.7 6.5 L-7.6 -2.5 Z" fill="#0f172a"></path></g>
+            <g transform="translate(18.07 -5.87) rotate(252)"><path d="M0 -8 L7.6 -2.5 L4.7 6.5 L-4.7 6.5 L-7.6 -2.5 Z" fill="#0f172a"></path></g>
+            <g transform="translate(11.17 15.37) rotate(324)"><path d="M0 -8 L7.6 -2.5 L4.7 6.5 L-4.7 6.5 L-7.6 -2.5 Z" fill="#0f172a"></path></g>
+            <g transform="translate(-11.17 15.37) rotate(36)"><path d="M0 -8 L7.6 -2.5 L4.7 6.5 L-4.7 6.5 L-7.6 -2.5 Z" fill="#0f172a"></path></g>
+            <g transform="translate(-18.07 -5.87) rotate(108)"><path d="M0 -8 L7.6 -2.5 L4.7 6.5 L-4.7 6.5 L-7.6 -2.5 Z" fill="#0f172a"></path></g>
+          </g>
+          <circle r="22" fill="none" stroke="#0f172a" stroke-width="3.4"></circle>
+        </svg>
       </div>
     </div>
+    <div class="intro-wordmark">Time Justo</div>
   </div>
   <script>
     (function () {
@@ -71,8 +68,8 @@
         sessionStorage.setItem("tj-intro-shown", "1");
       } catch (e) {}
       intro.classList.add("play");
-      setTimeout(function () { intro.classList.add("hide"); }, 1900);
-      setTimeout(function () { if (intro.parentNode) intro.parentNode.removeChild(intro); }, 2350);
+      setTimeout(function () { intro.classList.add("hide"); }, 2100);
+      setTimeout(function () { if (intro.parentNode) intro.parentNode.removeChild(intro); }, 2550);
     })();
   </script>
 
