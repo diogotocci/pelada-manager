@@ -2,12 +2,18 @@ import os
 from flask import Flask, render_template, jsonify, request, abort, Response, make_response
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
-from storage.postgres_storage import PlayerStorage, PeladaStorage, ensure_schema, count_recent_attempts
+from storage.postgres_storage import (
+    PlayerStorage,
+    PeladaStorage,
+    ensure_schema,
+    count_recent_failures,
+    record_failed_attempt,
+)
 from services.team_balancer import balance_teams
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "3.3.0")
+APP_VERSION = os.getenv("APP_VERSION", "3.3.1")
 
 ADMIN_SECRET = os.getenv("ADMIN_SECRET", "")
 
@@ -80,16 +86,25 @@ def _client_ip() -> str:
 
 
 def _throttle(ip: str, limit: int = THROTTLE_LIMIT, window: int = THROTTLE_WINDOW) -> None:
+    # Blocks only when there have been too many recent FAILED attempts. A
+    # correct password/key is never counted, so real users are never locked out.
     try:
-        count = count_recent_attempts(ip, window)
+        failures = count_recent_failures(ip, window)
     except Exception:
         return  # never hard-block auth because the throttle store is down
-    if count > limit:
+    if failures >= limit:
         response = make_response(
             jsonify({"error": "Muitas tentativas. Tente novamente mais tarde."}), 429
         )
         response.headers["Retry-After"] = str(window)
         abort(response)
+
+
+def _record_failure(ip: str) -> None:
+    try:
+        record_failed_attempt(ip)
+    except Exception:
+        pass
 
 
 def _is_valid_attribute(value: int) -> bool:
@@ -199,7 +214,8 @@ def create_pelada():
 
 @app.route("/api/peladas/<int:pelada_id>/auth", methods=["POST"])
 def auth_pelada(pelada_id):
-    _throttle(_client_ip())
+    ip = _client_ip()
+    _throttle(ip)
     data = request.get_json()
 
     if not data or "password" not in data:
@@ -215,6 +231,7 @@ def auth_pelada(pelada_id):
 
     ok = pelada_storage.verify_password(pelada_id, password)
     if not ok:
+        _record_failure(ip)
         return jsonify({"ok": False, "is_admin": False}), 401
 
     return jsonify({"ok": True, "is_admin": False, "token": _issue_token(pelada_id, False)})
@@ -225,11 +242,13 @@ def activate_admin(pelada_id):
     # Upgrade the caller to an admin token for this pelada (used by "ativar modo
     # admin" and by deleting a pelada from the lobby). The admin key stays
     # server-side and is never sent to the client.
-    _throttle(_client_ip())
+    ip = _client_ip()
+    _throttle(ip)
     data = request.get_json(silent=True) or {}
     key = data.get("key", "")
 
     if not ADMIN_SECRET or key != ADMIN_SECRET:
+        _record_failure(ip)
         abort(403, description="Invalid admin key")
 
     if not pelada_storage.get_pelada(pelada_id):

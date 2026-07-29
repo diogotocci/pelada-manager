@@ -139,24 +139,25 @@ def ensure_schema() -> None:
         conn.commit()
 
 
-def count_recent_attempts(ip: str, window_seconds: int) -> int:
-    """
-    Record an attempt from `ip`, prune rows older than the window, and return
-    how many attempts this IP made within the window (current one included).
-    """
+def count_recent_failures(ip: str, window_seconds: int) -> int:
+    """How many FAILED attempts this IP made within the window (no insert)."""
     with _get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("INSERT INTO auth_attempts (ip) VALUES (%s)", (ip,))
-            cur.execute(
-                "DELETE FROM auth_attempts WHERE ts < NOW() - (%s * INTERVAL '1 second')",
-                (window_seconds,),
-            )
             cur.execute(
                 "SELECT COUNT(*) AS n FROM auth_attempts "
                 "WHERE ip = %s AND ts > NOW() - (%s * INTERVAL '1 second')",
                 (ip, window_seconds),
             )
             return int(cur.fetchone()["n"])
+
+
+def record_failed_attempt(ip: str) -> None:
+    """Record one failed attempt and prune old rows. Successes are never
+    recorded, so legitimate logins (and groups sharing an IP) are not blocked."""
+    with _get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO auth_attempts (ip) VALUES (%s)", (ip,))
+            cur.execute("DELETE FROM auth_attempts WHERE ts < NOW() - INTERVAL '1 hour'")
 
 
 def _row_to_player(row) -> Player:
