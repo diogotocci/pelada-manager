@@ -1,12 +1,13 @@
 import os
-from flask import Flask, render_template, jsonify, request, abort, Response
+from flask import Flask, render_template, jsonify, request, abort, Response, make_response
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
-from storage.postgres_storage import PlayerStorage, PeladaStorage, ensure_schema
+from storage.postgres_storage import PlayerStorage, PeladaStorage, ensure_schema, count_recent_attempts
 from services.team_balancer import balance_teams
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "3.2.9")
+APP_VERSION = os.getenv("APP_VERSION", "3.3.0")
 
 ADMIN_SECRET = os.getenv("ADMIN_SECRET", "")
 
@@ -19,6 +20,14 @@ VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white"
 ANDROID_PACKAGE_NAME = os.getenv("ANDROID_PACKAGE_NAME", "xyz.timejusto.twa")
 ANDROID_CERT_FINGERPRINT = os.getenv("ANDROID_CERT_FINGERPRINT", "")
 
+# Token signing. SECRET_KEY must be set on Vercel; the fallback only exists so
+# local/CI runs work without it (tokens signed with the fallback are not secure).
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-insecure-key-change-me")
+_serializer = URLSafeTimedSerializer(SECRET_KEY, salt="pelada-token")
+TOKEN_MAX_AGE = 60 * 60 * 24 * 30  # 30 days
+THROTTLE_LIMIT = 10
+THROTTLE_WINDOW = 300  # 5 minutes
+
 player_storage = PlayerStorage()
 pelada_storage = PeladaStorage()
 
@@ -28,19 +37,59 @@ if os.getenv("DATABASE_URL"):
     ensure_schema()
 
 
-def _get_pelada_id() -> int:
+def _issue_token(pelada_id: int, is_admin: bool) -> str:
+    return _serializer.dumps({"pid": int(pelada_id), "adm": bool(is_admin)})
+
+
+def _require_pelada():
     """
-    Extract and validate pelada_id from the X-Pelada-Id request header.
-    Aborts with 400 if missing or invalid.
+    Return (pelada_id, is_admin) from the signed Bearer token. The pelada scope
+    comes from the token, never from a client-controlled header — a caller can
+    only touch the pelada they authenticated into. Aborts 401 otherwise.
     """
-    raw = request.headers.get("X-Pelada-Id", "")
+    auth = request.headers.get("Authorization", "")
+    token = auth[7:].strip() if auth.startswith("Bearer ") else ""
+    if not token:
+        abort(401, description="Missing token")
     try:
-        pelada_id = int(raw)
-        if pelada_id <= 0:
-            raise ValueError
-        return pelada_id
-    except (ValueError, TypeError):
-        abort(400, description="Missing or invalid X-Pelada-Id header")
+        data = _serializer.loads(token, max_age=TOKEN_MAX_AGE)
+    except SignatureExpired:
+        abort(401, description="Token expired")
+    except BadSignature:
+        abort(401, description="Invalid token")
+    return int(data["pid"]), bool(data.get("adm", False))
+
+
+def _player_json(player, is_admin):
+    """Members never receive ratings/attributes — only public fields."""
+    if is_admin:
+        return player.to_dict()
+    return {
+        "id": player.id,
+        "name": player.name,
+        "active": player.active,
+        "is_goalkeeper": player.is_goalkeeper,
+    }
+
+
+def _client_ip() -> str:
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.remote_addr or "unknown"
+
+
+def _throttle(ip: str, limit: int = THROTTLE_LIMIT, window: int = THROTTLE_WINDOW) -> None:
+    try:
+        count = count_recent_attempts(ip, window)
+    except Exception:
+        return  # never hard-block auth because the throttle store is down
+    if count > limit:
+        response = make_response(
+            jsonify({"error": "Muitas tentativas. Tente novamente mais tarde."}), 429
+        )
+        response.headers["Retry-After"] = str(window)
+        abort(response)
 
 
 def _is_valid_attribute(value: int) -> bool:
@@ -72,7 +121,6 @@ def index():
     return render_template(
         "index.html",
         app_version=APP_VERSION,
-        admin_secret=ADMIN_SECRET,
     )
 
 
@@ -145,11 +193,13 @@ def create_pelada():
         team2_color=team2_color,
         game_weekday=game_weekday,
     )
+    pelada["token"] = _issue_token(pelada["id"], True)
     return jsonify(pelada), 201
 
 
 @app.route("/api/peladas/<int:pelada_id>/auth", methods=["POST"])
 def auth_pelada(pelada_id):
+    _throttle(_client_ip())
     data = request.get_json()
 
     if not data or "password" not in data:
@@ -157,27 +207,44 @@ def auth_pelada(pelada_id):
 
     password = data["password"]
 
-    if password == ADMIN_SECRET:
+    if ADMIN_SECRET and password == ADMIN_SECRET:
         pelada = pelada_storage.get_pelada(pelada_id)
         if not pelada:
             abort(404, description="Pelada not found")
-        return jsonify({"ok": True, "is_admin": True})
+        return jsonify({"ok": True, "is_admin": True, "token": _issue_token(pelada_id, True)})
 
     ok = pelada_storage.verify_password(pelada_id, password)
     if not ok:
         return jsonify({"ok": False, "is_admin": False}), 401
 
-    return jsonify({"ok": True, "is_admin": False})
+    return jsonify({"ok": True, "is_admin": False, "token": _issue_token(pelada_id, False)})
+
+
+@app.route("/api/peladas/<int:pelada_id>/admin", methods=["POST"])
+def activate_admin(pelada_id):
+    # Upgrade the caller to an admin token for this pelada (used by "ativar modo
+    # admin" and by deleting a pelada from the lobby). The admin key stays
+    # server-side and is never sent to the client.
+    _throttle(_client_ip())
+    data = request.get_json(silent=True) or {}
+    key = data.get("key", "")
+
+    if not ADMIN_SECRET or key != ADMIN_SECRET:
+        abort(403, description="Invalid admin key")
+
+    if not pelada_storage.get_pelada(pelada_id):
+        abort(404, description="Pelada not found")
+
+    return jsonify({"ok": True, "token": _issue_token(pelada_id, True)})
 
 
 @app.route("/api/peladas/<int:pelada_id>/colors", methods=["PATCH"])
 def update_pelada_colors(pelada_id):
+    pid, adm = _require_pelada()
+    if not adm or pid != pelada_id:
+        abort(403, description="Admin token required for this pelada")
+
     data = request.get_json(silent=True) or {}
-    admin_secret = data.get("admin_secret", "")
-
-    if not ADMIN_SECRET or admin_secret != ADMIN_SECRET:
-        abort(403, description="Invalid admin secret")
-
     team1_color = data.get("team1_color")
     team2_color = data.get("team2_color")
 
@@ -194,12 +261,11 @@ def update_pelada_colors(pelada_id):
 
 @app.route("/api/peladas/<int:pelada_id>/weekday", methods=["PATCH"])
 def update_pelada_weekday(pelada_id):
+    pid, adm = _require_pelada()
+    if not adm or pid != pelada_id:
+        abort(403, description="Admin token required for this pelada")
+
     data = request.get_json(silent=True) or {}
-    admin_secret = data.get("admin_secret", "")
-
-    if not ADMIN_SECRET or admin_secret != ADMIN_SECRET:
-        abort(403, description="Invalid admin secret")
-
     game_weekday = _parse_weekday(data.get("game_weekday"))
 
     pelada = pelada_storage.set_weekday(pelada_id, game_weekday)
@@ -212,11 +278,9 @@ def update_pelada_weekday(pelada_id):
 
 @app.route("/api/peladas/<int:pelada_id>", methods=["DELETE"])
 def delete_pelada(pelada_id):
-    data = request.get_json(silent=True) or {}
-    admin_secret = data.get("admin_secret", "")
-
-    if not ADMIN_SECRET or admin_secret != ADMIN_SECRET:
-        abort(403, description="Invalid admin secret")
+    pid, adm = _require_pelada()
+    if not adm or pid != pelada_id:
+        abort(403, description="Admin token required for this pelada")
 
     success = pelada_storage.delete_pelada(pelada_id)
 
@@ -232,14 +296,14 @@ def delete_pelada(pelada_id):
 
 @app.route("/api/players", methods=["GET"])
 def list_players():
-    pelada_id = _get_pelada_id()
+    pelada_id, adm = _require_pelada()
     players = player_storage.get_all_players(pelada_id)
-    return jsonify([p.to_dict() for p in players])
+    return jsonify([_player_json(p, adm) for p in players])
 
 
 @app.route("/api/players", methods=["POST"])
 def create_player():
-    pelada_id = _get_pelada_id()
+    pelada_id, adm = _require_pelada()
     data = request.get_json()
 
     if not data or "name" not in data or "rating" not in data:
@@ -282,12 +346,14 @@ def create_player():
         gk_footwork=gk_footwork,
     )
 
-    return jsonify(player.to_dict()), 201
+    return jsonify(_player_json(player, adm)), 201
 
 
 @app.route("/api/players/<int:player_id>", methods=["PUT"])
 def update_player(player_id):
-    pelada_id = _get_pelada_id()
+    pelada_id, adm = _require_pelada()
+    if not adm:
+        abort(403, description="Admin token required")
     data = request.get_json()
 
     if not data:
@@ -351,12 +417,14 @@ def update_player(player_id):
     if not updated_player:
         abort(404, description="Player not found")
 
-    return jsonify(updated_player.to_dict())
+    return jsonify(_player_json(updated_player, adm))
 
 
 @app.route("/api/players/<int:player_id>", methods=["DELETE"])
 def delete_player(player_id):
-    pelada_id = _get_pelada_id()
+    pelada_id, adm = _require_pelada()
+    if not adm:
+        abort(403, description="Admin token required")
     success = player_storage.delete_player(pelada_id, player_id)
 
     if not success:
@@ -367,25 +435,25 @@ def delete_player(player_id):
 
 @app.route("/api/players/<int:player_id>/toggle-active", methods=["PATCH"])
 def toggle_player_active(player_id):
-    pelada_id = _get_pelada_id()
+    pelada_id, adm = _require_pelada()
     updated_player = player_storage.toggle_active(pelada_id, player_id)
 
     if not updated_player:
         abort(404, description="Player not found")
 
-    return jsonify(updated_player.to_dict())
+    return jsonify(_player_json(updated_player, adm))
 
 
 @app.route("/api/players/deactivate-all", methods=["PATCH"])
 def deactivate_all_players():
-    pelada_id = _get_pelada_id()
+    pelada_id, _adm = _require_pelada()
     player_storage.deactivate_all_players(pelada_id)
     return jsonify({"status": "ok"})
 
 
 @app.route("/api/players/set-active-batch", methods=["PATCH"])
 def set_active_batch():
-    pelada_id = _get_pelada_id()
+    pelada_id, adm = _require_pelada()
     data = request.get_json()
 
     if not data or "active_ids" not in data:
@@ -402,12 +470,12 @@ def set_active_batch():
         abort(400, description="'active_ids' must contain integers")
 
     updated_players = player_storage.set_active_batch(pelada_id, active_ids)
-    return jsonify([p.to_dict() for p in updated_players])
+    return jsonify([_player_json(p, adm) for p in updated_players])
 
 
 @app.route("/api/draw-teams", methods=["POST"])
 def draw_teams():
-    pelada_id = _get_pelada_id()
+    pelada_id, adm = _require_pelada()
     data = request.get_json()
 
     if not data or "team_size" not in data:
@@ -430,13 +498,13 @@ def draw_teams():
 
     result = []
     for idx, team in enumerate(teams, start=1):
-        result.append(
-            {
-                "name": f"Time {idx}",
-                "total_rating": team["total_rating"],
-                "players": [p.to_dict() for p in team["players"]],
-            }
-        )
+        entry = {
+            "name": f"Time {idx}",
+            "players": [_player_json(p, adm) for p in team["players"]],
+        }
+        if adm:
+            entry["total_rating"] = team["total_rating"]
+        result.append(entry)
 
     return jsonify({"teams": result})
 

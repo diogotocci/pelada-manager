@@ -14,8 +14,6 @@ let checkinState = {};
 let lastTeamSize = 5;
 let lastDrawnTeams = [];
 
-const ADMIN_SECRET = window.ADMIN_SECRET || "";
-
 const BIB_COLORS = [
   { key: "blue", label: "Azul", light: "#4da3ff", dark: "#2d7cff", emoji: "🔵" },
   { key: "yellow", label: "Amarelo", light: "#ffd94d", dark: "#f5be18", emoji: "🟡" },

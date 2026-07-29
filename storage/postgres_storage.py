@@ -126,7 +126,37 @@ def ensure_schema() -> None:
                 $$;
             """)
 
+            # Rate limiting: one row per sensitive-endpoint attempt (auth, admin).
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS auth_attempts (
+                    id  SERIAL PRIMARY KEY,
+                    ip  TEXT NOT NULL,
+                    ts  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_auth_attempts_ip_ts ON auth_attempts (ip, ts)")
+
         conn.commit()
+
+
+def count_recent_attempts(ip: str, window_seconds: int) -> int:
+    """
+    Record an attempt from `ip`, prune rows older than the window, and return
+    how many attempts this IP made within the window (current one included).
+    """
+    with _get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO auth_attempts (ip) VALUES (%s)", (ip,))
+            cur.execute(
+                "DELETE FROM auth_attempts WHERE ts < NOW() - (%s * INTERVAL '1 second')",
+                (window_seconds,),
+            )
+            cur.execute(
+                "SELECT COUNT(*) AS n FROM auth_attempts "
+                "WHERE ip = %s AND ts > NOW() - (%s * INTERVAL '1 second')",
+                (ip, window_seconds),
+            )
+            return int(cur.fetchone()["n"])
 
 
 def _row_to_player(row) -> Player:
