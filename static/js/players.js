@@ -14,6 +14,8 @@ function goHome() {
   players = [];
   checkinState = {};
   lastDrawnTeams = [];
+  setToken(null);
+  setAdminMode(false);
   localStorage.removeItem("pelada-current-id");
   localStorage.removeItem("pelada-current-name");
   showScreen("s-home");
@@ -129,9 +131,15 @@ async function confirmAuth() {
       body: JSON.stringify({ password: password }),
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(function () { return {}; });
 
-    if (!res.ok || !data.ok) {
+    if (res.status === 429) {
+      errEl.textContent = "Muitas tentativas. Tente mais tarde.";
+      errEl.classList.add("on");
+      return;
+    }
+
+    if (!res.ok || !data.ok || !data.token) {
       errEl.textContent = "Palavra-passe incorreta.";
       errEl.classList.add("on");
       $("au-pass").value = "";
@@ -139,9 +147,8 @@ async function confirmAuth() {
       return;
     }
 
-    if (data.is_admin) {
-      setAdminMode(true);
-    }
+    setToken(data.token);
+    setAdminMode(!!data.is_admin);
 
     closeSheets();
     enterPelada(pelada);
@@ -493,7 +500,7 @@ function openAdminKeySheet(mode) {
   setTimeout(function () { $("ak-pass").focus(); }, 100);
 }
 
-function confirmAdminKey() {
+async function confirmAdminKey() {
   const key = $("ak-pass").value.trim();
   const errEl = $("ak-err");
 
@@ -503,7 +510,32 @@ function confirmAdminKey() {
     return;
   }
 
-  if (key !== ADMIN_SECRET) {
+  const targetId = adminKeyMode === "admin"
+    ? currentPeladaId
+    : (deleteTargetPelada && deleteTargetPelada.id);
+  if (targetId == null) { closeSheets(); return; }
+
+  // The admin key is verified on the server; it never lives in the client.
+  let res, data;
+  try {
+    res = await fetchJSONRaw("/api/peladas/" + targetId + "/admin", {
+      method: "POST",
+      body: JSON.stringify({ key: key }),
+    });
+    data = await res.json().catch(function () { return {}; });
+  } catch (err) {
+    console.error(err);
+    errEl.textContent = "Erro ao verificar a chave.";
+    errEl.classList.add("on");
+    return;
+  }
+
+  if (res.status === 429) {
+    errEl.textContent = "Muitas tentativas. Tente mais tarde.";
+    errEl.classList.add("on");
+    return;
+  }
+  if (!res.ok || !data.token) {
     errEl.textContent = "Chave admin inválida.";
     errEl.classList.add("on");
     $("ak-pass").value = "";
@@ -512,27 +544,30 @@ function confirmAdminKey() {
   }
 
   if (adminKeyMode === "admin") {
+    setToken(data.token);
     setAdminMode(true);
+    // Reload players with the admin token so ratings/attributes come through.
+    if (currentPeladaId != null) loadPlayers();
     openSheet("menu");
     renderMenuSheet();
     showToast("Modo admin ativado");
     return;
   }
 
-  // delete-pelada
+  // delete-pelada: use the admin token we just obtained for this pelada.
   const pelada = deleteTargetPelada;
-  if (!pelada) { closeSheets(); return; }
+  const adminToken = data.token;
   openConfirmSheet(
     "Excluir pelada",
     "Excluir " + pelada.name + "? Essa ação é irreversível e remove todos os jogadores.",
     "Excluir",
     async function () {
       try {
-        const res = await fetchJSONRaw("/api/peladas/" + pelada.id, {
+        const delRes = await fetch("/api/peladas/" + pelada.id, {
           method: "DELETE",
-          body: JSON.stringify({ admin_secret: ADMIN_SECRET }),
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + adminToken },
         });
-        if (!res.ok) {
+        if (!delRes.ok) {
           showToast("Erro ao excluir pelada.");
           return;
         }
@@ -577,7 +612,6 @@ async function saveWeekday(weekday) {
     const res = await fetchJSONRaw("/api/peladas/" + currentPeladaId + "/weekday", {
       method: "PATCH",
       body: JSON.stringify({
-        admin_secret: ADMIN_SECRET,
         game_weekday: weekday,
       }),
     });
@@ -601,7 +635,6 @@ async function saveColors(team1Color, team2Color) {
     const res = await fetchJSONRaw("/api/peladas/" + currentPeladaId + "/colors", {
       method: "PATCH",
       body: JSON.stringify({
-        admin_secret: ADMIN_SECRET,
         team1_color: team1Color,
         team2_color: team2Color,
       }),
@@ -765,20 +798,19 @@ async function wizardCreate() {
       }),
     });
 
-    const pelada = await res.json();
+    const pelada = await res.json().catch(function () { return {}; });
 
-    if (!res.ok) {
+    if (!res.ok || !pelada.token) {
       showToast("Erro ao criar pelada.");
       return;
     }
 
+    // The creator is admin of the new pelada; use its token for the players.
+    setToken(pelada.token);
+
     for (const p of wizard.players) {
-      await fetch("/api/players", {
+      await fetchJSON("/api/players", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Pelada-Id": String(pelada.id),
-        },
         body: JSON.stringify({ name: p.name, rating: p.rating }),
       });
     }
