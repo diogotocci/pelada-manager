@@ -768,3 +768,68 @@ input { font: inherit; }
   .intro.play .intro-ballspin { animation: none; }
   .intro.play .intro-wordmark { animation: none; opacity: 1; }
 }
+
+/* ============================================================
+   Como funciona (acordeão de ajuda)
+   ============================================================ */
+
+.help-q {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.help-q-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 13px;
+  width: 100%;
+  text-align: left;
+}
+.help-q-ico {
+  width: 27px;
+  height: 27px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .88rem;
+  flex: none;
+}
+.help-q-title { flex: 1; font-size: .88rem; font-weight: 700; }
+.help-q-tag {
+  font-size: .58rem;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--surface2);
+  border-radius: 999px;
+  padding: 3px 7px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  flex: none;
+}
+.help-q-chev { color: var(--muted); flex: none; display: flex; transition: transform .2s ease; }
+.help-q-chev svg { width: 15px; height: 15px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.help-q.open .help-q-chev { transform: rotate(90deg); }
+
+.help-q-body { max-height: 0; overflow: hidden; transition: max-height .3s ease; }
+.help-q.open .help-q-body { max-height: 660px; }
+.help-q-inner { padding: 0 13px 14px; font-size: .82rem; line-height: 1.6; color: var(--muted); }
+.help-q-inner b { color: var(--ink); font-weight: 600; }
+.help-q-inner b.g { color: var(--accent); }
+
+.help-sub { background: var(--surface2); border-radius: 10px; padding: 9px 11px; margin-top: 8px; }
+.help-sub p { margin: 0; }
+.help-sub p + p { margin-top: 6px; }
+
+.help-formula { background: #0f172a; border-radius: 10px; padding: 11px 12px; margin-top: 8px; text-align: center; }
+.help-formula .f { font-size: .82rem; font-weight: 700; color: #e2f0e9; }
+.help-formula .s { font-size: .7rem; color: #9fb8c4; margin-top: 5px; }
+
+.help-ex { display: flex; gap: 8px; margin-top: 8px; }
+.help-ex > div { flex: 1; background: var(--surface2); border-radius: 10px; padding: 8px 9px; }
+.help-ex .t { font-size: .72rem; font-weight: 700; color: var(--ink); }
+.help-ex .d { font-size: .68rem; color: var(--muted); margin-top: 2px; }

@@ -843,6 +843,12 @@ document.addEventListener("DOMContentLoaded", function () {
     btn.addEventListener("click", toggleTheme);
   });
   $("new-pelada-btn").addEventListener("click", openWizard);
+  $("home-help-btn").addEventListener("click", function () { openHelp("s-home"); });
+
+  // Como funciona
+  $("help-back").addEventListener("click", function () {
+    showScreen(helpReturnScreen || "s-home");
+  });
 
   // Auth
   $("au-cancel").addEventListener("click", function () { closeSheets(); });
@@ -897,6 +903,11 @@ document.addEventListener("DOMContentLoaded", function () {
   // Ajustes
   $("mn-theme").addEventListener("click", toggleTheme);
   $("mn-admin").addEventListener("click", toggleAdmin);
+  $("mn-help").addEventListener("click", function () {
+    const current = document.querySelector(".screen.on");
+    closeSheets();
+    openHelp(current ? current.id : "s-home");
+  });
   $("mn-leave").addEventListener("click", goHome);
   $("mn-done").addEventListener("click", function () { closeSheets(); });
 
