@@ -339,7 +339,9 @@ function buildShareText() {
     }
 
     const color = getBibColor(colorKey);
-    lines.push(color.emoji + " " + color.label + " (" + sorted.length + ")");
+    // Count everyone on court, goalkeeper included (matches the app card).
+    const total = sorted.length + (keeper ? 1 : 0);
+    lines.push(color.emoji + " " + color.label + " (" + total + ")");
     if (keeper) {
       lines.push("🧤 " + keeper.name);
     }
