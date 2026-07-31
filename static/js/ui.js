@@ -9,6 +9,7 @@ let currentTeam1Color = "blue";
 let currentTeam2Color = "yellow";
 let currentPeladaWeekday = null;
 let isAdminMode = false;
+let helpReturnScreen = "s-home";
 
 let checkinState = {};
 let lastTeamSize = 5;
@@ -314,4 +315,147 @@ function renderWeekdayPicker(container, selectedValue, onSelect) {
     btn.addEventListener("click", function () { onSelect(w.value); });
     container.appendChild(btn);
   });
+}
+
+// ============================================================
+// Como funciona (help accordion)
+// ============================================================
+
+const HELP_ITEMS = [
+  {
+    ico: "\u26bd",
+    title: "Como os times s\u00e3o sorteados",
+    tag: false,
+    body:
+      "As <b>estrelas</b> de cada jogador definem a for\u00e7a dele. O app monta " +
+      "<b>2 times com a for\u00e7a somada parecida</b>, espalhando os melhores e os " +
+      "mais fracos entre os lados. <b class=\"g\">N\u00e3o \u00e9 aleat\u00f3rio</b> \u2014 \u00e9 " +
+      "equilibrado."
+  },
+  {
+    ico: "\u2b50",
+    title: "Os n\u00edveis (estrelas)",
+    tag: false,
+    body:
+      "Cada jogador tem de <b>1 a 5 estrelas</b> (pode ter meia estrela). Quanto " +
+      "mais estrelas, mais forte no sorteio. <b>S\u00f3 o admin</b> define e enxerga " +
+      "as estrelas."
+  },
+  {
+    ico: "\u26bd",
+    title: "Atributos do jogador de linha",
+    tag: true,
+    body:
+      "As <b>estrelas</b> s\u00e3o o que mais pesa. Al\u00e9m delas, cada jogador tem 3 " +
+      "atributos de <b>1 a 3</b> (2 = normal): <b>Marca\u00e7\u00e3o</b>, <b>Corrida</b> " +
+      "e <b>Faz gol</b>. Eles fazem o <b class=\"g\">ajuste fino</b> do sorteio:" +
+      "<div class=\"help-sub\">" +
+      "<p><b>1. N\u00e3o amontoa os extremos</b> \u2014 evita juntar v\u00e1rios craques " +
+      "(ou v\u00e1rios fracos) no mesmo atributo de um s\u00f3 lado.</p>" +
+      "<p><b>2. Equilibra a soma</b> \u2014 deixa a soma de cada atributo parecida " +
+      "entre os dois times.</p>" +
+      "</div>" +
+      "<p style=\"margin-top:8px\"><b>Peso:</b> Estrelas \u226b Marca\u00e7\u00e3o \u203a " +
+      "Faz gol \u203a Corrida. Quem \u00e9 <b>2 em tudo</b> n\u00e3o interfere no ajuste.</p>"
+  },
+  {
+    ico: "\ud83e\udde4",
+    title: "Goleiro fixo",
+    tag: true,
+    body:
+      "O goleiro <b>ocupa uma vaga</b> do time (num 5x5, sobram 4 na linha). A " +
+      "for\u00e7a dele vem das <b>estrelas</b> (defesa) e de <b>quanto joga com o " +
+      "p\u00e9</b>:" +
+      "<div class=\"help-formula\">" +
+      "<div class=\"f\">Vantagem = (Defesa + b\u00f4nus do p\u00e9) \u2212 2,5</div>" +
+      "<div class=\"s\">p\u00e9 1 \u2192 +0 \u00b7 p\u00e9 2 \u2192 +0,5 \u00b7 p\u00e9 3 \u2192 +1,0</div>" +
+      "</div>" +
+      "<p style=\"margin-top:8px\">Essa vantagem vira <b class=\"g\">refor\u00e7o pro " +
+      "time sem goleiro</b>, pra compensar o lado que tem o goleiro forte.</p>" +
+      "<div class=\"help-ex\">" +
+      "<div><div class=\"t\">3\u2605 \u00b7 p\u00e9 1</div><div class=\"d\">vantagem 0,5 \u2014 " +
+      "quase n\u00e3o muda</div></div>" +
+      "<div><div class=\"t\">5\u2605 \u00b7 p\u00e9 3</div><div class=\"d\">vantagem 3,5 \u2014 " +
+      "refor\u00e7a bem o outro time</div></div>" +
+      "</div>"
+  },
+  {
+    ico: "\ud83d\udc64",
+    title: "Membro e Admin",
+    tag: false,
+    body:
+      "<b>Membro:</b> entra com a senha, marca presen\u00e7a e sorteia os times.<br>" +
+      "<b>Admin</b> (chave): cadastra e edita jogadores, v\u00ea as notas e ajusta " +
+      "atributos, cores e dia da pelada."
+  },
+  {
+    ico: "\ud83d\udd12",
+    title: "Por que n\u00e3o vejo as notas?",
+    tag: false,
+    body:
+      "Por <b>privacidade</b>. A avalia\u00e7\u00e3o dos jogadores fica s\u00f3 com o admin \u2014 " +
+      "mas o <b class=\"g\">sorteio continua justo</b> pra todo mundo do mesmo " +
+      "jeito."
+  },
+  {
+    ico: "\ud83c\udfbd",
+    title: "Coletes, dia e compartilhar",
+    tag: false,
+    body:
+      "Cada pelada escolhe as <b>cores dos coletes</b> e o <b>dia</b> do jogo. " +
+      "D\u00e1 pra <b>compartilhar os times no WhatsApp</b> j\u00e1 com a data do " +
+      "pr\u00f3ximo jogo."
+  },
+  {
+    ico: "\ud83d\udee1\ufe0f",
+    title: "Seus dados",
+    tag: false,
+    body:
+      "Cada pelada \u00e9 <b>isolada</b> e protegida por senha. Ningu\u00e9m de uma " +
+      "pelada acessa os dados de outra."
+  }
+];
+
+function renderHelp() {
+  const acc = document.getElementById("help-acc");
+  if (!acc || acc.dataset.built === "1") return;
+
+  HELP_ITEMS.forEach(function (item, i) {
+    const q = document.createElement("div");
+    q.className = "help-q" + (i === 0 ? " open" : "");
+
+    const head = document.createElement("button");
+    head.type = "button";
+    head.className = "help-q-head";
+
+    const tagHTML = item.tag
+      ? "<span class=\"help-q-tag\">s\u00f3 admin</span>"
+      : "";
+    head.innerHTML =
+      "<span class=\"help-q-ico\">" + item.ico + "</span>" +
+      "<span class=\"help-q-title\">" + item.title + "</span>" +
+      tagHTML +
+      "<span class=\"help-q-chev\"><svg viewBox=\"0 0 24 24\">" +
+      "<path d=\"M9 18l6-6-6-6\"/></svg></span>";
+    head.addEventListener("click", function () { q.classList.toggle("open"); });
+
+    const bodyWrap = document.createElement("div");
+    bodyWrap.className = "help-q-body";
+    const inner = document.createElement("div");
+    inner.className = "help-q-inner";
+    inner.innerHTML = item.body;
+    bodyWrap.appendChild(inner);
+
+    q.appendChild(head);
+    q.appendChild(bodyWrap);
+    acc.appendChild(q);
+  });
+
+  acc.dataset.built = "1";
+}
+
+function openHelp(fromScreen) {
+  helpReturnScreen = fromScreen || "s-home";
+  renderHelp();
+  showScreen("s-help");
 }

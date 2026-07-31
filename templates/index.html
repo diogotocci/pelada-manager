@@ -95,6 +95,10 @@
           <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
           Nova pelada
         </button>
+        <button class="btn btn-ghost" id="home-help-btn" style="margin-top:8px">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/></svg>
+          Como funciona
+        </button>
         <div class="spacer-lg"></div>
       </div>
       <footer class="app-foot">
@@ -316,6 +320,27 @@
   </section>
 
   <!-- ============================================================
+       Como funciona (ajuda)
+       ============================================================ -->
+  <section class="screen" id="s-help">
+    <div class="frame">
+      <div class="appbar">
+        <button class="icon-btn" id="help-back" aria-label="Voltar">
+          <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="grow">
+          <h1>Como funciona</h1>
+          <p class="sub">As regras do sorteio</p>
+        </div>
+      </div>
+      <div class="scroll">
+        <div id="help-acc"></div>
+        <div class="spacer-lg"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
        Sheets
        ============================================================ -->
   <div class="veil" id="veil"></div>
@@ -433,6 +458,10 @@
         <p class="err" id="mn-same">Os dois times estão com a mesma cor.</p>
       </div>
       <div class="spacer-md"></div>
+      <button class="btn btn-ghost" id="mn-help" style="margin-bottom:8px">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/></svg>
+        Como funciona
+      </button>
       <button class="btn btn-danger" id="mn-leave">Sair da pelada</button>
       <p class="app-foot" style="padding-bottom:0">Time Justo · versão {{ app_version }}</p>
     </div>
