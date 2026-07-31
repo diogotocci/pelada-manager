@@ -913,5 +913,26 @@ document.addEventListener("DOMContentLoaded", function () {
   // Veil fecha sheets
   $("veil").addEventListener("click", function () { closeSheets(); });
 
+  // Botão voltar do Android: como o app é uma SPA (troca telas/sheets por JS,
+  // sem mexer no histórico), o back fecharia o app. Interceptamos: primeiro
+  // fecha um sheet aberto, depois volta pra lista de peladas; só na lista o
+  // próximo back sai do app.
+  history.pushState({ tj: true }, "");
+  window.addEventListener("popstate", function () {
+    const veil = $("veil");
+    if (veil && veil.classList.contains("on")) {
+      closeSheets();
+      history.pushState({ tj: true }, "");
+      return;
+    }
+    const home = $("s-home");
+    if (home && !home.classList.contains("on")) {
+      goHome();
+      history.pushState({ tj: true }, "");
+      return;
+    }
+    // Na lista de peladas: deixa o próximo back sair do app.
+  });
+
   loadPeladas();
 });
