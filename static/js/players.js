@@ -917,6 +917,9 @@ document.addEventListener("DOMContentLoaded", function () {
   // sem mexer no histórico), o back fecharia o app. Interceptamos: primeiro
   // fecha um sheet aberto, depois volta pra lista de peladas; só na lista o
   // próximo back sai do app.
+  let backExitArmed = false;
+  let backExitTimer = null;
+
   history.pushState({ tj: true }, "");
   window.addEventListener("popstate", function () {
     const veil = $("veil");
@@ -931,7 +934,17 @@ document.addEventListener("DOMContentLoaded", function () {
       history.pushState({ tj: true }, "");
       return;
     }
-    // Na lista de peladas: deixa o próximo back sair do app.
+    // Na lista de peladas: "toque em voltar de novo para sair".
+    if (backExitArmed) {
+      clearTimeout(backExitTimer);
+      backExitArmed = false;
+      history.back();
+      return;
+    }
+    backExitArmed = true;
+    showToast("Toque em voltar de novo para sair");
+    backExitTimer = setTimeout(function () { backExitArmed = false; }, 2000);
+    history.pushState({ tj: true }, "");
   });
 
   loadPeladas();
