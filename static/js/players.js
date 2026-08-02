@@ -669,10 +669,20 @@ function toggleAdmin() {
 // Nova pelada (wizard)
 // ============================================================
 
-let wizard = { c1: "blue", c2: "yellow", weekday: null, rating: 3, players: [] };
+let wizard = { c1: "blue", c2: "yellow", weekday: null, players: [] };
+
+// Draft of the player currently being filled in on wizard step 2. Mirrors the
+// full player sheet (stars, extra attributes, goalkeeper) so peladas start with
+// complete players, not just a star rating.
+let wizardDraft = { rating: 3, isGK: false, marking: 2, stamina: 2, scoring: 2, footwork: 1 };
+
+function resetWizardDraft() {
+  wizardDraft = { rating: 3, isGK: false, marking: 2, stamina: 2, scoring: 2, footwork: 1 };
+}
 
 function openWizard() {
-  wizard = { c1: "blue", c2: "yellow", weekday: null, rating: 3, players: [] };
+  wizard = { c1: "blue", c2: "yellow", weekday: null, players: [] };
+  resetWizardDraft();
   $("wz-name").value = "";
   $("wz-pass").value = "";
   $("wz-pass2").value = "";
@@ -681,7 +691,7 @@ function openWizard() {
   $("wz-player").value = "";
   renderWizardWeekday();
   renderWizardSwatches();
-  renderWizardStars();
+  renderWizardForm();
   renderWizardPlayers();
   showScreen("s-wiz1");
 }
@@ -698,11 +708,30 @@ function renderWizardSwatches() {
   renderSwatches($("wz-c2"), wizard.c2, function (key) { wizard.c2 = key; renderWizardSwatches(); });
 }
 
-function renderWizardStars() {
-  renderStarInput($("wz-stars"), wizard.rating, function (value) {
-    wizard.rating = value;
-    renderWizardStars();
+function renderWizardForm() {
+  renderStarInput($("wz-stars"), wizardDraft.rating, function (value) {
+    wizardDraft.rating = value;
+    renderWizardForm();
   });
+
+  $("wz-gk").classList.toggle("on", wizardDraft.isGK);
+  $("wz-stars-label").textContent = wizardDraft.isGK ? "Defesa · nível geral" : "Nível geral";
+
+  $("wz-adv-outfield").classList.toggle("hidden", wizardDraft.isGK);
+  $("wz-adv-gk").classList.toggle("hidden", !wizardDraft.isGK);
+
+  if (wizardDraft.isGK) {
+    renderSeg($("wz-footwork"), wizardDraft.footwork, function (v) { wizardDraft.footwork = v; renderWizardForm(); });
+  } else {
+    renderSeg($("wz-marking"), wizardDraft.marking, function (v) { wizardDraft.marking = v; renderWizardForm(); });
+    renderSeg($("wz-stamina"), wizardDraft.stamina, function (v) { wizardDraft.stamina = v; renderWizardForm(); });
+    renderSeg($("wz-scoring"), wizardDraft.scoring, function (v) { wizardDraft.scoring = v; renderWizardForm(); });
+  }
+}
+
+function toggleWizardGK() {
+  wizardDraft.isGK = !wizardDraft.isGK;
+  renderWizardForm();
 }
 
 function wizardNext() {
@@ -753,8 +782,10 @@ function renderWizardPlayers() {
     const main = document.createElement("div");
     main.className = "r-main";
     main.innerHTML =
-      '<span class="r-name">' + escapeHTML(p.name) + "</span>" +
-      '<span class="r-meta">' + buildStarsHTML(p.rating) + "</span>";
+      '<span class="r-name">' + escapeHTML(p.name) + gkGloveHTML(p) + "</span>" +
+      '<span class="r-meta">' + buildStarsHTML(p.rating) +
+      (p.is_goalkeeper ? '<span class="rating-num">· pé ' + Number(p.gk_footwork != null ? p.gk_footwork : 1) + "</span>" : "") +
+      "</span>";
 
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
@@ -781,10 +812,19 @@ function wizardAddPlayer() {
   const name = input.value.trim();
   if (!name) return;
 
-  wizard.players.push({ name: name, rating: wizard.rating });
+  const player = { name: name, rating: wizardDraft.rating, is_goalkeeper: wizardDraft.isGK };
+  if (wizardDraft.isGK) {
+    player.gk_footwork = wizardDraft.footwork;
+  } else {
+    player.marking = wizardDraft.marking;
+    player.stamina = wizardDraft.stamina;
+    player.scoring = wizardDraft.scoring;
+  }
+
+  wizard.players.push(player);
   input.value = "";
-  wizard.rating = 3;
-  renderWizardStars();
+  resetWizardDraft();
+  renderWizardForm();
   renderWizardPlayers();
   input.focus();
 }
@@ -820,7 +860,7 @@ async function wizardCreate() {
     for (const p of wizard.players) {
       await fetchJSON("/api/players", {
         method: "POST",
-        body: JSON.stringify({ name: p.name, rating: p.rating }),
+        body: JSON.stringify(p),
       });
     }
 
@@ -924,6 +964,7 @@ document.addEventListener("DOMContentLoaded", function () {
   $("wz-close").addEventListener("click", goHome);
   $("wz-back").addEventListener("click", function () { showScreen("s-wiz1"); });
   $("wz-next").addEventListener("click", wizardNext);
+  $("wz-gk").addEventListener("click", toggleWizardGK);
   $("wz-add").addEventListener("click", wizardAddPlayer);
   $("wz-create").addEventListener("click", wizardCreate);
   $("wz-player").addEventListener("keydown", function (e) {
