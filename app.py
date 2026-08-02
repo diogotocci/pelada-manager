@@ -13,9 +13,7 @@ from services.team_balancer import balance_teams
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "3.3.5")
-
-ADMIN_SECRET = os.getenv("ADMIN_SECRET", "")
+APP_VERSION = os.getenv("APP_VERSION", "3.3.6")
 
 VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white", "pink"}
 
@@ -181,17 +179,21 @@ def list_peladas():
 def create_pelada():
     data = request.get_json()
 
-    if not data or "name" not in data or "password" not in data:
-        abort(400, description="Missing 'name' or 'password' field")
+    if not data or "name" not in data or "password" not in data or "admin_password" not in data:
+        abort(400, description="Missing 'name', 'password' or 'admin_password' field")
 
     name = data["name"].strip()
     password = data["password"].strip()
+    admin_password = data["admin_password"].strip()
 
     if not name:
         abort(400, description="Name cannot be empty")
 
     if not password:
         abort(400, description="Password cannot be empty")
+
+    if not admin_password:
+        abort(400, description="Admin password cannot be empty")
 
     team1_color = data.get("team1_color", "blue")
     team2_color = data.get("team2_color", "yellow")
@@ -204,6 +206,7 @@ def create_pelada():
     pelada = pelada_storage.create_pelada(
         name=name,
         password=password,
+        admin_password=admin_password,
         team1_color=team1_color,
         team2_color=team2_color,
         game_weekday=game_weekday,
@@ -223,36 +226,33 @@ def auth_pelada(pelada_id):
 
     password = data["password"]
 
-    if ADMIN_SECRET and password == ADMIN_SECRET:
-        pelada = pelada_storage.get_pelada(pelada_id)
-        if not pelada:
-            abort(404, description="Pelada not found")
+    # The pelada's own admin password grants an admin token; the access password
+    # grants a member token. Admin is checked first so a pelada that reuses the
+    # same string for both still gets admin.
+    if pelada_storage.verify_admin_password(pelada_id, password):
         return jsonify({"ok": True, "is_admin": True, "token": _issue_token(pelada_id, True)})
 
-    ok = pelada_storage.verify_password(pelada_id, password)
-    if not ok:
-        _record_failure(ip)
-        return jsonify({"ok": False, "is_admin": False}), 401
+    if pelada_storage.verify_password(pelada_id, password):
+        return jsonify({"ok": True, "is_admin": False, "token": _issue_token(pelada_id, False)})
 
-    return jsonify({"ok": True, "is_admin": False, "token": _issue_token(pelada_id, False)})
+    _record_failure(ip)
+    return jsonify({"ok": False, "is_admin": False}), 401
 
 
 @app.route("/api/peladas/<int:pelada_id>/admin", methods=["POST"])
 def activate_admin(pelada_id):
     # Upgrade the caller to an admin token for this pelada (used by "ativar modo
-    # admin" and by deleting a pelada from the lobby). The admin key stays
-    # server-side and is never sent to the client.
+    # admin" and by deleting a pelada from the lobby). The admin key is this
+    # pelada's own admin password; it stays server-side and is never sent to the
+    # client.
     ip = _client_ip()
     _throttle(ip)
     data = request.get_json(silent=True) or {}
     key = data.get("key", "")
 
-    if not ADMIN_SECRET or key != ADMIN_SECRET:
+    if not pelada_storage.verify_admin_password(pelada_id, key):
         _record_failure(ip)
         abort(403, description="Invalid admin key")
-
-    if not pelada_storage.get_pelada(pelada_id):
-        abort(404, description="Pelada not found")
 
     return jsonify({"ok": True, "token": _issue_token(pelada_id, True)})
 

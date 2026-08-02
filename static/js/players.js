@@ -676,6 +676,7 @@ function openWizard() {
   $("wz-name").value = "";
   $("wz-pass").value = "";
   $("wz-pass2").value = "";
+  $("wz-admin-pass").value = "";
   $("wz-err").classList.remove("on");
   $("wz-player").value = "";
   renderWizardWeekday();
@@ -708,6 +709,7 @@ function wizardNext() {
   const name = $("wz-name").value.trim();
   const pass = $("wz-pass").value;
   const pass2 = $("wz-pass2").value;
+  const adminPass = $("wz-admin-pass").value;
   const errEl = $("wz-err");
 
   if (!name) {
@@ -722,6 +724,11 @@ function wizardNext() {
   }
   if (pass !== pass2) {
     errEl.textContent = "As senhas não coincidem.";
+    errEl.classList.add("on");
+    return;
+  }
+  if (!adminPass.trim()) {
+    errEl.textContent = "Defina uma senha de admin.";
     errEl.classList.add("on");
     return;
   }
@@ -785,6 +792,7 @@ function wizardAddPlayer() {
 async function wizardCreate() {
   const name = $("wz-name").value.trim();
   const password = $("wz-pass").value.trim();
+  const adminPassword = $("wz-admin-pass").value.trim();
 
   try {
     const res = await fetchJSONRaw("/api/peladas", {
@@ -792,6 +800,7 @@ async function wizardCreate() {
       body: JSON.stringify({
         name: name,
         password: password,
+        admin_password: adminPassword,
         team1_color: wizard.c1,
         team2_color: wizard.c2,
         game_weekday: wizard.weekday,
