@@ -302,11 +302,34 @@
       <div class="scroll">
         <div class="field">
           <label for="wz-player">Nome do jogador</label>
-          <input type="text" id="wz-player" placeholder="Digite e toque em adicionar">
+          <input type="text" id="wz-player" placeholder="Nome ou apelido">
         </div>
-        <div class="seg-row">
-          <span class="seg-lbl">Nível</span>
+        <div class="seg-row" style="padding:2px 0 14px">
+          <div style="display:flex;align-items:center;gap:9px;">
+            <span style="font-size:1.15rem">🧤</span>
+            <div>
+              <span class="seg-lbl">É goleiro fixo</span>
+              <p class="hint" style="margin:2px 0 0">Muda os atributos e o balanceamento</p>
+            </div>
+          </div>
+          <button class="switch" id="wz-gk" role="switch" aria-label="É goleiro fixo"></button>
+        </div>
+        <div class="field">
+          <label id="wz-stars-label">Nível geral</label>
           <div class="star-input" id="wz-stars"></div>
+          <p class="hint">Toque de novo na mesma estrela para meia estrela.</p>
+        </div>
+        <div id="wz-adv">
+          <p class="eyebrow" style="margin-top:6px">Atributos</p>
+          <div id="wz-adv-outfield">
+            <div class="seg-row"><span class="seg-lbl">Marca</span><div class="seg" id="wz-marking"></div></div>
+            <div class="seg-row"><span class="seg-lbl">Corre</span><div class="seg" id="wz-stamina"></div></div>
+            <div class="seg-row"><span class="seg-lbl">Faz gol</span><div class="seg" id="wz-scoring"></div></div>
+          </div>
+          <div id="wz-adv-gk" class="hidden">
+            <div class="seg-row"><span class="seg-lbl">Joga com o pé</span><div class="seg" id="wz-footwork"></div></div>
+            <p class="hint">Goleiro-linha (pé 3) pesa mais no equilíbrio dos times.</p>
+          </div>
         </div>
         <button class="btn btn-ghost" id="wz-add">
           <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
