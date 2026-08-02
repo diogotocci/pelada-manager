@@ -63,6 +63,29 @@ def ensure_schema() -> None:
                 $$;
             """)
 
+            # admin_password: per-pelada admin password (replaces the old single
+            # global ADMIN_SECRET). Added with an empty default so pre-existing
+            # rows get a value; the backfill below then seeds legacy peladas with
+            # the old shared admin password so they keep working unchanged.
+            cur.execute("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'peladas' AND column_name = 'admin_password'
+                    ) THEN
+                        ALTER TABLE peladas ADD COLUMN admin_password TEXT NOT NULL DEFAULT '';
+                    END IF;
+                END
+                $$;
+            """)
+
+            # One-time backfill: peladas created before per-pelada admin
+            # passwords existed keep the old shared admin password ('secret123').
+            # Guarded by = '' so it only seeds legacy rows and never overrides an
+            # admin password chosen at creation time.
+            cur.execute("UPDATE peladas SET admin_password = 'secret123' WHERE admin_password = ''")
+
             # game_weekday: day the pelada is played on.
             # Convention matches JS Date.getDay(): 0=Sunday ... 6=Saturday.
             # Nullable — when unset, sharing falls back to the current date.
@@ -199,16 +222,16 @@ class PeladaStorage:
                 """)
                 return [_row_to_pelada(r) for r in cur.fetchall()]
 
-    def create_pelada(self, name: str, password: str, team1_color: str = "blue", team2_color: str = "yellow", game_weekday: Optional[int] = None) -> Dict:
+    def create_pelada(self, name: str, password: str, admin_password: str, team1_color: str = "blue", team2_color: str = "yellow", game_weekday: Optional[int] = None) -> Dict:
         with _get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO peladas (name, password, team1_color, team2_color, game_weekday)
-                    VALUES (%s, %s, %s, %s, %s)
+                    INSERT INTO peladas (name, password, admin_password, team1_color, team2_color, game_weekday)
+                    VALUES (%s, %s, %s, %s, %s, %s)
                     RETURNING id, name, team1_color, team2_color, game_weekday, 0 AS player_count
                     """,
-                    (name, password, team1_color, team2_color, game_weekday),
+                    (name, password, admin_password, team1_color, team2_color, game_weekday),
                 )
                 return _row_to_pelada(cur.fetchone())
 
@@ -223,6 +246,18 @@ class PeladaStorage:
                 if row is None:
                     return False
                 return row["password"] == password
+
+    def verify_admin_password(self, pelada_id: int, password: str) -> bool:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT admin_password FROM peladas WHERE id = %s",
+                    (pelada_id,),
+                )
+                row = cur.fetchone()
+                if row is None or not row["admin_password"]:
+                    return False
+                return row["admin_password"] == password
 
     def get_pelada(self, pelada_id: int) -> Optional[Dict]:
         with _get_connection() as conn:
