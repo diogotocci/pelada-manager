@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin · Time Justo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#f7f8f6">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v={{ app_version }}">
+  <style>
+    .fb-row { display: flex; align-items: center; gap: 11px; padding: 13px 14px; width: 100%; text-align: left; }
+    .fb-row + .fb-row { border-top: 1px solid var(--line); }
+    .fb-row:active { background: var(--surface2); }
+    .fb-dot { width: 9px; height: 9px; border-radius: 50%; background: #378add; flex: none; }
+    .fb-dot.hidden { visibility: hidden; }
+    .fb-row.read .fb-main { opacity: .6; }
+    .fb-main { flex: 1; min-width: 0; }
+    .fb-subj { font-size: .92rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .fb-meta { font-size: .76rem; color: var(--muted); margin-top: 2px; display: flex; align-items: center; gap: 6px; }
+    .fb-ico { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--muted); flex: none; }
+    .fb-ico:hover { background: var(--surface2); color: var(--danger); }
+    .fb-ico svg { width: 17px; height: 17px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+    .fb-ico.ok { color: var(--accent); }
+    .fb-ico.ok:hover { background: transparent; color: var(--accent); }
+    .tag { font-size: .64rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; border-radius: 999px; padding: 3px 8px; }
+    .tag-bug { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); }
+    .tag-suggestion { color: var(--accent); background: var(--accent-soft); }
+    .tag-other { color: var(--muted); background: var(--surface2); }
+    .tag-plain { color: var(--muted); background: var(--surface2); }
+    .det-tags { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 14px; }
+    .det-msg { font-size: .98rem; line-height: 1.6; color: var(--ink); white-space: pre-wrap; }
+    .det-contact { margin-top: 14px; padding: 11px 12px; background: var(--surface2); border-radius: 10px; display: flex; align-items: center; gap: 9px; font-size: .9rem; }
+    .det-contact svg { width: 16px; height: 16px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; color: var(--muted); flex: none; }
+    .u-check { width: 26px; height: 26px; border-radius: 7px; border: 2px solid var(--line); display: flex; align-items: center; justify-content: center; flex: none; color: transparent; }
+    .u-check.done { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+    .u-check svg { width: 15px; height: 15px; stroke: currentColor; stroke-width: 3; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+    .u-row.done .fb-subj { text-decoration: line-through; color: var(--muted); }
+    .link-pill { font-size: .74rem; font-weight: 700; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 6px 12px; }
+  </style>
+</head>
+<body>
+
+  <section class="screen on" id="s-login">
+    <div class="frame">
+      <div class="big-title"><h1>Admin</h1></div>
+      <div class="scroll">
+        <p class="sub" style="color:var(--muted);font-size:.9rem;margin:0 2px 18px">Área geral de feedbacks. Acesso restrito.</p>
+        <div class="field">
+          <label for="lg-pass">Senha</label>
+          <input type="password" id="lg-pass" placeholder="••••••••" autocomplete="off">
+          <p class="err" id="lg-err"></p>
+        </div>
+        <button class="btn btn-primary" id="lg-btn">Entrar</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="s-list">
+    <div class="frame">
+      <div class="appbar">
+        <div class="grow"><h1>Feedbacks</h1><p class="sub" id="ls-sub">—</p></div>
+        <button class="link-pill" id="ls-useful">Úteis</button>
+      </div>
+      <div class="scroll">
+        <div class="card" id="ls-list" style="margin-top:6px"></div>
+        <div class="empty hidden" id="ls-empty">Nenhum feedback ainda.</div>
+        <div class="spacer-lg"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="s-detail">
+    <div class="frame">
+      <div class="appbar">
+        <button class="icon-btn" id="dt-back" aria-label="Voltar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="grow"><h1 id="dt-title">Feedback</h1></div>
+      </div>
+      <div class="scroll">
+        <div class="det-tags" id="dt-tags"></div>
+        <div class="det-msg" id="dt-msg"></div>
+        <div class="det-contact hidden" id="dt-contact">
+          <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M22 6l-10 7L2 6"/></svg>
+          <span id="dt-contact-val"></span>
+        </div>
+        <div class="spacer-lg"></div>
+      </div>
+      <div class="cta-bar">
+        <button class="btn btn-primary" id="dt-useful" style="flex:1">Marcar como útil</button>
+        <button class="btn btn-danger" id="dt-delete" style="width:auto;padding-left:22px;padding-right:22px">Excluir</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="s-useful">
+    <div class="frame">
+      <div class="appbar">
+        <button class="icon-btn" id="uf-back" aria-label="Voltar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="grow"><h1>Marcados como úteis</h1><p class="sub">Sua lista de melhorias</p></div>
+      </div>
+      <div class="scroll">
+        <div class="card" id="uf-list" style="margin-top:6px"></div>
+        <div class="empty hidden" id="uf-empty">Nada marcado como útil ainda.</div>
+        <div class="spacer-lg"></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    window.APP_VERSION = "{{ app_version }}";
+  </script>
+  <script src="{{ url_for('static', filename='js/admin.js') }}?v={{ app_version }}"></script>
+</body>
+</html>

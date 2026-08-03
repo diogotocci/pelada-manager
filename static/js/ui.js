@@ -465,9 +465,10 @@ let feedbackReturnScreen = "s-home";
 function openFeedback(fromScreen) {
   feedbackReturnScreen = fromScreen || "s-home";
   $("fb-category").value = "bug";
+  $("fb-subject").value = "";
   $("fb-message").value = "";
   $("fb-contact").value = "";
   $("fb-err").classList.remove("on");
   showScreen("s-feedback");
-  setTimeout(function () { $("fb-message").focus(); }, 100);
+  setTimeout(function () { $("fb-subject").focus(); }, 100);
 }

@@ -671,10 +671,17 @@ function toggleAdmin() {
 
 async function submitFeedback() {
   const category = $("fb-category").value;
+  const subject = $("fb-subject").value.trim();
   const message = $("fb-message").value.trim();
   const contact = $("fb-contact").value.trim();
   const errEl = $("fb-err");
 
+  if (!subject) {
+    errEl.textContent = "Dê um assunto.";
+    errEl.classList.add("on");
+    $("fb-subject").focus();
+    return;
+  }
   if (!message) {
     errEl.textContent = "Escreva uma mensagem.";
     errEl.classList.add("on");
@@ -689,7 +696,7 @@ async function submitFeedback() {
   try {
     const res = await fetchJSONRaw("/api/feedback", {
       method: "POST",
-      body: JSON.stringify({ category: category, message: message, contact: contact }),
+      body: JSON.stringify({ subject: subject, category: category, message: message, contact: contact }),
     });
 
     if (!res.ok) {

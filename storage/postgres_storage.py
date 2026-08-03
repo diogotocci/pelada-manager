@@ -166,10 +166,47 @@ def ensure_schema() -> None:
                 CREATE TABLE IF NOT EXISTS feedback (
                     id          SERIAL PRIMARY KEY,
                     pelada_id   INTEGER REFERENCES peladas(id) ON DELETE SET NULL,
+                    subject     TEXT NOT NULL DEFAULT '',
                     category    TEXT NOT NULL,
                     message     TEXT NOT NULL,
                     contact     TEXT,
                     app_version TEXT,
+                    is_read     BOOLEAN NOT NULL DEFAULT FALSE,
+                    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
+
+            # subject/is_read added after the table shipped without them.
+            cur.execute("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'feedback' AND column_name = 'subject'
+                    ) THEN
+                        ALTER TABLE feedback ADD COLUMN subject TEXT NOT NULL DEFAULT '';
+                    END IF;
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'feedback' AND column_name = 'is_read'
+                    ) THEN
+                        ALTER TABLE feedback ADD COLUMN is_read BOOLEAN NOT NULL DEFAULT FALSE;
+                    END IF;
+                END
+                $$;
+            """)
+
+            # Feedback marked "useful" is copied here as a standalone to-do item
+            # (GitHub-issue style), so it survives even if the original feedback
+            # is later deleted (feedback_id then becomes NULL).
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS useful_items (
+                    id          SERIAL PRIMARY KEY,
+                    feedback_id INTEGER REFERENCES feedback(id) ON DELETE SET NULL,
+                    subject     TEXT NOT NULL,
+                    message     TEXT,
+                    category    TEXT,
+                    done        BOOLEAN NOT NULL DEFAULT FALSE,
                     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
                 )
             """)
@@ -324,19 +361,107 @@ class PeladaStorage:
                 return cur.rowcount > 0
 
 
+def _row_to_feedback(row) -> Dict:
+    ts = row.get("created_at")
+    return {
+        "id": row["id"],
+        "pelada_id": row.get("pelada_id"),
+        "subject": row.get("subject") or "",
+        "category": row["category"],
+        "message": row["message"],
+        "contact": row.get("contact"),
+        "app_version": row.get("app_version"),
+        "is_read": bool(row.get("is_read", False)),
+        "created_at": ts.isoformat() if ts is not None else None,
+    }
+
+
+def _row_to_useful(row) -> Dict:
+    ts = row.get("created_at")
+    return {
+        "id": row["id"],
+        "feedback_id": row.get("feedback_id"),
+        "subject": row["subject"],
+        "message": row.get("message"),
+        "category": row.get("category"),
+        "done": bool(row.get("done", False)),
+        "created_at": ts.isoformat() if ts is not None else None,
+    }
+
+
 class FeedbackStorage:
-    def add_feedback(self, category: str, message: str, contact: Optional[str] = None, app_version: Optional[str] = None, pelada_id: Optional[int] = None) -> int:
+    def add_feedback(self, subject: str, category: str, message: str, contact: Optional[str] = None, app_version: Optional[str] = None, pelada_id: Optional[int] = None) -> int:
         with _get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO feedback (pelada_id, category, message, contact, app_version)
-                    VALUES (%s, %s, %s, %s, %s)
+                    INSERT INTO feedback (pelada_id, subject, category, message, contact, app_version)
+                    VALUES (%s, %s, %s, %s, %s, %s)
                     RETURNING id
                     """,
-                    (pelada_id, category, message, contact, app_version),
+                    (pelada_id, subject, category, message, contact, app_version),
                 )
                 return int(cur.fetchone()["id"])
+
+    def list_feedback(self) -> List[Dict]:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT * FROM feedback ORDER BY created_at DESC, id DESC")
+                return [_row_to_feedback(r) for r in cur.fetchall()]
+
+    def get_feedback(self, feedback_id: int) -> Optional[Dict]:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT * FROM feedback WHERE id = %s", (feedback_id,))
+                row = cur.fetchone()
+                return _row_to_feedback(row) if row else None
+
+    def mark_read(self, feedback_id: int) -> bool:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("UPDATE feedback SET is_read = TRUE WHERE id = %s", (feedback_id,))
+                return cur.rowcount > 0
+
+    def delete_feedback(self, feedback_id: int) -> bool:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM feedback WHERE id = %s", (feedback_id,))
+                return cur.rowcount > 0
+
+    def add_useful(self, feedback_id: int, subject: str, message: Optional[str], category: Optional[str]) -> Dict:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO useful_items (feedback_id, subject, message, category)
+                    VALUES (%s, %s, %s, %s)
+                    RETURNING *
+                    """,
+                    (feedback_id, subject, message, category),
+                )
+                return _row_to_useful(cur.fetchone())
+
+    def list_useful(self) -> List[Dict]:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT * FROM useful_items ORDER BY done, created_at DESC, id DESC")
+                return [_row_to_useful(r) for r in cur.fetchall()]
+
+    def set_useful_done(self, useful_id: int, done: bool) -> Optional[Dict]:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE useful_items SET done = %s WHERE id = %s RETURNING *",
+                    (done, useful_id),
+                )
+                row = cur.fetchone()
+                return _row_to_useful(row) if row else None
+
+    def delete_useful(self, useful_id: int) -> bool:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM useful_items WHERE id = %s", (useful_id,))
+                return cur.rowcount > 0
 
 
 class PlayerStorage:
