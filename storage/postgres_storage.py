@@ -311,19 +311,6 @@ class PeladaStorage:
                     return False
                 return row["admin_password"] == password
 
-    def get_pelada(self, pelada_id: int) -> Optional[Dict]:
-        with _get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT p.id, p.name, p.team1_color, p.team2_color, p.game_weekday, COUNT(pl.id) AS player_count
-                    FROM peladas p
-                    LEFT JOIN players pl ON pl.pelada_id = p.id
-                    WHERE p.id = %s
-                    GROUP BY p.id, p.name, p.team1_color, p.team2_color, p.game_weekday
-                """, (pelada_id,))
-                row = cur.fetchone()
-                return _row_to_pelada(row) if row else None
-
     def update_pelada_colors(self, pelada_id: int, team1_color: str, team2_color: str) -> Optional[Dict]:
         with _get_connection() as conn:
             with conn.cursor() as cur:
