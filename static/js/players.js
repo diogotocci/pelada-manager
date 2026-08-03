@@ -666,6 +666,32 @@ function toggleAdmin() {
 }
 
 // ============================================================
+// Acesso oculto ao /admin (tocar na versão várias vezes)
+// ============================================================
+
+const VERSION_TAPS_NEEDED = 7;
+let versionTaps = 0;
+let versionTapTimer = null;
+
+function handleVersionTap() {
+  versionTaps++;
+  clearTimeout(versionTapTimer);
+  versionTapTimer = setTimeout(function () { versionTaps = 0; }, 1200);
+
+  if (versionTaps >= VERSION_TAPS_NEEDED) {
+    versionTaps = 0;
+    clearTimeout(versionTapTimer);
+    window.location.href = "/admin";
+    return;
+  }
+
+  const remaining = VERSION_TAPS_NEEDED - versionTaps;
+  if (remaining <= 3) {
+    showToast(remaining === 1 ? "Falta 1 toque" : "Faltam " + remaining + " toques");
+  }
+}
+
+// ============================================================
 // Enviar feedback
 // ============================================================
 
@@ -942,6 +968,12 @@ document.addEventListener("DOMContentLoaded", function () {
   });
   $("new-pelada-btn").addEventListener("click", openWizard);
   $("home-help-btn").addEventListener("click", function () { openHelp("s-home"); });
+
+  // Tap the app version 7 times (Android "developer options" style) to reach
+  // the hidden /admin feedback inbox. The count resets after a short pause.
+  document.querySelectorAll(".ver-tap").forEach(function (el) {
+    el.addEventListener("click", handleVersionTap);
+  });
 
   // Como funciona
   $("help-back").addEventListener("click", function () {
