@@ -862,3 +862,72 @@ input { font: inherit; }
 .help-ex > div { flex: 1; background: var(--surface2); border-radius: 10px; padding: 8px 9px; }
 .help-ex .t { font-size: .72rem; font-weight: 700; color: var(--ink); }
 .help-ex .d { font-size: .68rem; color: var(--muted); margin-top: 2px; }
+
+/* ============================================================
+   Comparar níveis (tier list arrastável)
+   ============================================================ */
+
+.tier {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  margin-bottom: 8px;
+  transition: border-color .12s, background .12s;
+}
+.tier.drop-target { border-color: var(--accent); background: var(--accent-soft); }
+.tier-label {
+  flex: none;
+  width: 74px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+.tier-label .stars { font-size: .72rem; }
+.tier-num { font-size: .72rem; font-weight: 700; color: var(--muted); }
+.tier-chips {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  gap: 6px;
+  min-height: 42px;
+}
+.tier-chips.empty::before {
+  content: "Solte aqui";
+  font-size: .72rem;
+  color: var(--muted);
+  opacity: .5;
+  align-self: center;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 12px 7px 8px;
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--ink);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+}
+.chip.dragging { opacity: .35; }
+.chip-grip { width: 14px; height: 14px; fill: var(--muted); flex: none; }
+.chip-ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 200;
+  pointer-events: none;
+  cursor: grabbing;
+  box-shadow: 0 8px 24px -8px rgba(20, 30, 24, .35);
+}
