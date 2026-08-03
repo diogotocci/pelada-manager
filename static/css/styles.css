@@ -47,6 +47,10 @@ body {
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
+  /* No zoom: only pan/scroll gestures are allowed (blocks double-tap and
+     pinch zoom). iOS Safari pinch also needs the JS guard in ui.js/admin.js. */
+  touch-action: pan-x pan-y;
+  -webkit-text-size-adjust: 100%;
 }
 
 button { font: inherit; cursor: pointer; border: none; background: none; color: inherit; padding: 0; }
@@ -145,6 +149,8 @@ input { font: inherit; }
   color: var(--muted);
 }
 .app-foot b { font-weight: 600; color: var(--muted); }
+.ver-link { color: inherit; text-decoration: none; }
+.ver-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ============================================================
    Cards & rows
@@ -524,6 +530,29 @@ input { font: inherit; }
   color: var(--ink);
 }
 .field input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+.field select,
+.field textarea {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) - 4px);
+  padding: 13px 14px;
+  font-size: .95rem;
+  color: var(--ink);
+  font-family: inherit;
+}
+.field select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 38px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888880' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+}
+.field textarea { resize: vertical; min-height: 130px; line-height: 1.5; }
+.field select:focus,
+.field textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
 .hint { font-size: .74rem; color: var(--muted); margin-top: 6px; }
 .err { font-size: .78rem; color: var(--danger); margin-top: 6px; display: none; }
 .err.on { display: block; }

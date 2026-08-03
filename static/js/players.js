@@ -666,6 +666,81 @@ function toggleAdmin() {
 }
 
 // ============================================================
+// Acesso oculto ao /admin (tocar na versão várias vezes)
+// ============================================================
+
+const VERSION_TAPS_NEEDED = 7;
+let versionTaps = 0;
+let versionTapTimer = null;
+
+function handleVersionTap() {
+  versionTaps++;
+  clearTimeout(versionTapTimer);
+  versionTapTimer = setTimeout(function () { versionTaps = 0; }, 1200);
+
+  if (versionTaps >= VERSION_TAPS_NEEDED) {
+    versionTaps = 0;
+    clearTimeout(versionTapTimer);
+    window.location.href = "/admin";
+    return;
+  }
+
+  const remaining = VERSION_TAPS_NEEDED - versionTaps;
+  if (remaining <= 3) {
+    showToast(remaining === 1 ? "Falta 1 toque" : "Faltam " + remaining + " toques");
+  }
+}
+
+// ============================================================
+// Enviar feedback
+// ============================================================
+
+async function submitFeedback() {
+  const category = $("fb-category").value;
+  const subject = $("fb-subject").value.trim();
+  const message = $("fb-message").value.trim();
+  const contact = $("fb-contact").value.trim();
+  const errEl = $("fb-err");
+
+  if (!subject) {
+    errEl.textContent = "Dê um assunto.";
+    errEl.classList.add("on");
+    $("fb-subject").focus();
+    return;
+  }
+  if (!message) {
+    errEl.textContent = "Escreva uma mensagem.";
+    errEl.classList.add("on");
+    $("fb-message").focus();
+    return;
+  }
+  errEl.classList.remove("on");
+
+  const sendBtn = $("fb-send");
+  sendBtn.disabled = true;
+
+  try {
+    const res = await fetchJSONRaw("/api/feedback", {
+      method: "POST",
+      body: JSON.stringify({ subject: subject, category: category, message: message, contact: contact }),
+    });
+
+    if (!res.ok) {
+      showToast("Erro ao enviar. Tente de novo.");
+      return;
+    }
+
+    showToast("Feedback enviado. Obrigado!");
+    showScreen(feedbackReturnScreen || "s-home");
+  } catch (err) {
+    console.error(err);
+    showToast("Erro ao enviar. Tente de novo.");
+  } finally {
+    sendBtn.disabled = false;
+  }
+}
+
+// ============================================================
 // Nova pelada (wizard)
 // ============================================================
 
@@ -894,10 +969,22 @@ document.addEventListener("DOMContentLoaded", function () {
   $("new-pelada-btn").addEventListener("click", openWizard);
   $("home-help-btn").addEventListener("click", function () { openHelp("s-home"); });
 
+  // Tap the app version 7 times (Android "developer options" style) to reach
+  // the hidden /admin feedback inbox. The count resets after a short pause.
+  document.querySelectorAll(".ver-tap").forEach(function (el) {
+    el.addEventListener("click", handleVersionTap);
+  });
+
   // Como funciona
   $("help-back").addEventListener("click", function () {
     showScreen(helpReturnScreen || "s-home");
   });
+
+  // Enviar feedback
+  $("fb-back").addEventListener("click", function () {
+    showScreen(feedbackReturnScreen || "s-home");
+  });
+  $("fb-send").addEventListener("click", submitFeedback);
 
   // Auth
   $("au-cancel").addEventListener("click", function () { closeSheets(); });
@@ -956,6 +1043,11 @@ document.addEventListener("DOMContentLoaded", function () {
     const current = document.querySelector(".screen.on");
     closeSheets();
     openHelp(current ? current.id : "s-home");
+  });
+  $("mn-feedback").addEventListener("click", function () {
+    const current = document.querySelector(".screen.on");
+    closeSheets();
+    openFeedback(current ? current.id : "s-home");
   });
   $("mn-leave").addEventListener("click", goHome);
   $("mn-done").addEventListener("click", function () { closeSheets(); });

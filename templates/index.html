@@ -102,7 +102,7 @@
         <div class="spacer-lg"></div>
       </div>
       <footer class="app-foot">
-        Versão {{ app_version }} · desenvolvido com ❤️ por <b>Diogo Tocci</b>
+        <button type="button" class="ver-link ver-tap">Versão {{ app_version }}</button> · desenvolvido com ❤️ por <b>Diogo Tocci</b>
       </footer>
     </div>
   </section>
@@ -368,6 +368,51 @@
   </section>
 
   <!-- ============================================================
+       Enviar feedback
+       ============================================================ -->
+  <section class="screen" id="s-feedback">
+    <div class="frame">
+      <div class="appbar">
+        <button class="icon-btn" id="fb-back" aria-label="Voltar">
+          <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="grow">
+          <h1>Enviar feedback</h1>
+          <p class="sub">Reporte um bug ou sugira melhorias</p>
+        </div>
+      </div>
+      <div class="scroll">
+        <div class="field">
+          <label for="fb-category">Tipo</label>
+          <select id="fb-category">
+            <option value="bug">Reportar erro / bug</option>
+            <option value="suggestion">Sugestão</option>
+            <option value="other">Outro</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="fb-subject">Assunto</label>
+          <input type="text" id="fb-subject" placeholder="Resuma em poucas palavras" maxlength="120">
+        </div>
+        <div class="field">
+          <label for="fb-message">Mensagem</label>
+          <textarea id="fb-message" placeholder="Descreva o que aconteceu ou o que você gostaria de ver no app."></textarea>
+          <p class="err" id="fb-err"></p>
+        </div>
+        <div class="field">
+          <label for="fb-contact">Contato (opcional)</label>
+          <input type="text" id="fb-contact" placeholder="E-mail ou telefone para retorno">
+          <p class="hint">Deixe se quiser que a gente responda. A versão do app é enviada junto.</p>
+        </div>
+        <div class="spacer-lg"></div>
+      </div>
+      <div class="cta-bar">
+        <button class="btn btn-primary" id="fb-send">Enviar feedback</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
        Sheets
        ============================================================ -->
   <div class="veil" id="veil"></div>
@@ -489,8 +534,12 @@
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/></svg>
         Como funciona
       </button>
+      <button class="btn btn-ghost" id="mn-feedback" style="margin-bottom:8px">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Enviar feedback
+      </button>
       <button class="btn btn-danger" id="mn-leave">Sair da pelada</button>
-      <p class="app-foot" style="padding-bottom:0">Time Justo · versão {{ app_version }}</p>
+      <p class="app-foot" style="padding-bottom:0">Time Justo · <button type="button" class="ver-link ver-tap">versão {{ app_version }}</button></p>
     </div>
     <div class="s-actions">
       <button class="btn btn-primary" id="mn-done">Pronto</button>

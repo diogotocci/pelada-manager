@@ -5,6 +5,7 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from storage.postgres_storage import (
     PlayerStorage,
     PeladaStorage,
+    FeedbackStorage,
     ensure_schema,
     count_recent_failures,
     record_failed_attempt,
@@ -13,9 +14,19 @@ from services.team_balancer import balance_teams
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "3.3.7")
+APP_VERSION = os.getenv("APP_VERSION", "3.3.13")
 
 VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white", "pink"}
+
+VALID_FEEDBACK_CATEGORIES = {"bug", "suggestion", "other"}
+FEEDBACK_SUBJECT_MAX = 120
+FEEDBACK_MESSAGE_MAX = 2000
+FEEDBACK_CONTACT_MAX = 200
+
+# General admin (the /admin feedback inbox) — a single password, separate from
+# each pelada's own admin password. Set SUPERADMIN_PASSWORD on Vercel; when it
+# is empty the /admin login rejects everything.
+SUPERADMIN_PASSWORD = os.getenv("SUPERADMIN_PASSWORD", "")
 
 # Android TWA (app gerado no PWABuilder). Defina os fingerprints SHA-256 na env
 # var ANDROID_CERT_FINGERPRINT no Vercel para o app verificar o domínio e
@@ -34,6 +45,7 @@ THROTTLE_WINDOW = 300  # 5 minutes
 
 player_storage = PlayerStorage()
 pelada_storage = PeladaStorage()
+feedback_storage = FeedbackStorage()
 
 # Only touch the database when a connection is configured (always on Vercel).
 # Keeps `import app` side-effect-free for tests/CI that run without a DB.
@@ -62,6 +74,41 @@ def _require_pelada():
     except BadSignature:
         abort(401, description="Invalid token")
     return int(data["pid"]), bool(data.get("adm", False))
+
+
+def _issue_admin_token() -> str:
+    return _serializer.dumps({"sa": True})
+
+
+def _require_superadmin():
+    """Validate the general-admin (superadmin) Bearer token. Aborts 401/403."""
+    auth = request.headers.get("Authorization", "")
+    token = auth[7:].strip() if auth.startswith("Bearer ") else ""
+    if not token:
+        abort(401, description="Missing token")
+    try:
+        data = _serializer.loads(token, max_age=TOKEN_MAX_AGE)
+    except SignatureExpired:
+        abort(401, description="Token expired")
+    except BadSignature:
+        abort(401, description="Invalid token")
+    if data.get("sa") is not True:
+        abort(403, description="Superadmin token required")
+    return True
+
+
+def _optional_pelada_id():
+    """Return the pelada id from a valid Bearer token, or None. Never aborts —
+    used to tag feedback with its pelada when the caller happens to be logged in."""
+    auth = request.headers.get("Authorization", "")
+    token = auth[7:].strip() if auth.startswith("Bearer ") else ""
+    if not token:
+        return None
+    try:
+        data = _serializer.loads(token, max_age=TOKEN_MAX_AGE)
+    except (SignatureExpired, BadSignature):
+        return None
+    return int(data["pid"])
 
 
 def _player_json(player, is_admin):
@@ -135,6 +182,13 @@ def index():
         "index.html",
         app_version=APP_VERSION,
     )
+
+
+@app.route("/admin")
+def admin_page():
+    # General-admin feedback inbox. A standalone page gated by SUPERADMIN_PASSWORD;
+    # not linked from the app.
+    return render_template("admin.html", app_version=APP_VERSION)
 
 
 @app.route("/sw.js")
@@ -255,6 +309,120 @@ def activate_admin(pelada_id):
         abort(403, description="Invalid admin key")
 
     return jsonify({"ok": True, "token": _issue_token(pelada_id, True)})
+
+
+@app.route("/api/feedback", methods=["POST"])
+def submit_feedback():
+    data = request.get_json(silent=True) or {}
+
+    subject = (data.get("subject") or "").strip()
+    category = (data.get("category") or "").strip()
+    message = (data.get("message") or "").strip()
+    contact = (data.get("contact") or "").strip()
+
+    if not subject:
+        abort(400, description="Subject cannot be empty")
+    if len(subject) > FEEDBACK_SUBJECT_MAX:
+        abort(400, description="Subject too long")
+    if category not in VALID_FEEDBACK_CATEGORIES:
+        abort(400, description="Invalid feedback category")
+    if not message:
+        abort(400, description="Message cannot be empty")
+    if len(message) > FEEDBACK_MESSAGE_MAX:
+        abort(400, description="Message too long")
+    if len(contact) > FEEDBACK_CONTACT_MAX:
+        abort(400, description="Contact too long")
+
+    # The app version is recorded server-side (the deployed version), and the
+    # pelada is tagged only when the caller has a valid token.
+    feedback_id = feedback_storage.add_feedback(
+        subject=subject,
+        category=category,
+        message=message,
+        contact=contact or None,
+        app_version=APP_VERSION,
+        pelada_id=_optional_pelada_id(),
+    )
+    return jsonify({"ok": True, "id": feedback_id}), 201
+
+
+# ============================================================
+# General admin (feedback inbox at /admin)
+# ============================================================
+
+@app.route("/api/admin/auth", methods=["POST"])
+def admin_auth():
+    ip = _client_ip()
+    _throttle(ip)
+    data = request.get_json(silent=True) or {}
+    password = data.get("password", "")
+    if not SUPERADMIN_PASSWORD or password != SUPERADMIN_PASSWORD:
+        _record_failure(ip)
+        return jsonify({"ok": False}), 401
+    return jsonify({"ok": True, "token": _issue_admin_token()})
+
+
+@app.route("/api/admin/feedback", methods=["GET"])
+def admin_list_feedback():
+    _require_superadmin()
+    items = feedback_storage.list_feedback()
+    unread = sum(1 for f in items if not f["is_read"])
+    return jsonify({"feedback": items, "unread": unread})
+
+
+@app.route("/api/admin/feedback/<int:feedback_id>/read", methods=["POST"])
+def admin_mark_read(feedback_id):
+    _require_superadmin()
+    if not feedback_storage.mark_read(feedback_id):
+        abort(404, description="Feedback not found")
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/feedback/<int:feedback_id>", methods=["DELETE"])
+def admin_delete_feedback(feedback_id):
+    _require_superadmin()
+    if not feedback_storage.delete_feedback(feedback_id):
+        abort(404, description="Feedback not found")
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/feedback/<int:feedback_id>/useful", methods=["POST"])
+def admin_mark_useful(feedback_id):
+    _require_superadmin()
+    fb = feedback_storage.get_feedback(feedback_id)
+    if not fb:
+        abort(404, description="Feedback not found")
+    item = feedback_storage.add_useful(
+        feedback_id=feedback_id,
+        subject=fb["subject"] or fb["message"][:80],
+        message=fb["message"],
+        category=fb["category"],
+    )
+    return jsonify(item), 201
+
+
+@app.route("/api/admin/useful", methods=["GET"])
+def admin_list_useful():
+    _require_superadmin()
+    return jsonify({"useful": feedback_storage.list_useful()})
+
+
+@app.route("/api/admin/useful/<int:useful_id>", methods=["PATCH"])
+def admin_update_useful(useful_id):
+    _require_superadmin()
+    data = request.get_json(silent=True) or {}
+    item = feedback_storage.set_useful_done(useful_id, bool(data.get("done", False)))
+    if not item:
+        abort(404, description="Useful item not found")
+    return jsonify(item)
+
+
+@app.route("/api/admin/useful/<int:useful_id>", methods=["DELETE"])
+def admin_delete_useful(useful_id):
+    _require_superadmin()
+    if not feedback_storage.delete_useful(useful_id):
+        abort(404, description="Useful item not found")
+    return jsonify({"ok": True})
 
 
 @app.route("/api/peladas/<int:pelada_id>/colors", methods=["PATCH"])

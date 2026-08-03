@@ -1,4 +1,13 @@
 // ============================================================
+// No zoom — block pinch-zoom on iOS Safari, which ignores
+// user-scalable=no. (Double-tap zoom is handled by CSS touch-action.)
+// ============================================================
+
+["gesturestart", "gesturechange", "gestureend"].forEach(function (evt) {
+  document.addEventListener(evt, function (e) { e.preventDefault(); }, { passive: false });
+});
+
+// ============================================================
 // State
 // ============================================================
 
@@ -458,4 +467,17 @@ function openHelp(fromScreen) {
   helpReturnScreen = fromScreen || "s-home";
   renderHelp();
   showScreen("s-help");
+}
+
+let feedbackReturnScreen = "s-home";
+
+function openFeedback(fromScreen) {
+  feedbackReturnScreen = fromScreen || "s-home";
+  $("fb-category").value = "bug";
+  $("fb-subject").value = "";
+  $("fb-message").value = "";
+  $("fb-contact").value = "";
+  $("fb-err").classList.remove("on");
+  showScreen("s-feedback");
+  setTimeout(function () { $("fb-subject").focus(); }, 100);
 }
