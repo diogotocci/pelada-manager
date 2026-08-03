@@ -413,6 +413,27 @@
   </section>
 
   <!-- ============================================================
+       Comparar níveis (tier list arrastável, só admin)
+       ============================================================ -->
+  <section class="screen" id="s-compare">
+    <div class="frame">
+      <div class="appbar">
+        <button class="icon-btn" id="cmp-back" aria-label="Voltar">
+          <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="grow">
+          <h1>Comparar níveis</h1>
+          <p class="sub">Arraste um jogador entre as faixas</p>
+        </div>
+      </div>
+      <div class="scroll" id="cmp-scroll">
+        <div id="cmp-tiers"></div>
+        <div class="spacer-lg"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
        Sheets
        ============================================================ -->
   <div class="veil" id="veil"></div>
@@ -586,17 +607,6 @@
     </div>
   </div>
 
-  <!-- Comparar -->
-  <div class="sheet" id="sh-compare" role="dialog" aria-modal="true">
-    <div class="grab"></div>
-    <h3>Comparar por nível</h3>
-    <p class="s-sub">Jogadores agrupados por estrelas</p>
-    <div class="s-body" id="compare-body"></div>
-    <div class="s-actions">
-      <button class="btn btn-ghost" id="compare-close">Fechar</button>
-    </div>
-  </div>
-
   <div class="toast" id="toast" role="status"></div>
 
   <script>
@@ -606,6 +616,7 @@
   <script src="{{ url_for('static', filename='js/api.js') }}?v={{ app_version }}"></script>
   <script src="{{ url_for('static', filename='js/players.js') }}?v={{ app_version }}"></script>
   <script src="{{ url_for('static', filename='js/teams.js') }}?v={{ app_version }}"></script>
+  <script src="{{ url_for('static', filename='js/compare.js') }}?v={{ app_version }}"></script>
 
   <!-- Vercel Web Analytics -->
   <script>

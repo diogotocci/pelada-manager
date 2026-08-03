@@ -384,44 +384,6 @@ function copyShareText(text) {
 }
 
 // ============================================================
-// Comparar por nível
-// ============================================================
-
-function renderCompare() {
-  const bodyEl = $("compare-body");
-  bodyEl.innerHTML = "";
-
-  if (players.length === 0) {
-    bodyEl.innerHTML = '<p class="empty">Nenhum jogador cadastrado.</p>';
-    return;
-  }
-
-  const groups = {};
-  players.forEach(function (p) {
-    const key = p.rating.toFixed(1);
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(p.name);
-  });
-
-  const ratings = Object.keys(groups)
-    .map(function (r) { return parseFloat(r); })
-    .sort(function (a, b) { return b - a; });
-
-  let html = '<table class="audit-table"><thead><tr><th style="width:90px">Nível</th><th style="text-align:left">Jogadores</th></tr></thead><tbody>';
-  ratings.forEach(function (rating) {
-    const names = groups[rating.toFixed(1)].slice().sort(function (a, b) {
-      return a.trim().localeCompare(b.trim(), "pt-BR", { sensitivity: "base" });
-    });
-    html +=
-      '<tr><td style="text-align:left;white-space:nowrap">' + buildStarsHTML(rating) + "</td>" +
-      '<td style="text-align:left">' + names.map(escapeHTML).join(", ") + "</td></tr>";
-  });
-  html += "</tbody></table>";
-
-  bodyEl.innerHTML = html;
-}
-
-// ============================================================
 // Event listeners
 // ============================================================
 
@@ -438,7 +400,4 @@ document.addEventListener("DOMContentLoaded", function () {
   $("tm-share").addEventListener("click", shareTeams);
   $("tm-audit-btn").addEventListener("click", function () { renderAudit(); openSheet("audit"); });
   $("audit-close").addEventListener("click", function () { closeSheets(); });
-
-  $("sq-compare-btn").addEventListener("click", function () { renderCompare(); openSheet("compare"); });
-  $("compare-close").addEventListener("click", function () { closeSheets(); });
 });
