@@ -1,4 +1,13 @@
 // ============================================================
+// No zoom — block pinch-zoom on iOS Safari, which ignores
+// user-scalable=no. (Double-tap zoom is handled by CSS touch-action.)
+// ============================================================
+
+["gesturestart", "gesturechange", "gestureend"].forEach(function (evt) {
+  document.addEventListener(evt, function (e) { e.preventDefault(); }, { passive: false });
+});
+
+// ============================================================
 // State
 // ============================================================
 

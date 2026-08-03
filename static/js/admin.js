@@ -2,6 +2,12 @@
 // Admin feedback inbox (/admin) — standalone from the main app.
 // ============================================================
 
+// Block pinch-zoom on iOS Safari (it ignores user-scalable=no); double-tap
+// zoom is handled by CSS touch-action.
+["gesturestart", "gesturechange", "gestureend"].forEach(function (evt) {
+  document.addEventListener(evt, function (e) { e.preventDefault(); }, { passive: false });
+});
+
 let token = localStorage.getItem("tj-admin-token") || null;
 let feedbackList = [];
 let usefulList = [];
