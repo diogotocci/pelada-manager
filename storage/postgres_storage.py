@@ -159,6 +159,21 @@ def ensure_schema() -> None:
             """)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_auth_attempts_ip_ts ON auth_attempts (ip, ts)")
 
+            # User feedback (bug reports, suggestions). pelada_id is optional and
+            # kept even if the pelada is later deleted, so we can still read the
+            # message; contact is a free-text email/phone the user may leave.
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS feedback (
+                    id          SERIAL PRIMARY KEY,
+                    pelada_id   INTEGER REFERENCES peladas(id) ON DELETE SET NULL,
+                    category    TEXT NOT NULL,
+                    message     TEXT NOT NULL,
+                    contact     TEXT,
+                    app_version TEXT,
+                    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
+
         conn.commit()
 
 
@@ -307,6 +322,21 @@ class PeladaStorage:
             with conn.cursor() as cur:
                 cur.execute("DELETE FROM peladas WHERE id = %s", (pelada_id,))
                 return cur.rowcount > 0
+
+
+class FeedbackStorage:
+    def add_feedback(self, category: str, message: str, contact: Optional[str] = None, app_version: Optional[str] = None, pelada_id: Optional[int] = None) -> int:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO feedback (pelada_id, category, message, contact, app_version)
+                    VALUES (%s, %s, %s, %s, %s)
+                    RETURNING id
+                    """,
+                    (pelada_id, category, message, contact, app_version),
+                )
+                return int(cur.fetchone()["id"])
 
 
 class PlayerStorage:

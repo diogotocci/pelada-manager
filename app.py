@@ -5,6 +5,7 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from storage.postgres_storage import (
     PlayerStorage,
     PeladaStorage,
+    FeedbackStorage,
     ensure_schema,
     count_recent_failures,
     record_failed_attempt,
@@ -13,9 +14,13 @@ from services.team_balancer import balance_teams
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "3.3.7")
+APP_VERSION = os.getenv("APP_VERSION", "3.3.8")
 
 VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white", "pink"}
+
+VALID_FEEDBACK_CATEGORIES = {"bug", "suggestion", "other"}
+FEEDBACK_MESSAGE_MAX = 2000
+FEEDBACK_CONTACT_MAX = 200
 
 # Android TWA (app gerado no PWABuilder). Defina os fingerprints SHA-256 na env
 # var ANDROID_CERT_FINGERPRINT no Vercel para o app verificar o domínio e
@@ -34,6 +39,7 @@ THROTTLE_WINDOW = 300  # 5 minutes
 
 player_storage = PlayerStorage()
 pelada_storage = PeladaStorage()
+feedback_storage = FeedbackStorage()
 
 # Only touch the database when a connection is configured (always on Vercel).
 # Keeps `import app` side-effect-free for tests/CI that run without a DB.
@@ -62,6 +68,20 @@ def _require_pelada():
     except BadSignature:
         abort(401, description="Invalid token")
     return int(data["pid"]), bool(data.get("adm", False))
+
+
+def _optional_pelada_id():
+    """Return the pelada id from a valid Bearer token, or None. Never aborts —
+    used to tag feedback with its pelada when the caller happens to be logged in."""
+    auth = request.headers.get("Authorization", "")
+    token = auth[7:].strip() if auth.startswith("Bearer ") else ""
+    if not token:
+        return None
+    try:
+        data = _serializer.loads(token, max_age=TOKEN_MAX_AGE)
+    except (SignatureExpired, BadSignature):
+        return None
+    return int(data["pid"])
 
 
 def _player_json(player, is_admin):
@@ -255,6 +275,35 @@ def activate_admin(pelada_id):
         abort(403, description="Invalid admin key")
 
     return jsonify({"ok": True, "token": _issue_token(pelada_id, True)})
+
+
+@app.route("/api/feedback", methods=["POST"])
+def submit_feedback():
+    data = request.get_json(silent=True) or {}
+
+    category = (data.get("category") or "").strip()
+    message = (data.get("message") or "").strip()
+    contact = (data.get("contact") or "").strip()
+
+    if category not in VALID_FEEDBACK_CATEGORIES:
+        abort(400, description="Invalid feedback category")
+    if not message:
+        abort(400, description="Message cannot be empty")
+    if len(message) > FEEDBACK_MESSAGE_MAX:
+        abort(400, description="Message too long")
+    if len(contact) > FEEDBACK_CONTACT_MAX:
+        abort(400, description="Contact too long")
+
+    # The app version is recorded server-side (the deployed version), and the
+    # pelada is tagged only when the caller has a valid token.
+    feedback_id = feedback_storage.add_feedback(
+        category=category,
+        message=message,
+        contact=contact or None,
+        app_version=APP_VERSION,
+        pelada_id=_optional_pelada_id(),
+    )
+    return jsonify({"ok": True, "id": feedback_id}), 201
 
 
 @app.route("/api/peladas/<int:pelada_id>/colors", methods=["PATCH"])

@@ -459,3 +459,15 @@ function openHelp(fromScreen) {
   renderHelp();
   showScreen("s-help");
 }
+
+let feedbackReturnScreen = "s-home";
+
+function openFeedback(fromScreen) {
+  feedbackReturnScreen = fromScreen || "s-home";
+  $("fb-category").value = "bug";
+  $("fb-message").value = "";
+  $("fb-contact").value = "";
+  $("fb-err").classList.remove("on");
+  showScreen("s-feedback");
+  setTimeout(function () { $("fb-message").focus(); }, 100);
+}

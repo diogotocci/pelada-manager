@@ -666,6 +666,48 @@ function toggleAdmin() {
 }
 
 // ============================================================
+// Enviar feedback
+// ============================================================
+
+async function submitFeedback() {
+  const category = $("fb-category").value;
+  const message = $("fb-message").value.trim();
+  const contact = $("fb-contact").value.trim();
+  const errEl = $("fb-err");
+
+  if (!message) {
+    errEl.textContent = "Escreva uma mensagem.";
+    errEl.classList.add("on");
+    $("fb-message").focus();
+    return;
+  }
+  errEl.classList.remove("on");
+
+  const sendBtn = $("fb-send");
+  sendBtn.disabled = true;
+
+  try {
+    const res = await fetchJSONRaw("/api/feedback", {
+      method: "POST",
+      body: JSON.stringify({ category: category, message: message, contact: contact }),
+    });
+
+    if (!res.ok) {
+      showToast("Erro ao enviar. Tente de novo.");
+      return;
+    }
+
+    showToast("Feedback enviado. Obrigado!");
+    showScreen(feedbackReturnScreen || "s-home");
+  } catch (err) {
+    console.error(err);
+    showToast("Erro ao enviar. Tente de novo.");
+  } finally {
+    sendBtn.disabled = false;
+  }
+}
+
+// ============================================================
 // Nova pelada (wizard)
 // ============================================================
 
@@ -899,6 +941,12 @@ document.addEventListener("DOMContentLoaded", function () {
     showScreen(helpReturnScreen || "s-home");
   });
 
+  // Enviar feedback
+  $("fb-back").addEventListener("click", function () {
+    showScreen(feedbackReturnScreen || "s-home");
+  });
+  $("fb-send").addEventListener("click", submitFeedback);
+
   // Auth
   $("au-cancel").addEventListener("click", function () { closeSheets(); });
   $("au-confirm").addEventListener("click", confirmAuth);
@@ -956,6 +1004,11 @@ document.addEventListener("DOMContentLoaded", function () {
     const current = document.querySelector(".screen.on");
     closeSheets();
     openHelp(current ? current.id : "s-home");
+  });
+  $("mn-feedback").addEventListener("click", function () {
+    const current = document.querySelector(".screen.on");
+    closeSheets();
+    openFeedback(current ? current.id : "s-home");
   });
   $("mn-leave").addEventListener("click", goHome);
   $("mn-done").addEventListener("click", function () { closeSheets(); });
