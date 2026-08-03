@@ -307,6 +307,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (e.key === "Enter") { e.preventDefault(); login(); }
   });
 
+  $("ls-back").addEventListener("click", function () { window.location.href = "/"; });
   $("ls-useful").addEventListener("click", loadUseful);
   $("dt-back").addEventListener("click", function () { showScreen("s-list"); });
   $("dt-useful").addEventListener("click", markUseful);
