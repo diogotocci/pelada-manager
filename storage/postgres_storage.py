@@ -211,6 +211,49 @@ def ensure_schema() -> None:
                 )
             """)
 
+            # ---- Accounts (Google login) --------------------------------
+            # A user is identified by the stable Google `sub`; email/name/picture
+            # are only for display. google_sub is nullable so the owner of the
+            # legacy peladas can be pre-seeded by email and get the sub filled in
+            # on their first login.
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id          SERIAL PRIMARY KEY,
+                    google_sub  TEXT UNIQUE,
+                    email       TEXT UNIQUE NOT NULL,
+                    name        TEXT,
+                    picture     TEXT,
+                    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
+
+            # Which users belong to which pelada, and with what role.
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS pelada_members (
+                    pelada_id  INTEGER NOT NULL REFERENCES peladas(id) ON DELETE CASCADE,
+                    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    role       TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'member')),
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    PRIMARY KEY (pelada_id, user_id)
+                )
+            """)
+
+            # Migration: make diogotocci@gmail.com the owner of every existing
+            # pelada, so nothing is left ownerless when the model switches from
+            # per-pelada passwords to accounts. Idempotent (guarded by NOT EXISTS).
+            cur.execute("INSERT INTO users (email) VALUES ('diogotocci@gmail.com') ON CONFLICT (email) DO NOTHING")
+            cur.execute("""
+                INSERT INTO pelada_members (pelada_id, user_id, role)
+                SELECT p.id, u.id, 'owner'
+                FROM peladas p
+                CROSS JOIN users u
+                WHERE u.email = 'diogotocci@gmail.com'
+                  AND NOT EXISTS (
+                      SELECT 1 FROM pelada_members m
+                      WHERE m.pelada_id = p.id AND m.user_id = u.id
+                  )
+            """)
+
         conn.commit()
 
 
@@ -449,6 +492,89 @@ class FeedbackStorage:
             with conn.cursor() as cur:
                 cur.execute("DELETE FROM useful_items WHERE id = %s", (useful_id,))
                 return cur.rowcount > 0
+
+
+def _row_to_user(row) -> Dict:
+    return {
+        "id": row["id"],
+        "email": row["email"],
+        "name": row.get("name"),
+        "picture": row.get("picture"),
+    }
+
+
+class UserStorage:
+    def upsert_google_user(self, google_sub: str, email: str, name: Optional[str], picture: Optional[str]) -> Dict:
+        """Find the user by google_sub (or by email, for a pre-seeded owner whose
+        sub is still NULL) and update their profile; create them otherwise."""
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id FROM users WHERE google_sub = %s", (google_sub,))
+                row = cur.fetchone()
+                if row is None:
+                    cur.execute("SELECT id FROM users WHERE email = %s", (email,))
+                    row = cur.fetchone()
+
+                if row is not None:
+                    cur.execute(
+                        """
+                        UPDATE users
+                        SET google_sub = %s, email = %s, name = %s, picture = %s
+                        WHERE id = %s
+                        RETURNING *
+                        """,
+                        (google_sub, email, name, picture, row["id"]),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        INSERT INTO users (google_sub, email, name, picture)
+                        VALUES (%s, %s, %s, %s)
+                        RETURNING *
+                        """,
+                        (google_sub, email, name, picture),
+                    )
+                return _row_to_user(cur.fetchone())
+
+    def get_user(self, user_id: int) -> Optional[Dict]:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+                row = cur.fetchone()
+                return _row_to_user(row) if row else None
+
+    def get_role(self, pelada_id: int, user_id: int) -> Optional[str]:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT role FROM pelada_members WHERE pelada_id = %s AND user_id = %s",
+                    (pelada_id, user_id),
+                )
+                row = cur.fetchone()
+                return row["role"] if row else None
+
+    def list_user_peladas(self, user_id: int) -> List[Dict]:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT p.id, p.name, p.team1_color, p.team2_color, p.game_weekday,
+                           m.role, COUNT(pl.id) AS player_count
+                    FROM pelada_members m
+                    JOIN peladas p ON p.id = m.pelada_id
+                    LEFT JOIN players pl ON pl.pelada_id = p.id
+                    WHERE m.user_id = %s
+                    GROUP BY p.id, p.name, p.team1_color, p.team2_color, p.game_weekday, m.role
+                    ORDER BY p.id
+                    """,
+                    (user_id,),
+                )
+                result = []
+                for r in cur.fetchall():
+                    pelada = _row_to_pelada(r)
+                    pelada["role"] = r["role"]
+                    result.append(pelada)
+                return result
 
 
 class PlayerStorage:

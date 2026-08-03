@@ -1,11 +1,14 @@
 import os
 from flask import Flask, render_template, jsonify, request, abort, Response, make_response
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+from google.oauth2 import id_token as google_id_token
+from google.auth.transport import requests as google_requests
 
 from storage.postgres_storage import (
     PlayerStorage,
     PeladaStorage,
     FeedbackStorage,
+    UserStorage,
     ensure_schema,
     count_recent_failures,
     record_failed_attempt,
@@ -14,7 +17,7 @@ from services.team_balancer import balance_teams
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "3.3.15")
+APP_VERSION = os.getenv("APP_VERSION", "3.3.16")
 
 VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white", "pink"}
 
@@ -46,6 +49,13 @@ THROTTLE_WINDOW = 300  # 5 minutes
 player_storage = PlayerStorage()
 pelada_storage = PeladaStorage()
 feedback_storage = FeedbackStorage()
+user_storage = UserStorage()
+
+# Google login. GOOGLE_CLIENT_ID is public (also used in the front); it must be
+# set for login to work. The session token identifies the user (not a pelada).
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+_session_serializer = URLSafeTimedSerializer(SECRET_KEY, salt="user-session")
+SESSION_MAX_AGE = 60 * 60 * 24 * 30  # 30 days
 
 # Only touch the database when a connection is configured (always on Vercel).
 # Keeps `import app` side-effect-free for tests/CI that run without a DB.
@@ -74,6 +84,37 @@ def _require_pelada():
     except BadSignature:
         abort(401, description="Invalid token")
     return int(data["pid"]), bool(data.get("adm", False))
+
+
+def _verify_google_token(credential):
+    """Return {sub, email, name, picture} from a Google id_token.
+    Raises ValueError if the token is invalid, expired or for another audience."""
+    info = google_id_token.verify_oauth2_token(
+        credential, google_requests.Request(), GOOGLE_CLIENT_ID
+    )
+    return {
+        "sub": info["sub"],
+        "email": info.get("email", ""),
+        "name": info.get("name"),
+        "picture": info.get("picture"),
+    }
+
+
+def _issue_session_token(user_id: int) -> str:
+    return _session_serializer.dumps({"uid": int(user_id)})
+
+
+def _current_user():
+    """Return the logged-in user dict from the session token, or None."""
+    auth = request.headers.get("Authorization", "")
+    token = auth[7:].strip() if auth.startswith("Bearer ") else ""
+    if not token:
+        return None
+    try:
+        data = _session_serializer.loads(token, max_age=SESSION_MAX_AGE)
+    except (SignatureExpired, BadSignature):
+        return None
+    return user_storage.get_user(int(data["uid"]))
 
 
 def _issue_admin_token() -> str:
@@ -170,6 +211,41 @@ def _parse_weekday(value):
     if not 0 <= weekday <= 6:
         abort(400, description="Weekday must be between 0 and 6")
     return weekday
+
+
+# ============================================================
+# Accounts (Google login)
+# ============================================================
+
+@app.route("/api/auth/google", methods=["POST"])
+def auth_google():
+    data = request.get_json(silent=True) or {}
+    credential = data.get("credential", "")
+    if not credential:
+        abort(400, description="Missing credential")
+    if not GOOGLE_CLIENT_ID:
+        abort(503, description="Login not configured")
+
+    try:
+        info = _verify_google_token(credential)
+    except ValueError:
+        return jsonify({"ok": False}), 401
+
+    if not info.get("email"):
+        return jsonify({"ok": False}), 401
+
+    user = user_storage.upsert_google_user(
+        info["sub"], info["email"], info.get("name"), info.get("picture")
+    )
+    return jsonify({"ok": True, "token": _issue_session_token(user["id"]), "user": user})
+
+
+@app.route("/api/me", methods=["GET"])
+def me():
+    user = _current_user()
+    if not user:
+        abort(401, description="Not authenticated")
+    return jsonify(user)
 
 
 # ============================================================
