@@ -17,7 +17,7 @@ from services.team_balancer import balance_teams
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "3.3.16")
+APP_VERSION = os.getenv("APP_VERSION", "3.3.17")
 
 VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white", "pink"}
 
@@ -257,6 +257,7 @@ def index():
     return render_template(
         "index.html",
         app_version=APP_VERSION,
+        google_client_id=GOOGLE_CLIENT_ID,
     )
 
 

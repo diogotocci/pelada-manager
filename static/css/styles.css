@@ -931,3 +931,40 @@ input { font: inherit; }
   cursor: grabbing;
   box-shadow: 0 8px 24px -8px rgba(20, 30, 24, .35);
 }
+
+/* ============================================================
+   Account bar (Google login)
+   ============================================================ */
+
+.account-bar { margin: 4px 0 14px; min-height: 44px; }
+.account-info { display: flex; align-items: center; gap: 11px; }
+.account-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--accent-soft);
+  background-size: cover;
+  background-position: center;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .9rem;
+  font-weight: 700;
+}
+.account-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.account-name {
+  font-size: .92rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.account-logout {
+  align-self: flex-start;
+  font-size: .78rem;
+  color: var(--muted);
+  padding: 0;
+}
+.account-logout:hover { color: var(--danger); }
