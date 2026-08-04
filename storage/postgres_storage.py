@@ -1,4 +1,5 @@
 import os
+import secrets
 from typing import List, Optional, Dict
 
 import psycopg2
@@ -235,6 +236,24 @@ def ensure_schema() -> None:
                     role       TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'member')),
                     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                     PRIMARY KEY (pelada_id, user_id)
+                )
+            """)
+
+            # Invites: a shareable link (random token) that grants a role in a
+            # pelada. Multi-use, time-bound — valid while revoked_at IS NULL and
+            # now() < expires_at (no per-quantity limit). accepted_count is only
+            # informative.
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS pelada_invites (
+                    id             SERIAL PRIMARY KEY,
+                    pelada_id      INTEGER NOT NULL REFERENCES peladas(id) ON DELETE CASCADE,
+                    token          TEXT UNIQUE NOT NULL,
+                    role           TEXT NOT NULL CHECK (role IN ('admin', 'member')),
+                    created_by     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                    expires_at     TIMESTAMPTZ NOT NULL,
+                    revoked_at     TIMESTAMPTZ,
+                    accepted_count INTEGER NOT NULL DEFAULT 0,
+                    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
                 )
             """)
 
@@ -596,6 +615,125 @@ class UserStorage:
                     pelada["role"] = r["role"]
                     result.append(pelada)
                 return result
+
+    def add_membership(self, pelada_id: int, user_id: int, role: str) -> None:
+        """Add the user to the pelada with the given role. Idempotent: if they
+        are already a member, their role is left unchanged."""
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO pelada_members (pelada_id, user_id, role)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (pelada_id, user_id) DO NOTHING
+                    """,
+                    (pelada_id, user_id, role),
+                )
+
+    def list_members(self, pelada_id: int) -> List[Dict]:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT u.id, u.name, u.email, u.picture, m.role
+                    FROM pelada_members m
+                    JOIN users u ON u.id = m.user_id
+                    WHERE m.pelada_id = %s
+                    ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, u.name
+                    """,
+                    (pelada_id,),
+                )
+                members = []
+                for r in cur.fetchall():
+                    member = _row_to_user(r)
+                    member["role"] = r["role"]
+                    members.append(member)
+                return members
+
+    def remove_member(self, pelada_id: int, user_id: int) -> bool:
+        """Remove a member. The owner can never be removed this way."""
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "DELETE FROM pelada_members WHERE pelada_id = %s AND user_id = %s AND role <> 'owner'",
+                    (pelada_id, user_id),
+                )
+                return cur.rowcount > 0
+
+
+def _row_to_invite(row) -> Dict:
+    exp = row.get("expires_at")
+    return {
+        "id": row["id"],
+        "pelada_id": row["pelada_id"],
+        "token": row["token"],
+        "role": row["role"],
+        "expires_at": exp.isoformat() if exp is not None else None,
+        "revoked_at": row["revoked_at"].isoformat() if row.get("revoked_at") is not None else None,
+        "accepted_count": int(row.get("accepted_count", 0)),
+        "pelada_name": row.get("pelada_name"),
+    }
+
+
+class InviteStorage:
+    def add_invite(self, pelada_id: int, role: str, created_by: int, expires_at) -> Dict:
+        token = secrets.token_urlsafe(24)
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO pelada_invites (pelada_id, token, role, created_by, expires_at)
+                    VALUES (%s, %s, %s, %s, %s)
+                    RETURNING *
+                    """,
+                    (pelada_id, token, role, created_by, expires_at),
+                )
+                return _row_to_invite(cur.fetchone())
+
+    def get_invite(self, token: str) -> Optional[Dict]:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT i.*, p.name AS pelada_name
+                    FROM pelada_invites i
+                    JOIN peladas p ON p.id = i.pelada_id
+                    WHERE i.token = %s
+                    """,
+                    (token,),
+                )
+                row = cur.fetchone()
+                return _row_to_invite(row) if row else None
+
+    def list_active_invites(self, pelada_id: int) -> List[Dict]:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT * FROM pelada_invites
+                    WHERE pelada_id = %s AND revoked_at IS NULL AND expires_at > NOW()
+                    ORDER BY created_at DESC
+                    """,
+                    (pelada_id,),
+                )
+                return [_row_to_invite(r) for r in cur.fetchall()]
+
+    def revoke_invite(self, token: str) -> bool:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE pelada_invites SET revoked_at = NOW() WHERE token = %s AND revoked_at IS NULL",
+                    (token,),
+                )
+                return cur.rowcount > 0
+
+    def record_acceptance(self, invite_id: int) -> None:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE pelada_invites SET accepted_count = accepted_count + 1 WHERE id = %s",
+                    (invite_id,),
+                )
 
 
 class PlayerStorage:

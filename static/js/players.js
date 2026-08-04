@@ -114,6 +114,8 @@ function roleLabel(role) {
 
 // Called by auth.js after login/logout so the home reflects the session.
 function onAuthChanged() {
+  // If the user just logged in on an invite link, accept it instead.
+  if (typeof handleInviteAfterAuth === "function" && handleInviteAfterAuth()) return;
   const current = document.querySelector(".screen.on");
   if (current && current.id === "s-home") loadPeladas();
 }

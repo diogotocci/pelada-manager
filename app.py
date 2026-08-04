@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timedelta, timezone
 from flask import Flask, render_template, jsonify, request, abort, Response, make_response
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from google.oauth2 import id_token as google_id_token
@@ -9,6 +10,7 @@ from storage.postgres_storage import (
     PeladaStorage,
     FeedbackStorage,
     UserStorage,
+    InviteStorage,
     ensure_schema,
     count_recent_failures,
     record_failed_attempt,
@@ -17,7 +19,7 @@ from services.team_balancer import balance_teams
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "3.4.0")
+APP_VERSION = os.getenv("APP_VERSION", "3.4.2")
 
 VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white", "pink"}
 
@@ -50,6 +52,10 @@ player_storage = PlayerStorage()
 pelada_storage = PeladaStorage()
 feedback_storage = FeedbackStorage()
 user_storage = UserStorage()
+invite_storage = InviteStorage()
+
+VALID_INVITE_ROLES = {"admin", "member"}
+INVITE_MAX_TTL_HOURS = 720  # 30 days
 
 # Google login. GOOGLE_CLIENT_ID is public (also used in the front); it must be
 # set for login to work. The session token identifies the user (not a pelada).
@@ -194,6 +200,18 @@ def _record_failure(ip: str) -> None:
         pass
 
 
+def _invite_status(invite) -> str:
+    """'valid', 'revoked' or 'expired' for an invite dict from storage."""
+    if invite["revoked_at"] is not None:
+        return "revoked"
+    exp = datetime.fromisoformat(invite["expires_at"])
+    if exp.tzinfo is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+    if exp <= datetime.now(timezone.utc):
+        return "expired"
+    return "valid"
+
+
 def _is_valid_attribute(value: int) -> bool:
     return 1 <= value <= 3
 
@@ -274,6 +292,13 @@ def admin_page():
     # General-admin feedback inbox. A standalone page gated by SUPERADMIN_PASSWORD;
     # not linked from the app.
     return render_template("admin.html", app_version=APP_VERSION)
+
+
+@app.route("/entrar/<token>")
+def invite_page(token):
+    # Invite deep-link. Serves the SPA; the client reads the token from the URL
+    # and runs the accept flow (after login if needed).
+    return render_template("index.html", app_version=APP_VERSION, google_client_id=GOOGLE_CLIENT_ID)
 
 
 @app.route("/sw.js")
@@ -550,6 +575,106 @@ def delete_pelada(pelada_id):
         abort(404, description="Pelada not found")
 
     return jsonify({"status": "ok"})
+
+
+# ============================================================
+# Invites & members
+# ============================================================
+
+@app.route("/api/peladas/<int:pelada_id>/invites", methods=["POST"])
+def create_invite(pelada_id):
+    pid, user, role = _require_membership()
+    if pid != pelada_id or role not in ("owner", "admin"):
+        abort(403, description="Admin or owner only")
+
+    data = request.get_json(silent=True) or {}
+    invite_role = data.get("role", "member")
+    if invite_role not in VALID_INVITE_ROLES:
+        abort(400, description="Invalid invite role")
+    try:
+        ttl_hours = int(data.get("ttl_hours", 168))
+    except (ValueError, TypeError):
+        abort(400, description="Invalid ttl")
+    if ttl_hours < 1 or ttl_hours > INVITE_MAX_TTL_HOURS:
+        abort(400, description="ttl out of range")
+
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=ttl_hours)
+    invite = invite_storage.add_invite(pelada_id, invite_role, user["id"], expires_at)
+    return jsonify(invite), 201
+
+
+@app.route("/api/peladas/<int:pelada_id>/invites", methods=["GET"])
+def list_invites(pelada_id):
+    pid, user, role = _require_membership()
+    if pid != pelada_id or role not in ("owner", "admin"):
+        abort(403, description="Admin or owner only")
+    return jsonify(invite_storage.list_active_invites(pelada_id))
+
+
+@app.route("/api/invites/<token>/revoke", methods=["POST"])
+def revoke_invite(token):
+    user = _current_user()
+    if user is None:
+        abort(401, description="Not authenticated")
+    invite = invite_storage.get_invite(token)
+    if invite is None:
+        abort(404, description="Invite not found")
+    if user_storage.get_role(invite["pelada_id"], user["id"]) not in ("owner", "admin"):
+        abort(403, description="Admin or owner only")
+    invite_storage.revoke_invite(token)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/invites/<token>", methods=["GET"])
+def get_invite_info(token):
+    # Public preview so the accept page can show the pelada name/role before login.
+    invite = invite_storage.get_invite(token)
+    if invite is None:
+        return jsonify({"valid": False, "reason": "not_found"}), 404
+    status = _invite_status(invite)
+    return jsonify({
+        "valid": status == "valid",
+        "reason": status,
+        "pelada_name": invite["pelada_name"],
+        "role": invite["role"],
+    })
+
+
+@app.route("/api/invites/<token>/accept", methods=["POST"])
+def accept_invite(token):
+    user = _current_user()
+    if user is None:
+        abort(401, description="Not authenticated")
+    invite = invite_storage.get_invite(token)
+    if invite is None:
+        return jsonify({"ok": False, "reason": "not_found"}), 404
+    status = _invite_status(invite)
+    if status != "valid":
+        return jsonify({"ok": False, "reason": status}), 410
+
+    # Idempotent: an existing member keeps their current role.
+    user_storage.add_membership(invite["pelada_id"], user["id"], invite["role"])
+    invite_storage.record_acceptance(invite["id"])
+    role = user_storage.get_role(invite["pelada_id"], user["id"])
+    return jsonify({"ok": True, "pelada_id": invite["pelada_id"], "role": role})
+
+
+@app.route("/api/peladas/<int:pelada_id>/members", methods=["GET"])
+def list_members(pelada_id):
+    pid, user, role = _require_membership()
+    if pid != pelada_id or role not in ("owner", "admin"):
+        abort(403, description="Admin or owner only")
+    return jsonify(user_storage.list_members(pelada_id))
+
+
+@app.route("/api/peladas/<int:pelada_id>/members/<int:member_id>", methods=["DELETE"])
+def remove_member(pelada_id, member_id):
+    pid, user, role = _require_membership()
+    if pid != pelada_id or role not in ("owner", "admin"):
+        abort(403, description="Admin or owner only")
+    if not user_storage.remove_member(pelada_id, member_id):
+        abort(404, description="Member not found")
+    return jsonify({"ok": True})
 
 
 # ============================================================

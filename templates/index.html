@@ -433,6 +433,74 @@
   </section>
 
   <!-- ============================================================
+       Aceitar convite (deep-link /entrar/<token>)
+       ============================================================ -->
+  <section class="screen" id="s-invite">
+    <div class="frame">
+      <div class="appbar">
+        <button class="icon-btn" id="inv-back" aria-label="Voltar">
+          <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="grow"><h1>Convite</h1></div>
+      </div>
+      <div class="scroll">
+        <div class="card" id="inv-card" style="padding:22px 18px;text-align:center;margin-top:8px">
+          <div id="inv-body"><p class="empty">Carregando convite…</p></div>
+        </div>
+        <div class="spacer-lg"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       Membros e convites (owner/admin)
+       ============================================================ -->
+  <section class="screen" id="s-members">
+    <div class="frame">
+      <div class="appbar">
+        <button class="icon-btn" id="mb-back" aria-label="Voltar">
+          <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="grow"><h1>Membros e convites</h1><p class="sub" id="mb-sub">—</p></div>
+      </div>
+      <div class="scroll">
+        <p class="eyebrow">Convidar por link</p>
+        <div class="field">
+          <label>Papel</label>
+          <div class="chip-select" id="mb-role"></div>
+        </div>
+        <div class="field">
+          <label>Validade do link</label>
+          <div class="chip-select" id="mb-ttl"></div>
+        </div>
+        <button class="btn btn-primary" id="mb-generate">Gerar link de convite</button>
+        <div class="invite-link hidden" id="mb-link-box">
+          <input type="text" id="mb-link" readonly>
+          <div class="invite-link-actions">
+            <button class="btn btn-ghost btn-sm" id="mb-copy">
+              <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+              Copiar
+            </button>
+            <button class="btn btn-ghost btn-sm" id="mb-whatsapp">
+              <svg viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-12.5 7.5L3 21l2-5.5A8.5 8.5 0 1 1 21 11.5z"/></svg>
+              WhatsApp
+            </button>
+          </div>
+        </div>
+
+        <p class="eyebrow">Convites ativos</p>
+        <div class="card" id="mb-invites"></div>
+        <p class="empty hidden" id="mb-invites-empty">Nenhum convite ativo.</p>
+
+        <p class="eyebrow">Membros</p>
+        <div class="card" id="mb-members"></div>
+
+        <div class="spacer-lg"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
        Sheets
        ============================================================ -->
   <div class="veil" id="veil"></div>
@@ -523,6 +591,11 @@
         <p class="eyebrow">Colete do time 2</p>
         <div class="swatches" id="mn-c2"></div>
         <p class="err" id="mn-same">Os dois times estão com a mesma cor.</p>
+        <div class="spacer-md"></div>
+        <button class="btn btn-ghost" id="mn-members">
+          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Membros e convites
+        </button>
       </div>
       <div class="spacer-md"></div>
       <button class="btn btn-ghost" id="mn-help" style="margin-bottom:8px">
@@ -576,6 +649,7 @@
   <script src="{{ url_for('static', filename='js/players.js') }}?v={{ app_version }}"></script>
   <script src="{{ url_for('static', filename='js/teams.js') }}?v={{ app_version }}"></script>
   <script src="{{ url_for('static', filename='js/compare.js') }}?v={{ app_version }}"></script>
+  <script src="{{ url_for('static', filename='js/invites.js') }}?v={{ app_version }}"></script>
 
   <!-- Vercel Web Analytics -->
   <script>
