@@ -97,8 +97,9 @@
           </div>
         </div>
         <p class="eyebrow">Peladas</p>
+        <p id="pelada-logged-out" class="empty hidden">Entre com o Google acima para ver e criar suas peladas.</p>
         <p id="pelada-loading" class="empty">Carregando...</p>
-        <p id="pelada-empty" class="empty hidden">Nenhuma pelada cadastrada ainda.<br>Crie a primeira abaixo.</p>
+        <p id="pelada-empty" class="empty hidden">Você ainda não participa de nenhuma pelada.<br>Crie a primeira abaixo.</p>
         <div class="card rowlist" id="pelada-list"></div>
         <div class="spacer-md"></div>
         <button class="btn btn-ghost" id="new-pelada-btn">
@@ -266,18 +267,6 @@
         <div class="field">
           <label for="wz-name">Nome da pelada</label>
           <input type="text" id="wz-name" placeholder="Ex.: Pelada do bairro">
-        </div>
-        <div class="field">
-          <label for="wz-pass">Palavra-passe</label>
-          <input type="password" id="wz-pass" placeholder="Senha de acesso do grupo" autocomplete="new-password">
-        </div>
-        <div class="field">
-          <label for="wz-pass2">Confirmar palavra-passe</label>
-          <input type="password" id="wz-pass2" placeholder="Repita a senha" autocomplete="new-password">
-        </div>
-        <div class="field">
-          <label for="wz-admin-pass">Senha de admin</label>
-          <input type="password" id="wz-admin-pass" placeholder="Senha para gerir a pelada" autocomplete="new-password">
           <p class="err" id="wz-err"></p>
         </div>
         <p class="eyebrow">Dia da pelada</p>
@@ -448,24 +437,6 @@
        ============================================================ -->
   <div class="veil" id="veil"></div>
 
-  <!-- 02 · Entrar na pelada -->
-  <div class="sheet" id="sh-auth" role="dialog" aria-modal="true">
-    <div class="grab"></div>
-    <h3 id="au-name">Pelada</h3>
-    <p class="s-sub">Digite a palavra-passe do grupo para entrar</p>
-    <div class="s-body">
-      <div class="field">
-        <label for="au-pass">Palavra-passe</label>
-        <input type="password" id="au-pass" placeholder="••••••••" autocomplete="off">
-        <p class="err" id="au-err"></p>
-      </div>
-    </div>
-    <div class="s-actions">
-      <button class="btn btn-ghost" id="au-cancel">Cancelar</button>
-      <button class="btn btn-primary" id="au-confirm">Entrar</button>
-    </div>
-  </div>
-
   <!-- 04 · Configurar sorteio -->
   <div class="sheet" id="sh-draw" role="dialog" aria-modal="true">
     <div class="grab"></div>
@@ -544,13 +515,6 @@
         </div>
         <button class="switch" id="mn-theme" role="switch" aria-label="Tema escuro"></button>
       </div>
-      <div class="seg-row" style="padding:12px 0">
-        <div>
-          <span class="seg-lbl">Modo admin</span>
-          <p class="hint" style="margin:2px 0 0">Mostra níveis, edição e auditoria · pede a chave admin</p>
-        </div>
-        <button class="switch" id="mn-admin" role="switch" aria-label="Modo admin"></button>
-      </div>
       <div id="mn-colors-section" class="hidden">
         <p class="eyebrow">Dia da pelada</p>
         <div class="weekdays" id="mn-weekday"></div>
@@ -574,24 +538,6 @@
     </div>
     <div class="s-actions">
       <button class="btn btn-primary" id="mn-done">Pronto</button>
-    </div>
-  </div>
-
-  <!-- Chave admin (ativar modo admin / excluir pelada) -->
-  <div class="sheet" id="sh-adminkey" role="dialog" aria-modal="true">
-    <div class="grab"></div>
-    <h3 id="ak-title">Ativar modo admin</h3>
-    <p class="s-sub" id="ak-sub">Digite a chave de administrador</p>
-    <div class="s-body">
-      <div class="field">
-        <label for="ak-pass">Chave admin</label>
-        <input type="password" id="ak-pass" placeholder="••••••••" autocomplete="off">
-        <p class="err" id="ak-err"></p>
-      </div>
-    </div>
-    <div class="s-actions">
-      <button class="btn btn-ghost" id="ak-cancel">Cancelar</button>
-      <button class="btn btn-primary" id="ak-confirm">Confirmar</button>
     </div>
   </div>
 

@@ -100,24 +100,5 @@ def test_activate_admin_rejects_wrong_key(client):
     assert res.status_code == 403
 
 
-def test_create_requires_admin_password(client):
-    res = client.post(
-        "/api/peladas",
-        json={"name": "Nova", "password": "grupo123"},
-    )
-    assert res.status_code == 400
-
-
-def test_create_forwards_admin_password_and_returns_admin_token(client):
-    res = client.post(
-        "/api/peladas",
-        json={
-            "name": "Nova",
-            "password": "grupo123",
-            "admin_password": "chave-nova",
-        },
-    )
-    data = res.get_json()
-    assert res.status_code == 201
-    assert client.fake.created["admin_password"] == "chave-nova"
-    assert _adm_flag(data["token"]) is True
+# Note: pelada creation no longer uses passwords (accounts model, phase 2);
+# its tests live in test_membership.py.

@@ -330,6 +330,27 @@ class PeladaStorage:
                 )
                 return _row_to_pelada(cur.fetchone())
 
+    def create_pelada_owned(self, name: str, owner_user_id: int, team1_color: str = "blue", team2_color: str = "yellow", game_weekday: Optional[int] = None) -> Dict:
+        """Create a pelada (no password) and make the given user its owner, in
+        one transaction. Returns the pelada with role='owner'."""
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO peladas (name, team1_color, team2_color, game_weekday)
+                    VALUES (%s, %s, %s, %s)
+                    RETURNING id, name, team1_color, team2_color, game_weekday, 0 AS player_count
+                    """,
+                    (name, team1_color, team2_color, game_weekday),
+                )
+                pelada = _row_to_pelada(cur.fetchone())
+                cur.execute(
+                    "INSERT INTO pelada_members (pelada_id, user_id, role) VALUES (%s, %s, 'owner')",
+                    (pelada["id"], owner_user_id),
+                )
+                pelada["role"] = "owner"
+                return pelada
+
     def verify_password(self, pelada_id: int, password: str) -> bool:
         with _get_connection() as conn:
             with conn.cursor() as cur:

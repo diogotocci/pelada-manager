@@ -1,28 +1,21 @@
 // ============================================================
-// Auth token (per-pelada session)
+// Requests carry the user session token (from auth.js) and the current
+// pelada id. The server authorizes by the caller's membership role.
 // ============================================================
-
-let currentToken = localStorage.getItem("pelada-token") || null;
-
-function setToken(token) {
-  currentToken = token || null;
-  if (currentToken) {
-    localStorage.setItem("pelada-token", currentToken);
-  } else {
-    localStorage.removeItem("pelada-token");
-  }
-}
 
 function authHeaders() {
   const headers = { "Content-Type": "application/json" };
-  if (currentToken) {
-    headers["Authorization"] = "Bearer " + currentToken;
+  if (typeof userToken !== "undefined" && userToken) {
+    headers["Authorization"] = "Bearer " + userToken;
+  }
+  if (typeof currentPeladaId !== "undefined" && currentPeladaId != null) {
+    headers["X-Pelada-Id"] = String(currentPeladaId);
   }
   return headers;
 }
 
 function handleSessionExpired() {
-  setToken(null);
+  if (typeof logoutUser === "function") logoutUser();
   if (typeof showToast === "function") showToast("Sessão expirada. Entre de novo.");
   if (typeof goHome === "function") goHome();
 }
