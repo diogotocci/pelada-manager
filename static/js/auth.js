@@ -58,23 +58,14 @@ function logoutUser() {
 }
 
 function renderAccountBar() {
-  const bar = document.getElementById("account-bar");
-  if (!bar) return;
-
-  // Login not configured (no client id) — hide the whole bar.
-  if (!window.GOOGLE_CLIENT_ID) {
-    bar.classList.add("hidden");
-    return;
-  }
-  bar.classList.remove("hidden");
+  const guest = document.getElementById("home-guest");
+  const userEl = document.getElementById("home-user");
+  if (!guest || !userEl) return;
 
   const user = getCurrentUser();
-  const btnBox = document.getElementById("google-btn");
-  const info = document.getElementById("account-info");
-
   if (user) {
-    btnBox.classList.add("hidden");
-    info.classList.remove("hidden");
+    guest.classList.add("hidden");
+    userEl.classList.remove("hidden");
     document.getElementById("account-name").textContent = user.name || user.email;
     const avatar = document.getElementById("account-avatar");
     if (user.picture) {
@@ -87,8 +78,9 @@ function renderAccountBar() {
     return;
   }
 
-  info.classList.add("hidden");
-  btnBox.classList.remove("hidden");
+  userEl.classList.add("hidden");
+  guest.classList.remove("hidden");
+  const btnBox = document.getElementById("google-btn");
   btnBox.innerHTML = "";
   if (window.google && google.accounts && google.accounts.id) {
     google.accounts.id.renderButton(btnBox, {

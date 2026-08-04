@@ -86,30 +86,51 @@
         <button class="icon-btn theme-btn" aria-label="Alternar tema"></button>
       </div>
       <div class="scroll">
-        <div class="account-bar" id="account-bar">
-          <div id="google-btn"></div>
-          <div class="account-info hidden" id="account-info">
+        <!-- Deslogado: login -->
+        <div id="home-guest" class="hidden">
+          <div class="login-hero">
+            <div class="login-badge">⚽</div>
+            <h2 class="login-title">Entre para começar</h2>
+            <p class="login-sub">Faça login para ver e criar suas peladas.</p>
+            <div id="google-btn" class="login-gbtn"></div>
+          </div>
+          <button class="btn btn-ghost" id="guest-help-btn">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/></svg>
+            Como funciona
+          </button>
+          <button class="btn btn-ghost" id="guest-feedback-btn" style="margin-top:8px">
+            <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            Enviar feedback
+          </button>
+        </div>
+
+        <!-- Logado: app -->
+        <div id="home-user" class="hidden">
+          <div class="account-info" id="account-info">
             <div class="account-avatar" id="account-avatar"></div>
             <div class="account-main">
               <span class="account-name" id="account-name"></span>
               <button class="account-logout" id="account-logout">Sair</button>
             </div>
           </div>
+          <p class="eyebrow">Peladas</p>
+          <p id="pelada-loading" class="empty">Carregando...</p>
+          <p id="pelada-empty" class="empty hidden">Você ainda não participa de nenhuma pelada.<br>Crie a primeira abaixo.</p>
+          <div class="card rowlist" id="pelada-list"></div>
+          <div class="spacer-md"></div>
+          <button class="btn btn-ghost" id="new-pelada-btn">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            Nova pelada
+          </button>
+          <button class="btn btn-ghost" id="home-help-btn" style="margin-top:8px">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/></svg>
+            Como funciona
+          </button>
+          <button class="btn btn-ghost" id="home-feedback-btn" style="margin-top:8px">
+            <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            Enviar feedback
+          </button>
         </div>
-        <p class="eyebrow">Peladas</p>
-        <p id="pelada-logged-out" class="empty hidden">Entre com o Google acima para ver e criar suas peladas.</p>
-        <p id="pelada-loading" class="empty">Carregando...</p>
-        <p id="pelada-empty" class="empty hidden">Você ainda não participa de nenhuma pelada.<br>Crie a primeira abaixo.</p>
-        <div class="card rowlist" id="pelada-list"></div>
-        <div class="spacer-md"></div>
-        <button class="btn btn-ghost" id="new-pelada-btn">
-          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-          Nova pelada
-        </button>
-        <button class="btn btn-ghost" id="home-help-btn" style="margin-top:8px">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/></svg>
-          Como funciona
-        </button>
         <div class="spacer-lg"></div>
       </div>
       <footer class="app-foot">
