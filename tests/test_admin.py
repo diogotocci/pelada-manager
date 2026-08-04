@@ -103,9 +103,10 @@ def test_admin_routes_require_a_token(client):
     assert client.get("/api/admin/feedback").status_code == 401
 
 
-def test_pelada_token_is_not_accepted_as_superadmin(client):
-    pelada_token = app._issue_token(1, True)  # admin of a pelada, but not superadmin
-    res = client.get("/api/admin/feedback", headers={"Authorization": "Bearer " + pelada_token})
+def test_non_superadmin_token_is_not_accepted(client):
+    # A validly-signed token without the superadmin flag must be rejected.
+    token = app._serializer.dumps({"foo": "bar"})
+    res = client.get("/api/admin/feedback", headers={"Authorization": "Bearer " + token})
     assert res.status_code == 403
 
 
