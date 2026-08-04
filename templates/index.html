@@ -86,6 +86,16 @@
         <button class="icon-btn theme-btn" aria-label="Alternar tema"></button>
       </div>
       <div class="scroll">
+        <div class="account-bar" id="account-bar">
+          <div id="google-btn"></div>
+          <div class="account-info hidden" id="account-info">
+            <div class="account-avatar" id="account-avatar"></div>
+            <div class="account-main">
+              <span class="account-name" id="account-name"></span>
+              <button class="account-logout" id="account-logout">Sair</button>
+            </div>
+          </div>
+        </div>
         <p class="eyebrow">Peladas</p>
         <p id="pelada-loading" class="empty">Carregando...</p>
         <p id="pelada-empty" class="empty hidden">Nenhuma pelada cadastrada ainda.<br>Crie a primeira abaixo.</p>
@@ -611,9 +621,12 @@
 
   <script>
     window.APP_VERSION = "{{ app_version }}";
+    window.GOOGLE_CLIENT_ID = "{{ google_client_id }}";
   </script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="{{ url_for('static', filename='js/ui.js') }}?v={{ app_version }}"></script>
   <script src="{{ url_for('static', filename='js/api.js') }}?v={{ app_version }}"></script>
+  <script src="{{ url_for('static', filename='js/auth.js') }}?v={{ app_version }}"></script>
   <script src="{{ url_for('static', filename='js/players.js') }}?v={{ app_version }}"></script>
   <script src="{{ url_for('static', filename='js/teams.js') }}?v={{ app_version }}"></script>
   <script src="{{ url_for('static', filename='js/compare.js') }}?v={{ app_version }}"></script>
