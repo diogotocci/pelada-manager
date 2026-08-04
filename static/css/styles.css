@@ -936,8 +936,25 @@ input { font: inherit; }
    Account bar (Google login)
    ============================================================ */
 
-.account-bar { margin: 4px 0 14px; min-height: 44px; }
-.account-info { display: flex; align-items: center; gap: 11px; }
+/* Login hero (logged-out home) */
+.login-hero {
+  text-align: center;
+  padding: 30px 12px 26px;
+}
+.login-badge { font-size: 2.6rem; line-height: 1; margin-bottom: 10px; }
+.login-title { margin: 0 0 4px; font-size: 1.35rem; font-weight: 800; letter-spacing: -.02em; }
+.login-sub { margin: 0 0 20px; color: var(--muted); font-size: .9rem; }
+.login-gbtn { display: flex; justify-content: center; min-height: 44px; }
+
+/* Account header (logged-in home) */
+.account-info {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 6px 2px 14px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
 .account-avatar {
   width: 40px;
   height: 40px;

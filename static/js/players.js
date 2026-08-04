@@ -22,18 +22,12 @@ async function loadPeladas() {
   const loadingEl = $("pelada-loading");
   const emptyEl = $("pelada-empty");
   const listEl = $("pelada-list");
-  const loggedOutEl = $("pelada-logged-out");
+
+  // Only the logged-in home lists peladas; renderAccountBar owns guest/user view.
+  if (typeof userToken === "undefined" || !userToken) return;
 
   listEl.innerHTML = "";
   emptyEl.classList.add("hidden");
-
-  // Peladas require an account now — show the sign-in prompt when logged out.
-  if (typeof userToken === "undefined" || !userToken) {
-    loadingEl.classList.add("hidden");
-    loggedOutEl.classList.remove("hidden");
-    return;
-  }
-  loggedOutEl.classList.add("hidden");
   loadingEl.classList.remove("hidden");
 
   try {
@@ -821,6 +815,9 @@ document.addEventListener("DOMContentLoaded", function () {
   });
   $("new-pelada-btn").addEventListener("click", openWizard);
   $("home-help-btn").addEventListener("click", function () { openHelp("s-home"); });
+  $("home-feedback-btn").addEventListener("click", function () { openFeedback("s-home"); });
+  $("guest-help-btn").addEventListener("click", function () { openHelp("s-home"); });
+  $("guest-feedback-btn").addEventListener("click", function () { openFeedback("s-home"); });
 
   // Tap the app version 7 times (Android "developer options" style) to reach
   // the hidden /admin feedback inbox. The count resets after a short pause.
