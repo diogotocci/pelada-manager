@@ -17,7 +17,7 @@ from services.team_balancer import balance_teams
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "3.3.18")
+APP_VERSION = os.getenv("APP_VERSION", "3.3.19")
 
 VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white", "pink"}
 
@@ -67,23 +67,29 @@ def _issue_token(pelada_id: int, is_admin: bool) -> str:
     return _serializer.dumps({"pid": int(pelada_id), "adm": bool(is_admin)})
 
 
+def _require_membership():
+    """
+    Return (pelada_id, user, role) for the logged-in user and the pelada named
+    in the X-Pelada-Id header. Authorization is the caller's membership role in
+    that pelada — the header is safe because a non-member is rejected with 403.
+    """
+    user = _current_user()
+    if user is None:
+        abort(401, description="Not authenticated")
+    raw = request.headers.get("X-Pelada-Id", "")
+    if not raw.isdigit():
+        abort(400, description="Missing pelada")
+    pelada_id = int(raw)
+    role = user_storage.get_role(pelada_id, user["id"])
+    if role is None:
+        abort(403, description="Not a member of this pelada")
+    return pelada_id, user, role
+
+
 def _require_pelada():
-    """
-    Return (pelada_id, is_admin) from the signed Bearer token. The pelada scope
-    comes from the token, never from a client-controlled header — a caller can
-    only touch the pelada they authenticated into. Aborts 401 otherwise.
-    """
-    auth = request.headers.get("Authorization", "")
-    token = auth[7:].strip() if auth.startswith("Bearer ") else ""
-    if not token:
-        abort(401, description="Missing token")
-    try:
-        data = _serializer.loads(token, max_age=TOKEN_MAX_AGE)
-    except SignatureExpired:
-        abort(401, description="Token expired")
-    except BadSignature:
-        abort(401, description="Invalid token")
-    return int(data["pid"]), bool(data.get("adm", False))
+    """Back-compat wrapper: (pelada_id, is_admin) from the membership role."""
+    pelada_id, _user, role = _require_membership()
+    return pelada_id, role in ("owner", "admin")
 
 
 def _verify_google_token(credential):
@@ -139,17 +145,12 @@ def _require_superadmin():
 
 
 def _optional_pelada_id():
-    """Return the pelada id from a valid Bearer token, or None. Never aborts —
-    used to tag feedback with its pelada when the caller happens to be logged in."""
-    auth = request.headers.get("Authorization", "")
-    token = auth[7:].strip() if auth.startswith("Bearer ") else ""
-    if not token:
+    """Return the pelada id the caller is currently in (from X-Pelada-Id) when
+    logged in, or None. Best-effort — only used to tag feedback with a pelada."""
+    if _current_user() is None:
         return None
-    try:
-        data = _serializer.loads(token, max_age=TOKEN_MAX_AGE)
-    except (SignatureExpired, BadSignature):
-        return None
-    return int(data["pid"])
+    raw = request.headers.get("X-Pelada-Id", "")
+    return int(raw) if raw.isdigit() else None
 
 
 def _player_json(player, is_admin):
@@ -309,47 +310,37 @@ def assetlinks():
 
 @app.route("/api/peladas", methods=["GET"])
 def list_peladas():
-    peladas = pelada_storage.list_peladas()
-    return jsonify(peladas)
+    user = _current_user()
+    if user is None:
+        abort(401, description="Not authenticated")
+    return jsonify(user_storage.list_user_peladas(user["id"]))
 
 
 @app.route("/api/peladas", methods=["POST"])
 def create_pelada():
-    data = request.get_json()
+    user = _current_user()
+    if user is None:
+        abort(401, description="Not authenticated")
 
-    if not data or "name" not in data or "password" not in data or "admin_password" not in data:
-        abort(400, description="Missing 'name', 'password' or 'admin_password' field")
-
-    name = data["name"].strip()
-    password = data["password"].strip()
-    admin_password = data["admin_password"].strip()
-
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
     if not name:
         abort(400, description="Name cannot be empty")
 
-    if not password:
-        abort(400, description="Password cannot be empty")
-
-    if not admin_password:
-        abort(400, description="Admin password cannot be empty")
-
     team1_color = data.get("team1_color", "blue")
     team2_color = data.get("team2_color", "yellow")
-
     if team1_color not in VALID_BIB_COLORS or team2_color not in VALID_BIB_COLORS:
         abort(400, description="Invalid bib color")
 
     game_weekday = _parse_weekday(data.get("game_weekday"))
 
-    pelada = pelada_storage.create_pelada(
+    pelada = pelada_storage.create_pelada_owned(
         name=name,
-        password=password,
-        admin_password=admin_password,
+        owner_user_id=user["id"],
         team1_color=team1_color,
         team2_color=team2_color,
         game_weekday=game_weekday,
     )
-    pelada["token"] = _issue_token(pelada["id"], True)
     return jsonify(pelada), 201
 
 
@@ -549,9 +540,9 @@ def update_pelada_weekday(pelada_id):
 
 @app.route("/api/peladas/<int:pelada_id>", methods=["DELETE"])
 def delete_pelada(pelada_id):
-    pid, adm = _require_pelada()
-    if not adm or pid != pelada_id:
-        abort(403, description="Admin token required for this pelada")
+    pid, _user, role = _require_membership()
+    if pid != pelada_id or role != "owner":
+        abort(403, description="Only the owner can delete this pelada")
 
     success = pelada_storage.delete_pelada(pelada_id)
 

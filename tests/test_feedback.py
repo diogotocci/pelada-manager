@@ -88,22 +88,15 @@ def test_message_too_long_is_rejected(client):
     assert client.fake.saved is None
 
 
-def test_valid_token_scopes_feedback_to_its_pelada(client):
-    token = app._issue_token(7, False)
-    res = client.post(
-        "/api/feedback",
-        json=_payload(),
-        headers={"Authorization": "Bearer " + token},
-    )
+def test_logged_in_user_scopes_feedback_to_the_current_pelada(client, monkeypatch):
+    monkeypatch.setattr(app, "_current_user", lambda: {"id": 1, "email": "a@b.com"})
+    res = client.post("/api/feedback", json=_payload(), headers={"X-Pelada-Id": "7"})
     assert res.status_code == 201
     assert client.fake.saved["pelada_id"] == 7
 
 
-def test_invalid_token_does_not_block_feedback(client):
-    res = client.post(
-        "/api/feedback",
-        json=_payload(),
-        headers={"Authorization": "Bearer not-a-real-token"},
-    )
+def test_anonymous_feedback_is_not_scoped(client, monkeypatch):
+    monkeypatch.setattr(app, "_current_user", lambda: None)
+    res = client.post("/api/feedback", json=_payload())
     assert res.status_code == 201
     assert client.fake.saved["pelada_id"] is None
