@@ -17,7 +17,7 @@ from services.team_balancer import balance_teams
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "3.3.17")
+APP_VERSION = os.getenv("APP_VERSION", "3.3.18")
 
 VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white", "pink"}
 
@@ -234,9 +234,16 @@ def auth_google():
     if not info.get("email"):
         return jsonify({"ok": False}), 401
 
-    user = user_storage.upsert_google_user(
-        info["sub"], info["email"], info.get("name"), info.get("picture")
-    )
+    try:
+        user = user_storage.upsert_google_user(
+            info["sub"], info["email"], info.get("name"), info.get("picture")
+        )
+    except Exception:
+        # Almost always a missing/unreachable database (e.g. no DATABASE_URL
+        # locally). Log it and return JSON so the client shows a clean message.
+        app.logger.exception("Google login: could not persist user")
+        return jsonify({"ok": False, "error": "server"}), 500
+
     return jsonify({"ok": True, "token": _issue_session_token(user["id"]), "user": user})
 
 

@@ -35,7 +35,8 @@ async function handleGoogleCredential(response) {
     });
     const data = await res.json().catch(function () { return {}; });
     if (!res.ok || !data.token) {
-      showToast("Não foi possível entrar.");
+      console.error("Login failed:", res.status, data);
+      showToast(res.status === 503 ? "Login indisponível." : "Não foi possível entrar.");
       return;
     }
     setUserSession(data.token, data.user);
