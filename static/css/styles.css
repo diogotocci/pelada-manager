@@ -968,3 +968,15 @@ input { font: inherit; }
   padding: 0;
 }
 .account-logout:hover { color: var(--danger); }
+
+/* Pelada role badge on the home list */
+.role-tag {
+  font-size: .62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  padding: 2px 7px;
+}

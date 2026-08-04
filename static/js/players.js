@@ -2,9 +2,6 @@
 // Home — lista de peladas
 // ============================================================
 
-let authTargetPelada = null;
-let deleteTargetPelada = null;
-let adminKeyMode = "admin"; // "admin" | "delete-pelada"
 let confirmAction = null;
 
 function goHome() {
@@ -14,7 +11,6 @@ function goHome() {
   players = [];
   checkinState = {};
   lastDrawnTeams = [];
-  setToken(null);
   setAdminMode(false);
   localStorage.removeItem("pelada-current-id");
   localStorage.removeItem("pelada-current-name");
@@ -26,15 +22,22 @@ async function loadPeladas() {
   const loadingEl = $("pelada-loading");
   const emptyEl = $("pelada-empty");
   const listEl = $("pelada-list");
+  const loggedOutEl = $("pelada-logged-out");
 
-  loadingEl.classList.remove("hidden");
-  emptyEl.classList.add("hidden");
   listEl.innerHTML = "";
+  emptyEl.classList.add("hidden");
+
+  // Peladas require an account now — show the sign-in prompt when logged out.
+  if (typeof userToken === "undefined" || !userToken) {
+    loadingEl.classList.add("hidden");
+    loggedOutEl.classList.remove("hidden");
+    return;
+  }
+  loggedOutEl.classList.add("hidden");
+  loadingEl.classList.remove("hidden");
 
   try {
-    const res = await fetch("/api/peladas");
-    const peladas = await res.json();
-
+    const peladas = await fetchJSON("/api/peladas");
     loadingEl.classList.add("hidden");
 
     if (peladas.length === 0) {
@@ -57,37 +60,41 @@ async function loadPeladas() {
       main.className = "r-main";
       main.innerHTML =
         '<span class="r-name">' + escapeHTML(p.name) + "</span>" +
-        '<span class="r-meta">' + p.player_count + " jogador" + (p.player_count === 1 ? "" : "es") + "</span>";
+        '<span class="r-meta">' + p.player_count + " jogador" + (p.player_count === 1 ? "" : "es") +
+        '<span class="role-tag">' + roleLabel(p.role) + "</span></span>";
 
       const meta = main.querySelector(".r-meta");
-      meta.appendChild(buildBibEl(p.team1_color, true));
-      meta.appendChild(buildBibEl(p.team2_color, true));
+      meta.insertBefore(buildBibEl(p.team1_color, true), meta.querySelector(".role-tag"));
+      meta.insertBefore(buildBibEl(p.team2_color, true), meta.querySelector(".role-tag"));
 
-      const deleteBtn = document.createElement("button");
-      deleteBtn.type = "button";
-      deleteBtn.className = "row-action";
-      deleteBtn.setAttribute("aria-label", "Excluir pelada");
-      deleteBtn.title = "Excluir pelada";
-      deleteBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/></svg>';
-      deleteBtn.addEventListener("click", function (e) {
-        e.stopPropagation();
-        startDeletePelada(p);
-      });
+      row.appendChild(avatar);
+      row.appendChild(main);
+
+      // Only the owner can delete a pelada.
+      if (p.role === "owner") {
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "row-action";
+        deleteBtn.setAttribute("aria-label", "Excluir pelada");
+        deleteBtn.title = "Excluir pelada";
+        deleteBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/></svg>';
+        deleteBtn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          startDeletePelada(p);
+        });
+        row.appendChild(deleteBtn);
+      }
 
       const chev = document.createElement("span");
       chev.className = "chev";
       chev.innerHTML = '<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>';
-
-      row.appendChild(avatar);
-      row.appendChild(main);
-      row.appendChild(deleteBtn);
       row.appendChild(chev);
 
-      row.addEventListener("click", function () { openAuthSheet(p); });
+      row.addEventListener("click", function () { enterPelada(p); });
       row.addEventListener("keydown", function (e) {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          openAuthSheet(p);
+          enterPelada(p);
         }
       });
       listEl.appendChild(row);
@@ -99,64 +106,16 @@ async function loadPeladas() {
   }
 }
 
-// ============================================================
-// Auth
-// ============================================================
-
-function openAuthSheet(pelada) {
-  authTargetPelada = pelada;
-  $("au-name").textContent = pelada.name;
-  $("au-pass").value = "";
-  $("au-err").classList.remove("on");
-  openSheet("auth");
-  setTimeout(function () { $("au-pass").focus(); }, 100);
+function roleLabel(role) {
+  if (role === "owner") return "Dono";
+  if (role === "admin") return "Admin";
+  return "Membro";
 }
 
-async function confirmAuth() {
-  const pelada = authTargetPelada;
-  if (!pelada) return;
-
-  const password = $("au-pass").value.trim();
-  const errEl = $("au-err");
-
-  if (!password) {
-    errEl.textContent = "Digite a palavra-passe.";
-    errEl.classList.add("on");
-    return;
-  }
-
-  try {
-    const res = await fetchJSONRaw("/api/peladas/" + pelada.id + "/auth", {
-      method: "POST",
-      body: JSON.stringify({ password: password }),
-    });
-
-    const data = await res.json().catch(function () { return {}; });
-
-    if (res.status === 429) {
-      errEl.textContent = "Muitas tentativas. Tente mais tarde.";
-      errEl.classList.add("on");
-      return;
-    }
-
-    if (!res.ok || !data.ok || !data.token) {
-      errEl.textContent = "Palavra-passe incorreta.";
-      errEl.classList.add("on");
-      $("au-pass").value = "";
-      $("au-pass").focus();
-      return;
-    }
-
-    setToken(data.token);
-    setAdminMode(!!data.is_admin);
-
-    closeSheets();
-    enterPelada(pelada);
-  } catch (err) {
-    console.error(err);
-    errEl.textContent = "Erro ao autenticar.";
-    errEl.classList.add("on");
-  }
+// Called by auth.js after login/logout so the home reflects the session.
+function onAuthChanged() {
+  const current = document.querySelector(".screen.on");
+  if (current && current.id === "s-home") loadPeladas();
 }
 
 // ============================================================
@@ -169,6 +128,7 @@ function enterPelada(pelada) {
   currentTeam1Color = pelada.team1_color || "blue";
   currentTeam2Color = pelada.team2_color || "yellow";
   currentPeladaWeekday = pelada.game_weekday != null ? pelada.game_weekday : null;
+  setAdminMode(pelada.role === "owner" || pelada.role === "admin");
 
   localStorage.setItem("pelada-current-id", String(pelada.id));
   localStorage.setItem("pelada-current-name", pelada.name);
@@ -490,84 +450,23 @@ function openConfirmSheet(title, message, actionLabel, onConfirm) {
 // Chave admin (ativar modo admin / excluir pelada)
 // ============================================================
 
-function openAdminKeySheet(mode) {
-  adminKeyMode = mode;
-  $("ak-title").textContent = mode === "admin" ? "Ativar modo admin" : "Excluir pelada";
-  $("ak-sub").textContent = "Digite a chave de administrador";
-  $("ak-pass").value = "";
-  $("ak-err").classList.remove("on");
-  openSheet("adminkey");
-  setTimeout(function () { $("ak-pass").focus(); }, 100);
-}
-
-async function confirmAdminKey() {
-  const key = $("ak-pass").value.trim();
-  const errEl = $("ak-err");
-
-  if (!key) {
-    errEl.textContent = "Digite a chave admin.";
-    errEl.classList.add("on");
-    return;
-  }
-
-  const targetId = adminKeyMode === "admin"
-    ? currentPeladaId
-    : (deleteTargetPelada && deleteTargetPelada.id);
-  if (targetId == null) { closeSheets(); return; }
-
-  // The admin key is verified on the server; it never lives in the client.
-  let res, data;
-  try {
-    res = await fetchJSONRaw("/api/peladas/" + targetId + "/admin", {
-      method: "POST",
-      body: JSON.stringify({ key: key }),
-    });
-    data = await res.json().catch(function () { return {}; });
-  } catch (err) {
-    console.error(err);
-    errEl.textContent = "Erro ao verificar a chave.";
-    errEl.classList.add("on");
-    return;
-  }
-
-  if (res.status === 429) {
-    errEl.textContent = "Muitas tentativas. Tente mais tarde.";
-    errEl.classList.add("on");
-    return;
-  }
-  if (!res.ok || !data.token) {
-    errEl.textContent = "Chave admin inválida.";
-    errEl.classList.add("on");
-    $("ak-pass").value = "";
-    $("ak-pass").focus();
-    return;
-  }
-
-  if (adminKeyMode === "admin") {
-    setToken(data.token);
-    setAdminMode(true);
-    // Reload players with the admin token so ratings/attributes come through.
-    if (currentPeladaId != null) loadPlayers();
-    openSheet("menu");
-    renderMenuSheet();
-    showToast("Modo admin ativado");
-    return;
-  }
-
-  // delete-pelada: use the admin token we just obtained for this pelada.
-  const pelada = deleteTargetPelada;
-  const adminToken = data.token;
+function startDeletePelada(pelada) {
+  // Only owners see the delete button; the server also enforces role == owner.
   openConfirmSheet(
     "Excluir pelada",
     "Excluir " + pelada.name + "? Essa ação é irreversível e remove todos os jogadores.",
     "Excluir",
     async function () {
       try {
-        const delRes = await fetch("/api/peladas/" + pelada.id, {
+        const res = await fetch("/api/peladas/" + pelada.id, {
           method: "DELETE",
-          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + adminToken },
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + userToken,
+            "X-Pelada-Id": String(pelada.id),
+          },
         });
-        if (!delRes.ok) {
+        if (!res.ok) {
           showToast("Erro ao excluir pelada.");
           return;
         }
@@ -577,16 +476,9 @@ async function confirmAdminKey() {
       } catch (err) {
         console.error(err);
         showToast("Erro ao excluir pelada.");
-      } finally {
-        deleteTargetPelada = null;
       }
     }
   );
-}
-
-function startDeletePelada(pelada) {
-  deleteTargetPelada = pelada;
-  openAdminKeySheet("delete-pelada");
 }
 
 // ============================================================
@@ -653,16 +545,6 @@ async function saveColors(team1Color, team2Color) {
     console.error(err);
     showToast("Erro ao salvar cores.");
   }
-}
-
-function toggleAdmin() {
-  if (!isAdminMode) {
-    openAdminKeySheet("admin");
-    return;
-  }
-  setAdminMode(false);
-  renderMenuSheet();
-  showToast("Modo admin desativado");
 }
 
 // ============================================================
@@ -759,9 +641,6 @@ function openWizard() {
   wizard = { c1: "blue", c2: "yellow", weekday: null, players: [] };
   resetWizardDraft();
   $("wz-name").value = "";
-  $("wz-pass").value = "";
-  $("wz-pass2").value = "";
-  $("wz-admin-pass").value = "";
   $("wz-err").classList.remove("on");
   $("wz-player").value = "";
   renderWizardWeekday();
@@ -811,28 +690,10 @@ function toggleWizardGK() {
 
 function wizardNext() {
   const name = $("wz-name").value.trim();
-  const pass = $("wz-pass").value;
-  const pass2 = $("wz-pass2").value;
-  const adminPass = $("wz-admin-pass").value;
   const errEl = $("wz-err");
 
   if (!name) {
     errEl.textContent = "Dê um nome à pelada.";
-    errEl.classList.add("on");
-    return;
-  }
-  if (!pass.trim()) {
-    errEl.textContent = "Defina uma palavra-passe.";
-    errEl.classList.add("on");
-    return;
-  }
-  if (pass !== pass2) {
-    errEl.textContent = "As senhas não coincidem.";
-    errEl.classList.add("on");
-    return;
-  }
-  if (!adminPass.trim()) {
-    errEl.textContent = "Defina uma senha de admin.";
     errEl.classList.add("on");
     return;
   }
@@ -906,16 +767,12 @@ function wizardAddPlayer() {
 
 async function wizardCreate() {
   const name = $("wz-name").value.trim();
-  const password = $("wz-pass").value.trim();
-  const adminPassword = $("wz-admin-pass").value.trim();
 
   try {
     const res = await fetchJSONRaw("/api/peladas", {
       method: "POST",
       body: JSON.stringify({
         name: name,
-        password: password,
-        admin_password: adminPassword,
         team1_color: wizard.c1,
         team2_color: wizard.c2,
         game_weekday: wizard.weekday,
@@ -924,13 +781,15 @@ async function wizardCreate() {
 
     const pelada = await res.json().catch(function () { return {}; });
 
-    if (!res.ok || !pelada.token) {
+    if (!res.ok || !pelada.id) {
       showToast("Erro ao criar pelada.");
       return;
     }
 
-    // The creator is admin of the new pelada; use its token for the players.
-    setToken(pelada.token);
+    // The creator is the owner; set the context so player creation is authorized
+    // (requests carry the session token + this pelada id).
+    currentPeladaId = pelada.id;
+    setAdminMode(true);
 
     for (const p of wizard.players) {
       await fetchJSON("/api/players", {
@@ -939,15 +798,8 @@ async function wizardCreate() {
       });
     }
 
-    setAdminMode(true);
     showToast("Pelada criada");
-    enterPelada({
-      id: pelada.id,
-      name: name,
-      team1_color: wizard.c1,
-      team2_color: wizard.c2,
-      game_weekday: wizard.weekday,
-    });
+    enterPelada(pelada);
   } catch (err) {
     console.error(err);
     showToast("Erro ao criar pelada.");
@@ -960,7 +812,6 @@ async function wizardCreate() {
 
 document.addEventListener("DOMContentLoaded", function () {
   loadTheme();
-  loadAdminMode();
 
   // Home
   document.querySelectorAll(".theme-btn").forEach(function (btn) {
@@ -985,13 +836,6 @@ document.addEventListener("DOMContentLoaded", function () {
     showScreen(feedbackReturnScreen || "s-home");
   });
   $("fb-send").addEventListener("click", submitFeedback);
-
-  // Auth
-  $("au-cancel").addEventListener("click", function () { closeSheets(); });
-  $("au-confirm").addEventListener("click", confirmAuth);
-  $("au-pass").addEventListener("keydown", function (e) {
-    if (e.key === "Enter") { e.preventDefault(); confirmAuth(); }
-  });
 
   // Check-in
   $("ci-back").addEventListener("click", goHome);
@@ -1021,24 +865,8 @@ document.addEventListener("DOMContentLoaded", function () {
     if (confirmAction) confirmAction();
   });
 
-  // Chave admin
-  $("ak-cancel").addEventListener("click", function () {
-    if (adminKeyMode === "admin") {
-      renderMenuSheet();
-      openSheet("menu");
-    } else {
-      deleteTargetPelada = null;
-      closeSheets();
-    }
-  });
-  $("ak-confirm").addEventListener("click", confirmAdminKey);
-  $("ak-pass").addEventListener("keydown", function (e) {
-    if (e.key === "Enter") { e.preventDefault(); confirmAdminKey(); }
-  });
-
   // Ajustes
   $("mn-theme").addEventListener("click", toggleTheme);
-  $("mn-admin").addEventListener("click", toggleAdmin);
   $("mn-help").addEventListener("click", function () {
     const current = document.querySelector(".screen.on");
     closeSheets();

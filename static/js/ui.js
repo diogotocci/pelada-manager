@@ -129,24 +129,14 @@ function toggleTheme() {
 // Admin mode
 // ============================================================
 
-function loadAdminMode() {
-  isAdminMode = localStorage.getItem("pelada-admin-mode") === "true";
-}
-
+// Admin mode is derived from the caller's role in the current pelada
+// (owner/admin), set on enterPelada — never persisted.
 function setAdminMode(enabled) {
   isAdminMode = enabled;
-  if (enabled) {
-    localStorage.setItem("pelada-admin-mode", "true");
-  } else {
-    localStorage.removeItem("pelada-admin-mode");
-  }
   refreshAdminUI();
 }
 
 function refreshAdminUI() {
-  const adminSwitch = $("mn-admin");
-  if (adminSwitch) adminSwitch.classList.toggle("on", isAdminMode);
-
   const colorsSection = $("mn-colors-section");
   if (colorsSection) colorsSection.classList.toggle("hidden", !isAdminMode);
 

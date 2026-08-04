@@ -41,6 +41,7 @@ async function handleGoogleCredential(response) {
     }
     setUserSession(data.token, data.user);
     renderAccountBar();
+    if (typeof onAuthChanged === "function") onAuthChanged();
     showToast("Bem-vindo, " + (data.user.name || data.user.email) + "!");
   } catch (err) {
     showToast("Não foi possível entrar.");
@@ -53,6 +54,7 @@ function logoutUser() {
     google.accounts.id.disableAutoSelect();
   }
   renderAccountBar();
+  if (typeof onAuthChanged === "function") onAuthChanged();
 }
 
 function renderAccountBar() {
@@ -111,6 +113,7 @@ async function refreshUserSession() {
     }
   } catch (err) { /* offline — keep the cached session */ }
   renderAccountBar();
+  if (typeof onAuthChanged === "function") onAuthChanged();
 }
 
 function initGoogleLogin() {
