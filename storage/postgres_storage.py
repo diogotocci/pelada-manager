@@ -27,22 +27,8 @@ def ensure_schema() -> None:
                 CREATE TABLE IF NOT EXISTS peladas (
                     id         SERIAL PRIMARY KEY,
                     name       TEXT NOT NULL,
-                    password   TEXT NOT NULL DEFAULT '',
                     created_at TIMESTAMPTZ DEFAULT NOW()
                 )
-            """)
-
-            cur.execute("""
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1 FROM information_schema.columns
-                        WHERE table_name = 'peladas' AND column_name = 'password'
-                    ) THEN
-                        ALTER TABLE peladas ADD COLUMN password TEXT NOT NULL DEFAULT '';
-                    END IF;
-                END
-                $$;
             """)
 
             cur.execute("""
@@ -64,28 +50,10 @@ def ensure_schema() -> None:
                 $$;
             """)
 
-            # admin_password: per-pelada admin password (replaces the old single
-            # global ADMIN_SECRET). Added with an empty default so pre-existing
-            # rows get a value; the backfill below then seeds legacy peladas with
-            # the old shared admin password so they keep working unchanged.
-            cur.execute("""
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1 FROM information_schema.columns
-                        WHERE table_name = 'peladas' AND column_name = 'admin_password'
-                    ) THEN
-                        ALTER TABLE peladas ADD COLUMN admin_password TEXT NOT NULL DEFAULT '';
-                    END IF;
-                END
-                $$;
-            """)
-
-            # One-time backfill: peladas created before per-pelada admin
-            # passwords existed keep the old shared admin password ('secret123').
-            # Guarded by = '' so it only seeds legacy rows and never overrides an
-            # admin password chosen at creation time.
-            cur.execute("UPDATE peladas SET admin_password = 'secret123' WHERE admin_password = ''")
+            # Drop the old per-pelada password columns — access is by account
+            # role now (see the accounts model), not passwords.
+            cur.execute("ALTER TABLE peladas DROP COLUMN IF EXISTS password")
+            cur.execute("ALTER TABLE peladas DROP COLUMN IF EXISTS admin_password")
 
             # game_weekday: day the pelada is played on.
             # Convention matches JS Date.getDay(): 0=Sunday ... 6=Saturday.
@@ -336,19 +304,6 @@ class PeladaStorage:
                 """)
                 return [_row_to_pelada(r) for r in cur.fetchall()]
 
-    def create_pelada(self, name: str, password: str, admin_password: str, team1_color: str = "blue", team2_color: str = "yellow", game_weekday: Optional[int] = None) -> Dict:
-        with _get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    INSERT INTO peladas (name, password, admin_password, team1_color, team2_color, game_weekday)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                    RETURNING id, name, team1_color, team2_color, game_weekday, 0 AS player_count
-                    """,
-                    (name, password, admin_password, team1_color, team2_color, game_weekday),
-                )
-                return _row_to_pelada(cur.fetchone())
-
     def create_pelada_owned(self, name: str, owner_user_id: int, team1_color: str = "blue", team2_color: str = "yellow", game_weekday: Optional[int] = None) -> Dict:
         """Create a pelada (no password) and make the given user its owner, in
         one transaction. Returns the pelada with role='owner'."""
@@ -369,30 +324,6 @@ class PeladaStorage:
                 )
                 pelada["role"] = "owner"
                 return pelada
-
-    def verify_password(self, pelada_id: int, password: str) -> bool:
-        with _get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT password FROM peladas WHERE id = %s",
-                    (pelada_id,),
-                )
-                row = cur.fetchone()
-                if row is None:
-                    return False
-                return row["password"] == password
-
-    def verify_admin_password(self, pelada_id: int, password: str) -> bool:
-        with _get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT admin_password FROM peladas WHERE id = %s",
-                    (pelada_id,),
-                )
-                row = cur.fetchone()
-                if row is None or not row["admin_password"]:
-                    return False
-                return row["admin_password"] == password
 
     def update_pelada_colors(self, pelada_id: int, team1_color: str, team2_color: str) -> Optional[Dict]:
         with _get_connection() as conn:

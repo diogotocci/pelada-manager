@@ -19,7 +19,7 @@ from services.team_balancer import balance_teams
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "3.4.4")
+APP_VERSION = os.getenv("APP_VERSION", "3.4.5")
 
 VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white", "pink"}
 
@@ -67,10 +67,6 @@ SESSION_MAX_AGE = 60 * 60 * 24 * 30  # 30 days
 # Keeps `import app` side-effect-free for tests/CI that run without a DB.
 if os.getenv("DATABASE_URL"):
     ensure_schema()
-
-
-def _issue_token(pelada_id: int, is_admin: bool) -> str:
-    return _serializer.dumps({"pid": int(pelada_id), "adm": bool(is_admin)})
 
 
 def _require_membership():
@@ -367,48 +363,6 @@ def create_pelada():
         game_weekday=game_weekday,
     )
     return jsonify(pelada), 201
-
-
-@app.route("/api/peladas/<int:pelada_id>/auth", methods=["POST"])
-def auth_pelada(pelada_id):
-    ip = _client_ip()
-    _throttle(ip)
-    data = request.get_json()
-
-    if not data or "password" not in data:
-        abort(400, description="Missing 'password' field")
-
-    password = data["password"]
-
-    # The pelada's own admin password grants an admin token; the access password
-    # grants a member token. Admin is checked first so a pelada that reuses the
-    # same string for both still gets admin.
-    if pelada_storage.verify_admin_password(pelada_id, password):
-        return jsonify({"ok": True, "is_admin": True, "token": _issue_token(pelada_id, True)})
-
-    if pelada_storage.verify_password(pelada_id, password):
-        return jsonify({"ok": True, "is_admin": False, "token": _issue_token(pelada_id, False)})
-
-    _record_failure(ip)
-    return jsonify({"ok": False, "is_admin": False}), 401
-
-
-@app.route("/api/peladas/<int:pelada_id>/admin", methods=["POST"])
-def activate_admin(pelada_id):
-    # Upgrade the caller to an admin token for this pelada (used by "ativar modo
-    # admin" and by deleting a pelada from the lobby). The admin key is this
-    # pelada's own admin password; it stays server-side and is never sent to the
-    # client.
-    ip = _client_ip()
-    _throttle(ip)
-    data = request.get_json(silent=True) or {}
-    key = data.get("key", "")
-
-    if not pelada_storage.verify_admin_password(pelada_id, key):
-        _record_failure(ip)
-        abort(403, description="Invalid admin key")
-
-    return jsonify({"ok": True, "token": _issue_token(pelada_id, True)})
 
 
 @app.route("/api/feedback", methods=["POST"])
