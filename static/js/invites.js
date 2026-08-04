@@ -231,10 +231,10 @@ async function loadInvites() {
       row.className = "row";
       const main = document.createElement("div");
       main.className = "r-main";
+      const accTxt = inv.accepted_count === 1 ? "1 entrou" : inv.accepted_count + " entraram";
       main.innerHTML =
         '<span class="r-name">' + (inv.role === "admin" ? "Admin" : "Membro") + "</span>" +
-        '<span class="r-meta">expira ' + inviteExpiryLabel(inv.expires_at) +
-        " · " + inv.accepted_count + " entrou" + (inv.accepted_count === 1 ? "" : "ram") + "</span>";
+        '<span class="r-meta">expira ' + inviteExpiryLabel(inv.expires_at) + " · " + accTxt + "</span>";
       const revoke = document.createElement("button");
       revoke.className = "row-action";
       revoke.setAttribute("aria-label", "Revogar convite");
@@ -280,7 +280,11 @@ async function loadMembers() {
       row.className = "row";
       const avatar = document.createElement("div");
       avatar.className = "avatar";
-      if (mem.picture) { avatar.style.backgroundImage = "url(" + mem.picture + ")"; avatar.style.backgroundSize = "cover"; }
+      if (mem.picture) {
+        avatar.style.backgroundImage = "url(" + mem.picture + ")";
+        avatar.style.backgroundSize = "cover";
+        avatar.style.backgroundPosition = "center";
+      }
       else avatar.textContent = (mem.name || mem.email || "?").trim().slice(0, 1).toUpperCase();
       const main = document.createElement("div");
       main.className = "r-main";
