@@ -3,7 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <title>Admin · Time Justo</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+  <script>
+    // Edge-to-edge only on Android (see index.html for the rationale).
+    if (/Android/i.test(navigator.userAgent)) {
+      var _vp = document.querySelector('meta[name="viewport"]');
+      _vp.setAttribute("content", _vp.getAttribute("content") + ", viewport-fit=cover");
+    }
+  </script>
   <meta name="robots" content="noindex, nofollow">
   <meta name="theme-color" content="#f7f8f6">
   <link rel="preconnect" href="https://fonts.googleapis.com">
