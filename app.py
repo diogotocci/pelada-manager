@@ -19,7 +19,7 @@ from services.team_balancer import balance_teams
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "3.4.8")
+APP_VERSION = os.getenv("APP_VERSION", "3.4.9")
 
 VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white", "pink"}
 
@@ -626,6 +626,22 @@ def remove_member(pelada_id, member_id):
         abort(403, description="Admin or owner only")
     if not user_storage.remove_member(pelada_id, member_id):
         abort(404, description="Member not found")
+    return jsonify({"ok": True})
+
+
+@app.route("/api/peladas/<int:pelada_id>/members/<int:member_id>/role", methods=["POST"])
+def set_member_role(pelada_id, member_id):
+    # Owner and admins can move members between 'member' and 'admin'. The owner's
+    # role never changes here (use transfer for that).
+    pid, user, role = _require_membership()
+    if pid != pelada_id or role not in ("owner", "admin"):
+        abort(403, description="Admin or owner only")
+    data = request.get_json(silent=True) or {}
+    new_role = data.get("role")
+    if new_role not in ("admin", "member"):
+        abort(400, description="Invalid role")
+    if not user_storage.set_member_role(pelada_id, member_id, new_role):
+        abort(404, description="Member not found or is the owner")
     return jsonify({"ok": True})
 
 
