@@ -1,10 +1,19 @@
-"""General-admin (/admin) feedback inbox: auth, authorization and actions.
-
-Storage and the rate-limit store are mocked, so this runs without a database."""
+"""General-admin (/admin) feedback inbox: authorization (by Google email) and
+actions. Storage is mocked, so this runs without a database."""
 
 import pytest
 
 import app
+
+
+class FakeUsers:
+    # uid 1 is the superadmin (matches SUPERADMIN_EMAIL below); uid 2 is not.
+    EMAILS = {1: "boss@x.com", 2: "other@x.com"}
+
+    def get_user(self, uid):
+        if uid not in self.EMAILS:
+            return None
+        return {"id": uid, "email": self.EMAILS[uid], "name": "U", "picture": None}
 
 
 class FakeStore:
@@ -64,49 +73,25 @@ class FakeStore:
 def client(monkeypatch):
     store = FakeStore()
     monkeypatch.setattr(app, "feedback_storage", store)
-    monkeypatch.setattr(app, "SUPERADMIN_PASSWORD", "secret-pass")
-    monkeypatch.setattr(app, "count_recent_failures", lambda ip, w: 0)
-    monkeypatch.setattr(app, "record_failed_attempt", lambda ip: None)
+    monkeypatch.setattr(app, "user_storage", FakeUsers())
+    monkeypatch.setattr(app, "SUPERADMIN_EMAIL", "boss@x.com")
     c = app.app.test_client()
     c.store = store
     return c
 
 
-def _auth():
-    return {"Authorization": "Bearer " + app._issue_admin_token()}
-
-
-# --- auth -------------------------------------------------------------
-
-def test_admin_auth_success_returns_superadmin_token(client):
-    res = client.post("/api/admin/auth", json={"password": "secret-pass"})
-    data = res.get_json()
-    assert res.status_code == 200
-    assert data["ok"] is True
-    assert app._serializer.loads(data["token"])["sa"] is True
-
-
-def test_admin_auth_wrong_password_rejected(client):
-    res = client.post("/api/admin/auth", json={"password": "nope"})
-    assert res.status_code == 401
-
-
-def test_admin_auth_disabled_when_no_password_set(client, monkeypatch):
-    monkeypatch.setattr(app, "SUPERADMIN_PASSWORD", "")
-    res = client.post("/api/admin/auth", json={"password": ""})
-    assert res.status_code == 401
+def _auth(uid=1):
+    return {"Authorization": "Bearer " + app._issue_session_token(uid)}
 
 
 # --- authorization ----------------------------------------------------
 
-def test_admin_routes_require_a_token(client):
+def test_admin_requires_login(client):
     assert client.get("/api/admin/feedback").status_code == 401
 
 
-def test_non_superadmin_token_is_not_accepted(client):
-    # A validly-signed token without the superadmin flag must be rejected.
-    token = app._serializer.dumps({"foo": "bar"})
-    res = client.get("/api/admin/feedback", headers={"Authorization": "Bearer " + token})
+def test_non_superadmin_is_forbidden(client):
+    res = client.get("/api/admin/feedback", headers=_auth(2))  # other@x.com
     assert res.status_code == 403
 
 

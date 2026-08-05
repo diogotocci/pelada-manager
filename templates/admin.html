@@ -47,13 +47,12 @@
     <div class="frame">
       <div class="big-title"><h1>Admin</h1></div>
       <div class="scroll">
-        <p class="sub" style="color:var(--muted);font-size:.9rem;margin:0 2px 18px">Área geral de feedbacks. Acesso restrito.</p>
-        <div class="field">
-          <label for="lg-pass">Senha</label>
-          <input type="password" id="lg-pass" placeholder="••••••••" autocomplete="off">
-          <p class="err" id="lg-err"></p>
+        <div class="login-hero">
+          <div class="login-badge">🛡️</div>
+          <h2 class="login-title">Área restrita</h2>
+          <p class="login-sub" id="lg-msg">Entre com a conta autorizada para ver os feedbacks.</p>
+          <div id="lg-gbtn" class="login-gbtn"></div>
         </div>
-        <button class="btn btn-primary" id="lg-btn">Entrar</button>
       </div>
     </div>
   </section>
@@ -119,7 +118,9 @@
 
   <script>
     window.APP_VERSION = "{{ app_version }}";
+    window.GOOGLE_CLIENT_ID = "{{ google_client_id }}";
   </script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="{{ url_for('static', filename='js/admin.js') }}?v={{ app_version }}"></script>
 </body>
 </html>

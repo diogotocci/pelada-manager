@@ -17,6 +17,7 @@ let currentPeladaName = "";
 let currentTeam1Color = "blue";
 let currentTeam2Color = "yellow";
 let currentPeladaWeekday = null;
+let currentPeladaRole = null;
 let isAdminMode = false;
 let helpReturnScreen = "s-home";
 
