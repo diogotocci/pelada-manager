@@ -24,6 +24,27 @@
       html { transform: rotate(-90deg); transform-origin: left top; width: 100vh; height: 100vw; overflow-x: hidden; position: absolute; top: 100%; left: 0; }
     }
   </style>
+  <script>
+    // Report JS crashes from real devices to the server (viewable in /admin).
+    (function () {
+      function who() { try { var u = JSON.parse(localStorage.getItem("tj-user") || "null"); return (u && u.email) || ""; } catch (e) { return ""; } }
+      function report(p) {
+        try {
+          p.who = who(); p.url = location.href;
+          var body = JSON.stringify(p);
+          if (navigator.sendBeacon) navigator.sendBeacon("/api/clientlog", new Blob([body], { type: "application/json" }));
+          else fetch("/api/clientlog", { method: "POST", headers: { "Content-Type": "application/json" }, body: body, keepalive: true });
+        } catch (e) { /* never let logging throw */ }
+      }
+      window.addEventListener("error", function (e) {
+        report({ message: e.message || "error", stack: (e.error && e.error.stack) || (e.filename + ":" + e.lineno + ":" + e.colno) });
+      });
+      window.addEventListener("unhandledrejection", function (e) {
+        var r = e.reason;
+        report({ message: "unhandledrejection: " + (r && (r.message || String(r))), stack: r && r.stack });
+      });
+    })();
+  </script>
 </head>
 
 <body>
