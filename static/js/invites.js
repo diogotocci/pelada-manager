@@ -294,26 +294,61 @@ async function loadMembers() {
       row.appendChild(avatar);
       row.appendChild(main);
       if (mem.role !== "owner") {
+        const canManage = currentPeladaRole === "owner" || currentPeladaRole === "admin";
+        // Owner and admins can promote a member to admin or demote an admin.
+        if (canManage) {
+          const roleBtn = document.createElement("button");
+          roleBtn.className = "row-action pos";
+          if (mem.role === "member") {
+            roleBtn.setAttribute("aria-label", "Tornar admin");
+            roleBtn.title = "Tornar admin";
+            roleBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
+            roleBtn.addEventListener("click", function () { setMemberRole(mem, "admin"); });
+          } else {
+            roleBtn.setAttribute("aria-label", "Tornar membro");
+            roleBtn.title = "Tornar membro";
+            roleBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg>';
+            roleBtn.addEventListener("click", function () { setMemberRole(mem, "member"); });
+          }
+          row.appendChild(roleBtn);
+        }
         // Only the owner can hand ownership over.
         if (currentPeladaRole === "owner") {
           const crown = document.createElement("button");
-          crown.className = "row-action";
+          crown.className = "row-action pos";
           crown.setAttribute("aria-label", "Tornar dono");
           crown.title = "Tornar dono";
           crown.innerHTML = '<svg viewBox="0 0 24 24"><path d="M3 7l4 4 5-6 5 6 4-4v10H3z"/></svg>';
           crown.addEventListener("click", function () { transferOwnership(mem); });
           row.appendChild(crown);
         }
-        const rm = document.createElement("button");
-        rm.className = "row-action";
-        rm.setAttribute("aria-label", "Remover membro");
-        rm.innerHTML = '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>';
-        rm.addEventListener("click", function () { removeMember(mem); });
-        row.appendChild(rm);
+        if (canManage) {
+          const rm = document.createElement("button");
+          rm.className = "row-action";
+          rm.setAttribute("aria-label", "Remover membro");
+          rm.innerHTML = '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>';
+          rm.addEventListener("click", function () { removeMember(mem); });
+          row.appendChild(rm);
+        }
       }
       listEl.appendChild(row);
     });
   } catch (err) { /* ignore */ }
+}
+
+async function setMemberRole(mem, newRole) {
+  try {
+    const res = await fetch("/api/peladas/" + currentPeladaId + "/members/" + mem.id + "/role", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ role: newRole }),
+    });
+    if (!res.ok) { showToast("Erro ao mudar o papel."); return; }
+    showToast(newRole === "admin" ? (mem.name || "Membro") + " agora é admin" : (mem.name || "Admin") + " agora é membro");
+    loadMembers();
+  } catch (err) {
+    showToast("Erro ao mudar o papel.");
+  }
 }
 
 function transferOwnership(mem) {

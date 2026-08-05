@@ -13,6 +13,7 @@ class FakeUsers:
         self.deleted_user = None
         self.transferred = None
         self.removed = None
+        self.role_change = None
 
     def get_user(self, uid):
         return {"id": uid, "email": "u@x.com", "name": "U", "picture": None}
@@ -31,6 +32,10 @@ class FakeUsers:
     def remove_member(self, pelada_id, user_id):
         self.removed = (pelada_id, user_id)
         return True
+
+    def set_member_role(self, pelada_id, user_id, new_role):
+        self.role_change = (pelada_id, user_id, new_role)
+        return user_id in self.members
 
 
 @pytest.fixture
@@ -103,3 +108,38 @@ def test_member_leaves(env):
     res = env.post("/api/peladas/5/leave", headers=_auth(uid=1, pelada_id=5))
     assert res.status_code == 200
     assert env.users.removed == (5, 1)
+
+
+# --- change member/admin role ----------------------------------------
+
+def test_admin_can_promote_member_to_admin(env):
+    env.users.role = "admin"
+    res = env.post("/api/peladas/5/members/2/role", json={"role": "admin"}, headers=_auth(pelada_id=5))
+    assert res.status_code == 200
+    assert env.users.role_change == (5, 2, "admin")
+
+
+def test_admin_can_demote_admin_to_member(env):
+    env.users.role = "admin"
+    res = env.post("/api/peladas/5/members/2/role", json={"role": "member"}, headers=_auth(pelada_id=5))
+    assert res.status_code == 200
+    assert env.users.role_change == (5, 2, "member")
+
+
+def test_plain_member_cannot_change_roles(env):
+    env.users.role = "member"
+    res = env.post("/api/peladas/5/members/2/role", json={"role": "admin"}, headers=_auth(pelada_id=5))
+    assert res.status_code == 403
+    assert env.users.role_change is None
+
+
+def test_invalid_target_role_is_rejected(env):
+    env.users.role = "owner"
+    res = env.post("/api/peladas/5/members/2/role", json={"role": "owner"}, headers=_auth(pelada_id=5))
+    assert res.status_code == 400
+
+
+def test_changing_role_of_non_member_is_404(env):
+    env.users.role = "owner"
+    res = env.post("/api/peladas/5/members/9/role", json={"role": "admin"}, headers=_auth(pelada_id=5))
+    assert res.status_code == 404

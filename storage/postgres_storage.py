@@ -623,6 +623,17 @@ class UserStorage:
                 )
                 return cur.rowcount > 0
 
+    def set_member_role(self, pelada_id: int, user_id: int, new_role: str) -> bool:
+        """Change a member between 'admin' and 'member'. The owner's role is never
+        touched here (that only changes via transfer_ownership)."""
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE pelada_members SET role = %s WHERE pelada_id = %s AND user_id = %s AND role <> 'owner'",
+                    (new_role, pelada_id, user_id),
+                )
+                return cur.rowcount > 0
+
     def transfer_ownership(self, pelada_id: int, new_owner_user_id: int) -> None:
         """Promote a member to owner; the current owner becomes an admin."""
         with _get_connection() as conn:
@@ -637,19 +648,37 @@ class UserStorage:
                 )
 
     def delete_user(self, user_id: int) -> None:
-        """Delete the user, the peladas they own (cascading to members, players
-        and invites), and their remaining memberships."""
+        """Delete the user. A pelada must always have an owner, so for each pelada
+        this user owns we hand ownership to another member — an admin first, then
+        any member. If they were the only member, the pelada is deleted. The
+        user's own memberships go away by cascade when the user row is deleted."""
         with _get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    """
-                    DELETE FROM peladas WHERE id IN (
-                        SELECT pelada_id FROM pelada_members
-                        WHERE user_id = %s AND role = 'owner'
-                    )
-                    """,
+                    "SELECT pelada_id FROM pelada_members WHERE user_id = %s AND role = 'owner'",
                     (user_id,),
                 )
+                owned = [r["pelada_id"] for r in cur.fetchall()]
+
+                for pelada_id in owned:
+                    cur.execute(
+                        """
+                        SELECT user_id FROM pelada_members
+                        WHERE pelada_id = %s AND user_id <> %s
+                        ORDER BY CASE role WHEN 'admin' THEN 0 WHEN 'member' THEN 1 ELSE 2 END, user_id
+                        LIMIT 1
+                        """,
+                        (pelada_id, user_id),
+                    )
+                    row = cur.fetchone()
+                    if row:
+                        cur.execute(
+                            "UPDATE pelada_members SET role = 'owner' WHERE pelada_id = %s AND user_id = %s",
+                            (pelada_id, row["user_id"]),
+                        )
+                    else:
+                        cur.execute("DELETE FROM peladas WHERE id = %s", (pelada_id,))
+
                 cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
 
 
