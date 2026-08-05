@@ -8,7 +8,9 @@
   document.addEventListener(evt, function (e) { e.preventDefault(); }, { passive: false });
 });
 
-let token = localStorage.getItem("tj-admin-token") || null;
+// Reuse the app's Google session (same origin) — /admin is gated server-side
+// to the SUPERADMIN_EMAIL account.
+let token = localStorage.getItem("tj-user-token") || null;
 let feedbackList = [];
 let usefulList = [];
 let currentDetail = null;
@@ -83,49 +85,82 @@ async function api(method, url, body) {
 
 function logout() {
   token = null;
-  localStorage.removeItem("tj-admin-token");
+  localStorage.removeItem("tj-user-token");
+  localStorage.removeItem("tj-user");
   showScreen("s-login");
+  renderGoogleButton();
 }
 
 // ------------------------------------------------------------
-// Login
+// Login (Google, gated to SUPERADMIN_EMAIL)
 // ------------------------------------------------------------
 
-async function login() {
-  const pass = $("lg-pass").value;
-  const errEl = $("lg-err");
-  if (!pass) {
-    errEl.textContent = "Digite a senha.";
-    errEl.classList.add("on");
-    return;
-  }
-  errEl.classList.remove("on");
+async function handleGoogleCredential(response) {
+  $("lg-msg").textContent = "Entrando…";
   try {
-    const res = await fetch("/api/admin/auth", {
+    const res = await fetch("/api/auth/google", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: pass }),
+      body: JSON.stringify({ credential: response.credential }),
     });
     const data = await res.json().catch(function () { return {}; });
-    if (res.status === 429) {
-      errEl.textContent = "Muitas tentativas. Tente mais tarde.";
-      errEl.classList.add("on");
-      return;
-    }
     if (!res.ok || !data.token) {
-      errEl.textContent = "Senha incorreta.";
-      errEl.classList.add("on");
-      $("lg-pass").value = "";
+      $("lg-msg").textContent = "Não foi possível entrar.";
       return;
     }
     token = data.token;
-    localStorage.setItem("tj-admin-token", token);
-    $("lg-pass").value = "";
-    loadList();
+    localStorage.setItem("tj-user-token", token);
+    tryEnter();
   } catch (err) {
-    errEl.textContent = "Erro ao entrar.";
-    errEl.classList.add("on");
+    $("lg-msg").textContent = "Erro ao entrar.";
   }
+}
+
+// Enter the inbox if the current session is the superadmin, else show why not.
+async function tryEnter() {
+  try {
+    const res = await fetch("/api/admin/feedback", { headers: { "Authorization": "Bearer " + token } });
+    if (res.status === 200) {
+      const data = await res.json();
+      feedbackList = data.feedback || [];
+      renderList(data.unread || 0);
+      showScreen("s-list");
+      return;
+    }
+    if (res.status === 403) {
+      $("lg-msg").textContent = "Esta conta não tem acesso à área de admin.";
+    } else {
+      $("lg-msg").textContent = "Entre com a conta autorizada para ver os feedbacks.";
+    }
+    showScreen("s-login");
+    renderGoogleButton();
+  } catch (err) {
+    $("lg-msg").textContent = "Erro ao carregar.";
+  }
+}
+
+function renderGoogleButton() {
+  const box = $("lg-gbtn");
+  if (!box || !window.GOOGLE_CLIENT_ID) return;
+  if (window.google && google.accounts && google.accounts.id) {
+    box.innerHTML = "";
+    google.accounts.id.renderButton(box, {
+      theme: "outline", size: "large", type: "standard",
+      text: "signin_with", shape: "pill", locale: "pt-BR",
+    });
+  } else {
+    setTimeout(renderGoogleButton, 200);
+  }
+}
+
+function initGoogle() {
+  if (!window.GOOGLE_CLIENT_ID) return;
+  if (!(window.google && google.accounts && google.accounts.id)) {
+    setTimeout(initGoogle, 150);
+    return;
+  }
+  google.accounts.id.initialize({ client_id: window.GOOGLE_CLIENT_ID, callback: handleGoogleCredential });
+  renderGoogleButton();
 }
 
 // ------------------------------------------------------------
@@ -308,10 +343,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const savedTheme = localStorage.getItem("pelada-theme");
   document.documentElement.setAttribute("data-theme", savedTheme === "dark" ? "dark" : "light");
 
-  $("lg-btn").addEventListener("click", login);
-  $("lg-pass").addEventListener("keydown", function (e) {
-    if (e.key === "Enter") { e.preventDefault(); login(); }
-  });
+  initGoogle();
 
   $("ls-back").addEventListener("click", function () { window.location.href = "/"; });
   $("ls-useful").addEventListener("click", loadUseful);
@@ -321,7 +353,7 @@ document.addEventListener("DOMContentLoaded", function () {
   $("uf-back").addEventListener("click", function () { loadList(); });
 
   if (token) {
-    loadList();
+    tryEnter();
   } else {
     showScreen("s-login");
   }

@@ -11,6 +11,7 @@ function goHome() {
   players = [];
   checkinState = {};
   lastDrawnTeams = [];
+  currentPeladaRole = null;
   setAdminMode(false);
   localStorage.removeItem("pelada-current-id");
   localStorage.removeItem("pelada-current-name");
@@ -124,6 +125,7 @@ function enterPelada(pelada) {
   currentTeam1Color = pelada.team1_color || "blue";
   currentTeam2Color = pelada.team2_color || "yellow";
   currentPeladaWeekday = pelada.game_weekday != null ? pelada.game_weekday : null;
+  currentPeladaRole = pelada.role || null;
   setAdminMode(pelada.role === "owner" || pelada.role === "admin");
 
   localStorage.setItem("pelada-current-id", String(pelada.id));
@@ -472,6 +474,56 @@ function startDeletePelada(pelada) {
       } catch (err) {
         console.error(err);
         showToast("Erro ao excluir pelada.");
+      }
+    }
+  );
+}
+
+// Leave the current pelada (remove your own membership). The owner must transfer
+// ownership first — leaving is only for admins/members.
+function leaveCurrentPelada() {
+  if (currentPeladaRole === "owner") {
+    showToast("Transfira a propriedade antes de sair da pelada.");
+    return;
+  }
+  closeSheets();
+  openConfirmSheet(
+    "Sair da pelada",
+    "Você vai deixar " + currentPeladaName + " e perder o acesso. Continuar?",
+    "Sair",
+    async function () {
+      try {
+        const res = await fetch("/api/peladas/" + currentPeladaId + "/leave", {
+          method: "POST",
+          headers: authHeaders(),
+        });
+        if (!res.ok) { showToast("Erro ao sair da pelada."); return; }
+        closeSheets();
+        showToast("Você saiu da pelada");
+        goHome();
+      } catch (err) {
+        showToast("Erro ao sair da pelada.");
+      }
+    }
+  );
+}
+
+// Delete the logged-in account (and the peladas it owns), then sign out.
+function deleteAccount() {
+  openConfirmSheet(
+    "Excluir conta",
+    "Isso apaga sua conta e as peladas onde você é dono. Não dá para desfazer. Continuar?",
+    "Excluir",
+    async function () {
+      try {
+        const res = await fetch("/api/me", { method: "DELETE", headers: authHeaders() });
+        if (!res.ok) { showToast("Erro ao excluir a conta."); return; }
+        closeSheets();
+        if (typeof logoutUser === "function") logoutUser();
+        goHome();
+        showToast("Conta excluída");
+      } catch (err) {
+        showToast("Erro ao excluir a conta.");
       }
     }
   );
@@ -876,7 +928,8 @@ document.addEventListener("DOMContentLoaded", function () {
     closeSheets();
     openFeedback(current ? current.id : "s-home");
   });
-  $("mn-leave").addEventListener("click", goHome);
+  $("mn-leave").addEventListener("click", leaveCurrentPelada);
+  $("delete-account-btn").addEventListener("click", deleteAccount);
   $("mn-done").addEventListener("click", function () { closeSheets(); });
 
   // Wizard

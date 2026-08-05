@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, timedelta, timezone
-from flask import Flask, render_template, jsonify, request, abort, Response, make_response
+from flask import Flask, render_template, jsonify, request, abort, Response
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from google.oauth2 import id_token as google_id_token
 from google.auth.transport import requests as google_requests
@@ -12,14 +12,12 @@ from storage.postgres_storage import (
     UserStorage,
     InviteStorage,
     ensure_schema,
-    count_recent_failures,
-    record_failed_attempt,
 )
 from services.team_balancer import balance_teams
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "3.4.5")
+APP_VERSION = os.getenv("APP_VERSION", "3.4.6")
 
 VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white", "pink"}
 
@@ -28,10 +26,9 @@ FEEDBACK_SUBJECT_MAX = 120
 FEEDBACK_MESSAGE_MAX = 2000
 FEEDBACK_CONTACT_MAX = 200
 
-# General admin (the /admin feedback inbox) — a single password, separate from
-# each pelada's own admin password. Set SUPERADMIN_PASSWORD on Vercel; when it
-# is empty the /admin login rejects everything.
-SUPERADMIN_PASSWORD = os.getenv("SUPERADMIN_PASSWORD", "")
+# General admin (the /admin feedback inbox) — gated by the Google account whose
+# email matches SUPERADMIN_EMAIL. Anyone else logging in there is rejected.
+SUPERADMIN_EMAIL = os.getenv("SUPERADMIN_EMAIL", "diogotocci@gmail.com")
 
 # Android TWA (app gerado no PWABuilder). Defina os fingerprints SHA-256 na env
 # var ANDROID_CERT_FINGERPRINT no Vercel para o app verificar o domínio e
@@ -43,10 +40,6 @@ ANDROID_CERT_FINGERPRINT = os.getenv("ANDROID_CERT_FINGERPRINT", "")
 # Token signing. SECRET_KEY must be set on Vercel; the fallback only exists so
 # local/CI runs work without it (tokens signed with the fallback are not secure).
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-insecure-key-change-me")
-_serializer = URLSafeTimedSerializer(SECRET_KEY, salt="pelada-token")
-TOKEN_MAX_AGE = 60 * 60 * 24 * 30  # 30 days
-THROTTLE_LIMIT = 10
-THROTTLE_WINDOW = 300  # 5 minutes
 
 player_storage = PlayerStorage()
 pelada_storage = PeladaStorage()
@@ -125,25 +118,14 @@ def _current_user():
     return user_storage.get_user(int(data["uid"]))
 
 
-def _issue_admin_token() -> str:
-    return _serializer.dumps({"sa": True})
-
-
 def _require_superadmin():
-    """Validate the general-admin (superadmin) Bearer token. Aborts 401/403."""
-    auth = request.headers.get("Authorization", "")
-    token = auth[7:].strip() if auth.startswith("Bearer ") else ""
-    if not token:
-        abort(401, description="Missing token")
-    try:
-        data = _serializer.loads(token, max_age=TOKEN_MAX_AGE)
-    except SignatureExpired:
-        abort(401, description="Token expired")
-    except BadSignature:
-        abort(401, description="Invalid token")
-    if data.get("sa") is not True:
-        abort(403, description="Superadmin token required")
-    return True
+    """Only the Google account whose email is SUPERADMIN_EMAIL may use /admin."""
+    user = _current_user()
+    if user is None:
+        abort(401, description="Not authenticated")
+    if (user.get("email") or "").strip().lower() != SUPERADMIN_EMAIL.strip().lower():
+        abort(403, description="Not authorized")
+    return user
 
 
 def _optional_pelada_id():
@@ -165,35 +147,6 @@ def _player_json(player, is_admin):
         "active": player.active,
         "is_goalkeeper": player.is_goalkeeper,
     }
-
-
-def _client_ip() -> str:
-    forwarded = request.headers.get("X-Forwarded-For", "")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.remote_addr or "unknown"
-
-
-def _throttle(ip: str, limit: int = THROTTLE_LIMIT, window: int = THROTTLE_WINDOW) -> None:
-    # Blocks only when there have been too many recent FAILED attempts. A
-    # correct password/key is never counted, so real users are never locked out.
-    try:
-        failures = count_recent_failures(ip, window)
-    except Exception:
-        return  # never hard-block auth because the throttle store is down
-    if failures >= limit:
-        response = make_response(
-            jsonify({"error": "Muitas tentativas. Tente novamente mais tarde."}), 429
-        )
-        response.headers["Retry-After"] = str(window)
-        abort(response)
-
-
-def _record_failure(ip: str) -> None:
-    try:
-        record_failed_attempt(ip)
-    except Exception:
-        pass
 
 
 def _invite_status(invite) -> str:
@@ -270,6 +223,16 @@ def me():
     return jsonify(user)
 
 
+@app.route("/api/me", methods=["DELETE"])
+def delete_account():
+    user = _current_user()
+    if not user:
+        abort(401, description="Not authenticated")
+    # Deletes the account, its memberships everywhere, and the peladas it owns.
+    user_storage.delete_user(user["id"])
+    return jsonify({"ok": True})
+
+
 # ============================================================
 # Page
 # ============================================================
@@ -285,9 +248,9 @@ def index():
 
 @app.route("/admin")
 def admin_page():
-    # General-admin feedback inbox. A standalone page gated by SUPERADMIN_PASSWORD;
+    # General-admin feedback inbox. Gated by SUPERADMIN_EMAIL (Google login);
     # not linked from the app.
-    return render_template("admin.html", app_version=APP_VERSION)
+    return render_template("admin.html", app_version=APP_VERSION, google_client_id=GOOGLE_CLIENT_ID)
 
 
 @app.route("/entrar/<token>")
@@ -403,18 +366,6 @@ def submit_feedback():
 # ============================================================
 # General admin (feedback inbox at /admin)
 # ============================================================
-
-@app.route("/api/admin/auth", methods=["POST"])
-def admin_auth():
-    ip = _client_ip()
-    _throttle(ip)
-    data = request.get_json(silent=True) or {}
-    password = data.get("password", "")
-    if not SUPERADMIN_PASSWORD or password != SUPERADMIN_PASSWORD:
-        _record_failure(ip)
-        return jsonify({"ok": False}), 401
-    return jsonify({"ok": True, "token": _issue_admin_token()})
-
 
 @app.route("/api/admin/feedback", methods=["GET"])
 def admin_list_feedback():
@@ -628,6 +579,36 @@ def remove_member(pelada_id, member_id):
         abort(403, description="Admin or owner only")
     if not user_storage.remove_member(pelada_id, member_id):
         abort(404, description="Member not found")
+    return jsonify({"ok": True})
+
+
+@app.route("/api/peladas/<int:pelada_id>/transfer", methods=["POST"])
+def transfer_ownership(pelada_id):
+    pid, user, role = _require_membership()
+    if pid != pelada_id or role != "owner":
+        abort(403, description="Only the owner can transfer")
+    data = request.get_json(silent=True) or {}
+    try:
+        new_owner_id = int(data.get("user_id"))
+    except (ValueError, TypeError):
+        abort(400, description="Missing user_id")
+    if new_owner_id == user["id"]:
+        abort(400, description="Already the owner")
+    if user_storage.get_role(pelada_id, new_owner_id) is None:
+        abort(404, description="Target is not a member")
+    # The new owner is promoted and the current owner becomes an admin.
+    user_storage.transfer_ownership(pelada_id, new_owner_id)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/peladas/<int:pelada_id>/leave", methods=["POST"])
+def leave_pelada(pelada_id):
+    pid, user, role = _require_membership()
+    if pid != pelada_id:
+        abort(403, description="Not a member of this pelada")
+    if role == "owner":
+        abort(403, description="Transfer ownership before leaving")
+    user_storage.remove_member(pelada_id, user["id"])
     return jsonify({"ok": True})
 
 

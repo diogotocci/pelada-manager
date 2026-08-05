@@ -118,15 +118,8 @@ def ensure_schema() -> None:
                 $$;
             """)
 
-            # Rate limiting: one row per sensitive-endpoint attempt (auth, admin).
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS auth_attempts (
-                    id  SERIAL PRIMARY KEY,
-                    ip  TEXT NOT NULL,
-                    ts  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                )
-            """)
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_auth_attempts_ip_ts ON auth_attempts (ip, ts)")
+            # The old password rate-limit table is no longer used (no passwords).
+            cur.execute("DROP TABLE IF EXISTS auth_attempts")
 
             # User feedback (bug reports, suggestions). pelada_id is optional and
             # kept even if the pelada is later deleted, so we can still read the
@@ -242,27 +235,6 @@ def ensure_schema() -> None:
             """)
 
         conn.commit()
-
-
-def count_recent_failures(ip: str, window_seconds: int) -> int:
-    """How many FAILED attempts this IP made within the window (no insert)."""
-    with _get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT COUNT(*) AS n FROM auth_attempts "
-                "WHERE ip = %s AND ts > NOW() - (%s * INTERVAL '1 second')",
-                (ip, window_seconds),
-            )
-            return int(cur.fetchone()["n"])
-
-
-def record_failed_attempt(ip: str) -> None:
-    """Record one failed attempt and prune old rows. Successes are never
-    recorded, so legitimate logins (and groups sharing an IP) are not blocked."""
-    with _get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("INSERT INTO auth_attempts (ip) VALUES (%s)", (ip,))
-            cur.execute("DELETE FROM auth_attempts WHERE ts < NOW() - INTERVAL '1 hour'")
 
 
 def _row_to_player(row) -> Player:
@@ -590,6 +562,35 @@ class UserStorage:
                     (pelada_id, user_id),
                 )
                 return cur.rowcount > 0
+
+    def transfer_ownership(self, pelada_id: int, new_owner_user_id: int) -> None:
+        """Promote a member to owner; the current owner becomes an admin."""
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE pelada_members SET role = 'admin' WHERE pelada_id = %s AND role = 'owner'",
+                    (pelada_id,),
+                )
+                cur.execute(
+                    "UPDATE pelada_members SET role = 'owner' WHERE pelada_id = %s AND user_id = %s",
+                    (pelada_id, new_owner_user_id),
+                )
+
+    def delete_user(self, user_id: int) -> None:
+        """Delete the user, the peladas they own (cascading to members, players
+        and invites), and their remaining memberships."""
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    DELETE FROM peladas WHERE id IN (
+                        SELECT pelada_id FROM pelada_members
+                        WHERE user_id = %s AND role = 'owner'
+                    )
+                    """,
+                    (user_id,),
+                )
+                cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
 
 
 def _row_to_invite(row) -> Dict:

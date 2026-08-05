@@ -293,8 +293,17 @@ async function loadMembers() {
         '<span class="r-meta">' + roleLabel(mem.role) + "</span>";
       row.appendChild(avatar);
       row.appendChild(main);
-      // Owners can't be removed here.
       if (mem.role !== "owner") {
+        // Only the owner can hand ownership over.
+        if (currentPeladaRole === "owner") {
+          const crown = document.createElement("button");
+          crown.className = "row-action";
+          crown.setAttribute("aria-label", "Tornar dono");
+          crown.title = "Tornar dono";
+          crown.innerHTML = '<svg viewBox="0 0 24 24"><path d="M3 7l4 4 5-6 5 6 4-4v10H3z"/></svg>';
+          crown.addEventListener("click", function () { transferOwnership(mem); });
+          row.appendChild(crown);
+        }
         const rm = document.createElement("button");
         rm.className = "row-action";
         rm.setAttribute("aria-label", "Remover membro");
@@ -305,6 +314,30 @@ async function loadMembers() {
       listEl.appendChild(row);
     });
   } catch (err) { /* ignore */ }
+}
+
+function transferOwnership(mem) {
+  openConfirmSheet(
+    "Transferir propriedade",
+    "Tornar " + (mem.name || mem.email) + " o dono? Você passa a ser admin.",
+    "Transferir",
+    async function () {
+      try {
+        const res = await fetch("/api/peladas/" + currentPeladaId + "/transfer", {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({ user_id: mem.id }),
+        });
+        if (!res.ok) { showToast("Erro ao transferir."); return; }
+        currentPeladaRole = "admin";
+        closeSheets();
+        showToast("Propriedade transferida");
+        loadMembers();
+      } catch (err) {
+        showToast("Erro ao transferir.");
+      }
+    }
+  );
 }
 
 function removeMember(mem) {
