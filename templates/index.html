@@ -3,7 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <title>Time Justo</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+  <script>
+    // Edge-to-edge only on Android: the TWA draws under the system bars there,
+    // so we opt into viewport-fit=cover and let the CSS safe-area paddings
+    // reserve the nav bar. iOS already insets content natively — using
+    // viewport-fit=cover there just leaves a gap above the home indicator.
+    if (/Android/i.test(navigator.userAgent)) {
+      var _vp = document.querySelector('meta[name="viewport"]');
+      _vp.setAttribute("content", _vp.getAttribute("content") + ", viewport-fit=cover");
+    }
+  </script>
 
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}?v={{ app_version }}">
   <link rel="apple-touch-icon" sizes="192x192" href="{{ url_for('static', filename='icon-192.png') }}?v={{ app_version }}">
