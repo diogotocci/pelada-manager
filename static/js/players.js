@@ -19,6 +19,8 @@ function goHome() {
   loadPeladas();
 }
 
+let peladasReqId = 0;
+
 async function loadPeladas() {
   const loadingEl = $("pelada-loading");
   const emptyEl = $("pelada-empty");
@@ -27,13 +29,18 @@ async function loadPeladas() {
   // Only the logged-in home lists peladas; renderAccountBar owns guest/user view.
   if (typeof userToken === "undefined" || !userToken) return;
 
-  listEl.innerHTML = "";
+  // Guard against concurrent calls (e.g. goHome + onAuthChanged): only the
+  // latest one renders, and it clears the list right before appending — so the
+  // peladas never get duplicated.
+  const reqId = ++peladasReqId;
   emptyEl.classList.add("hidden");
   loadingEl.classList.remove("hidden");
 
   try {
     const peladas = await fetchJSON("/api/peladas");
+    if (reqId !== peladasReqId) return;
     loadingEl.classList.add("hidden");
+    listEl.innerHTML = "";
 
     if (peladas.length === 0) {
       emptyEl.classList.remove("hidden");
@@ -95,6 +102,7 @@ async function loadPeladas() {
       listEl.appendChild(row);
     });
   } catch (err) {
+    if (reqId !== peladasReqId) return;
     console.error("Failed to load peladas:", err);
     loadingEl.classList.add("hidden");
     showToast("Erro ao carregar peladas.");

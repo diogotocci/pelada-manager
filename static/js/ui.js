@@ -333,13 +333,37 @@ const HELP_ITEMS = [
       "equilibrado."
   },
   {
+    ico: "\ud83d\udd11",
+    title: "Entrar e criar pelada",
+    tag: false,
+    body:
+      "Voc\u00ea entra no app com sua <b>conta Google</b> \u2014 sem senha de grupo. Ao " +
+      "criar uma pelada, voc\u00ea vira o <b>dono</b> dela. Na tela inicial aparecem " +
+      "s\u00f3 as peladas de que voc\u00ea participa."
+  },
+  {
+    ico: "\ud83d\udc64",
+    title: "Dono, admin e membro",
+    tag: false,
+    body:
+      "Cada pessoa tem um papel na pelada:" +
+      "<div class=\"help-sub\">" +
+      "<p><b>Dono:</b> manda na pelada \u2014 pode <b>excluir</b>, <b>transferir</b> " +
+      "a propriedade e faz tudo que o admin faz.</p>" +
+      "<p><b>Admin:</b> cadastra e edita jogadores, v\u00ea e ajusta as notas, " +
+      "atributos, cores e dia, e <b>convida</b> gente.</p>" +
+      "<p><b>Membro:</b> marca presen\u00e7a e sorteia. Pode cadastrar jogador, mas " +
+      "depois <b>n\u00e3o v\u00ea nem edita</b> as notas.</p>" +
+      "</div>"
+  },
+  {
     ico: "\u2b50",
     title: "Os n\u00edveis (estrelas)",
     tag: false,
     body:
       "Cada jogador tem de <b>1 a 5 estrelas</b> (pode ter meia estrela). Quanto " +
-      "mais estrelas, mais forte no sorteio. <b>S\u00f3 o admin</b> define e enxerga " +
-      "as estrelas."
+      "mais estrelas, mais forte no sorteio. <b>S\u00f3 admin e dono</b> definem e " +
+      "enxergam as estrelas."
   },
   {
     ico: "\u26bd",
@@ -380,20 +404,21 @@ const HELP_ITEMS = [
       "</div>"
   },
   {
-    ico: "\ud83d\udc64",
-    title: "Membro e Admin",
-    tag: false,
+    ico: "\ud83d\udd17",
+    title: "Convidar pra pelada",
+    tag: true,
     body:
-      "<b>Membro:</b> entra com a senha, marca presen\u00e7a e sorteia os times.<br>" +
-      "<b>Admin</b> (chave): cadastra e edita jogadores, v\u00ea as notas e ajusta " +
-      "atributos, cores e dia da pelada."
+      "<b>Dono e admin</b> geram um <b>link de convite</b> (como membro ou admin), " +
+      "escolhem a validade (1h, 24h ou 7 dias) e mandam no <b>WhatsApp</b>. " +
+      "Quem abrir o link entra com o Google e j\u00e1 cai na pelada. D\u00e1 pra " +
+      "<b class=\"g\">revogar</b> o link quando quiser."
   },
   {
     ico: "\ud83d\udd12",
     title: "Por que n\u00e3o vejo as notas?",
     tag: false,
     body:
-      "Por <b>privacidade</b>. A avalia\u00e7\u00e3o dos jogadores fica s\u00f3 com o admin \u2014 " +
+      "Por <b>privacidade</b>. As notas ficam s\u00f3 com o <b>admin e o dono</b> \u2014 " +
       "mas o <b class=\"g\">sorteio continua justo</b> pra todo mundo do mesmo " +
       "jeito."
   },
@@ -411,8 +436,9 @@ const HELP_ITEMS = [
     title: "Seus dados",
     tag: false,
     body:
-      "Cada pelada \u00e9 <b>isolada</b> e protegida por senha. Ningu\u00e9m de uma " +
-      "pelada acessa os dados de outra."
+      "Cada pelada \u00e9 <b>isolada</b>: s\u00f3 quem participa acessa. Voc\u00ea pode <b>sair</b> " +
+      "de uma pelada quando quiser, ou <b>excluir sua conta</b> \u2014 o que apaga " +
+      "tamb\u00e9m as peladas onde voc\u00ea \u00e9 dono."
   }
 ];
 
