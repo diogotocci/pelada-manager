@@ -234,6 +234,21 @@ def ensure_schema() -> None:
                   )
             """)
 
+            # Client-side error reports (JS crashes on real devices), so we can
+            # debug what happened without the device's console.
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS client_errors (
+                    id          SERIAL PRIMARY KEY,
+                    message     TEXT,
+                    stack       TEXT,
+                    url         TEXT,
+                    user_agent  TEXT,
+                    app_version TEXT,
+                    who         TEXT,
+                    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
+
         conn.commit()
 
 
@@ -435,6 +450,51 @@ class FeedbackStorage:
             with conn.cursor() as cur:
                 cur.execute("DELETE FROM useful_items WHERE id = %s", (useful_id,))
                 return cur.rowcount > 0
+
+
+class ClientLogStorage:
+    def add_error(self, message, stack, url, user_agent, app_version, who) -> None:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO client_errors (message, stack, url, user_agent, app_version, who)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    """,
+                    (message, stack, url, user_agent, app_version, who),
+                )
+                # Keep only the 500 most recent rows.
+                cur.execute(
+                    "DELETE FROM client_errors WHERE id < (SELECT MAX(id) - 500 FROM client_errors)"
+                )
+
+    def list_errors(self, limit: int = 100) -> List[Dict]:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT * FROM client_errors ORDER BY id DESC LIMIT %s",
+                    (limit,),
+                )
+                rows = cur.fetchall()
+                result = []
+                for r in rows:
+                    ts = r.get("created_at")
+                    result.append({
+                        "id": r["id"],
+                        "message": r.get("message"),
+                        "stack": r.get("stack"),
+                        "url": r.get("url"),
+                        "user_agent": r.get("user_agent"),
+                        "app_version": r.get("app_version"),
+                        "who": r.get("who"),
+                        "created_at": ts.isoformat() if ts is not None else None,
+                    })
+                return result
+
+    def clear(self) -> None:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM client_errors")
 
 
 def _row_to_user(row) -> Dict:

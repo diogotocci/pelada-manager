@@ -39,7 +39,32 @@
     .u-check svg { width: 15px; height: 15px; stroke: currentColor; stroke-width: 3; fill: none; stroke-linecap: round; stroke-linejoin: round; }
     .u-row.done .fb-subj { text-decoration: line-through; color: var(--muted); }
     .link-pill { font-size: .74rem; font-weight: 700; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 6px 12px; }
+    .err-item { border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; margin-bottom: 8px; background: var(--surface); }
+    .err-msg { font-size: .84rem; font-weight: 600; color: var(--danger); word-break: break-word; }
+    .err-meta { font-size: .7rem; color: var(--muted); margin-top: 4px; word-break: break-word; }
+    .err-stack { font-size: .68rem; color: var(--muted); white-space: pre-wrap; word-break: break-word; margin-top: 6px; font-family: monospace; max-height: 150px; overflow: auto; }
   </style>
+  <script>
+    // Report JS crashes from real devices to the server (viewable in /admin).
+    (function () {
+      function who() { try { var u = JSON.parse(localStorage.getItem("tj-user") || "null"); return (u && u.email) || ""; } catch (e) { return ""; } }
+      function report(p) {
+        try {
+          p.who = who(); p.url = location.href;
+          var body = JSON.stringify(p);
+          if (navigator.sendBeacon) navigator.sendBeacon("/api/clientlog", new Blob([body], { type: "application/json" }));
+          else fetch("/api/clientlog", { method: "POST", headers: { "Content-Type": "application/json" }, body: body, keepalive: true });
+        } catch (e) { /* never let logging throw */ }
+      }
+      window.addEventListener("error", function (e) {
+        report({ message: e.message || "error", stack: (e.error && e.error.stack) || (e.filename + ":" + e.lineno + ":" + e.colno) });
+      });
+      window.addEventListener("unhandledrejection", function (e) {
+        var r = e.reason;
+        report({ message: "unhandledrejection: " + (r && (r.message || String(r))), stack: r && r.stack });
+      });
+    })();
+  </script>
 </head>
 <body>
 
@@ -64,6 +89,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
         <div class="grow"><h1>Feedbacks</h1><p class="sub" id="ls-sub">—</p></div>
+        <button class="link-pill" id="ls-errors" style="margin-right:6px">Erros</button>
         <button class="link-pill" id="ls-useful">Úteis</button>
       </div>
       <div class="scroll">
@@ -94,6 +120,23 @@
       <div class="cta-bar">
         <button class="btn btn-primary" id="dt-useful" style="flex:1">Marcar como útil</button>
         <button class="btn btn-danger" id="dt-delete" style="width:auto;padding-left:22px;padding-right:22px">Excluir</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="s-errors">
+    <div class="frame">
+      <div class="appbar">
+        <button class="icon-btn" id="er-back" aria-label="Voltar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="grow"><h1>Erros do app</h1><p class="sub">Crashes reportados pelos aparelhos</p></div>
+        <button class="link-pill" id="er-clear">Limpar</button>
+      </div>
+      <div class="scroll">
+        <div id="er-list" style="margin-top:6px"></div>
+        <div class="empty hidden" id="er-empty">Nenhum erro reportado.</div>
+        <div class="spacer-lg"></div>
       </div>
     </div>
   </section>

@@ -279,6 +279,44 @@ async function loadUseful() {
   } catch (err) { /* ignore */ }
 }
 
+// ------------------------------------------------------------
+// Client errors
+// ------------------------------------------------------------
+
+async function loadErrors() {
+  try {
+    const res = await api("GET", "/api/admin/errors");
+    const data = await res.json();
+    const errors = data.errors || [];
+    const listEl = $("er-list");
+    listEl.innerHTML = "";
+    $("er-empty").classList.toggle("hidden", errors.length > 0);
+    errors.forEach(function (e) {
+      const item = document.createElement("div");
+      item.className = "err-item";
+      let meta = timeAgo(e.created_at) + " · v" + (e.app_version || "?");
+      if (e.who) meta += " · " + e.who;
+      let html =
+        '<div class="err-msg">' + escapeHTML(e.message || "(sem mensagem)") + "</div>" +
+        '<div class="err-meta">' + escapeHTML(meta) + "</div>";
+      if (e.url) html += '<div class="err-meta">' + escapeHTML(e.url) + "</div>";
+      if (e.user_agent) html += '<div class="err-meta">' + escapeHTML(e.user_agent) + "</div>";
+      if (e.stack) html += '<div class="err-stack">' + escapeHTML(e.stack) + "</div>";
+      item.innerHTML = html;
+      listEl.appendChild(item);
+    });
+    showScreen("s-errors");
+  } catch (err) { /* ignore */ }
+}
+
+async function clearErrors() {
+  if (!window.confirm("Limpar todos os erros?")) return;
+  try {
+    await api("DELETE", "/api/admin/errors");
+    loadErrors();
+  } catch (err) { /* ignore */ }
+}
+
 function renderUseful() {
   const listEl = $("uf-list");
   listEl.innerHTML = "";
@@ -347,6 +385,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
   $("ls-back").addEventListener("click", function () { window.location.href = "/"; });
   $("ls-useful").addEventListener("click", loadUseful);
+  $("ls-errors").addEventListener("click", loadErrors);
+  $("er-back").addEventListener("click", function () { showScreen("s-list"); });
+  $("er-clear").addEventListener("click", clearErrors);
   $("dt-back").addEventListener("click", function () { showScreen("s-list"); });
   $("dt-useful").addEventListener("click", markUseful);
   $("dt-delete").addEventListener("click", function () { if (currentDetail) deleteFeedback(currentDetail.id); });

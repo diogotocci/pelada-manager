@@ -1,4 +1,5 @@
 import os
+import logging
 from datetime import datetime, timedelta, timezone
 from flask import Flask, render_template, jsonify, request, abort, Response
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
@@ -11,13 +12,14 @@ from storage.postgres_storage import (
     FeedbackStorage,
     UserStorage,
     InviteStorage,
+    ClientLogStorage,
     ensure_schema,
 )
 from services.team_balancer import balance_teams
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "3.4.7")
+APP_VERSION = os.getenv("APP_VERSION", "3.4.8")
 
 VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white", "pink"}
 
@@ -41,11 +43,18 @@ ANDROID_CERT_FINGERPRINT = os.getenv("ANDROID_CERT_FINGERPRINT", "")
 # local/CI runs work without it (tokens signed with the fallback are not secure).
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-insecure-key-change-me")
 
+logging.basicConfig(level=logging.INFO)
+
 player_storage = PlayerStorage()
 pelada_storage = PeladaStorage()
 feedback_storage = FeedbackStorage()
 user_storage = UserStorage()
 invite_storage = InviteStorage()
+clientlog_storage = ClientLogStorage()
+
+CLIENTLOG_MSG_MAX = 800
+CLIENTLOG_STACK_MAX = 6000
+CLIENTLOG_URL_MAX = 500
 
 VALID_INVITE_ROLES = {"admin", "member"}
 INVITE_MAX_TTL_HOURS = 720  # 30 days
@@ -363,9 +372,41 @@ def submit_feedback():
     return jsonify({"ok": True, "id": feedback_id}), 201
 
 
+@app.route("/api/clientlog", methods=["POST"])
+def client_log():
+    # Captures JS crashes from real devices (no console access). Public, best
+    # effort; failures here must never surface to the user.
+    data = request.get_json(silent=True) or {}
+    message = (data.get("message") or "")[:CLIENTLOG_MSG_MAX]
+    stack = (data.get("stack") or "")[:CLIENTLOG_STACK_MAX]
+    url = (data.get("url") or "")[:CLIENTLOG_URL_MAX]
+    who = (data.get("who") or "")[:200]
+    user_agent = request.headers.get("User-Agent", "")[:400]
+
+    app.logger.warning("clientlog: %s | %s | %s | %s", message, url, who, user_agent[:120])
+    try:
+        clientlog_storage.add_error(message, stack, url, user_agent, APP_VERSION, who or None)
+    except Exception:
+        app.logger.exception("clientlog: could not persist")
+    return ("", 204)
+
+
 # ============================================================
 # General admin (feedback inbox at /admin)
 # ============================================================
+
+@app.route("/api/admin/errors", methods=["GET"])
+def admin_list_errors():
+    _require_superadmin()
+    return jsonify({"errors": clientlog_storage.list_errors()})
+
+
+@app.route("/api/admin/errors", methods=["DELETE"])
+def admin_clear_errors():
+    _require_superadmin()
+    clientlog_storage.clear()
+    return jsonify({"ok": True})
+
 
 @app.route("/api/admin/feedback", methods=["GET"])
 def admin_list_feedback():
@@ -552,15 +593,21 @@ def accept_invite(token):
         abort(401, description="Not authenticated")
     invite = invite_storage.get_invite(token)
     if invite is None:
+        app.logger.info("invite accept: not_found token=%s", token[:8])
         return jsonify({"ok": False, "reason": "not_found"}), 404
     status = _invite_status(invite)
     if status != "valid":
+        app.logger.info("invite accept: %s token=%s", status, token[:8])
         return jsonify({"ok": False, "reason": status}), 410
 
     # Idempotent: an existing member keeps their current role.
     user_storage.add_membership(invite["pelada_id"], user["id"], invite["role"])
     invite_storage.record_acceptance(invite["id"])
     role = user_storage.get_role(invite["pelada_id"], user["id"])
+    app.logger.info(
+        "invite accept ok: pelada=%s invite_role=%s -> role=%s user=%s",
+        invite["pelada_id"], invite["role"], role, user.get("email"),
+    )
     return jsonify({"ok": True, "pelada_id": invite["pelada_id"], "role": role})
 
 
