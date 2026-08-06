@@ -1,4 +1,33 @@
 // ============================================================
+// Mostrar / ocultar estrelas na tela de times (só admin/dono)
+// ============================================================
+
+// Eye open = stars/sums shown; eye off = hidden. Persisted so it sticks.
+let showStars = localStorage.getItem("tj-show-stars") !== "false";
+
+const EYE_OPEN_ICON = '<svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_OFF_ICON = '<svg viewBox="0 0 24 24"><path d="M17.9 17.9A10.1 10.1 0 0 1 12 20C5 20 1 12 1 12a18.5 18.5 0 0 1 5.1-6M9.9 4.2A9.1 9.1 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.2 3.2M9.9 9.9a3 3 0 1 0 4.2 4.2M1 1l22 22"/></svg>';
+
+// Stars are visible only when the caller is admin/owner AND the eye is open.
+function starsVisible() {
+  return isAdminMode && showStars;
+}
+
+function updateStarsToggle() {
+  const btn = $("tm-stars-btn");
+  if (!btn) return;
+  btn.innerHTML = showStars ? EYE_OPEN_ICON : EYE_OFF_ICON;
+  btn.setAttribute("aria-label", showStars ? "Ocultar estrelas" : "Mostrar estrelas");
+}
+
+function toggleStars() {
+  showStars = !showStars;
+  localStorage.setItem("tj-show-stars", showStars ? "true" : "false");
+  updateStarsToggle();
+  if (lastDrawnTeams.length > 0) renderTeams(lastDrawnTeams);
+}
+
+// ============================================================
 // Configurar sorteio (sheet)
 // ============================================================
 
@@ -120,15 +149,16 @@ function renderTeams(teams) {
 
   $("tm-sub").textContent = gameDateLabel();
   $("tm-audit-btn").classList.toggle("hidden", !isAdminMode);
+  $("tm-stars-btn").classList.toggle("hidden", !isAdminMode);
+  updateStarsToggle();
 
   cardsEl.innerHTML = "";
   balanceEl.innerHTML = "";
 
   if (!teams || teams.length === 0) return;
 
-  // Placar de equilíbrio: só no modo admin, para não revelar as notas dos
-  // jogadores quando há poucos presentes.
-  if (isAdminMode && teams.length >= 2) {
+  // Placar de equilíbrio: só para admin/dono e com o olho aberto.
+  if (starsVisible() && teams.length >= 2) {
     const color1 = getBibColor(currentTeam1Color);
     const color2 = getBibColor(currentTeam2Color);
     balanceEl.classList.remove("hidden");
@@ -173,7 +203,7 @@ function renderTeams(teams) {
     const count = (team.players || []).length;
     totalEl.textContent = isBench
       ? String(count)
-      : count + " na linha" + (isAdminMode ? " · " + formatDecimal(teamTotal(team)) + " ★" : "");
+      : count + " na linha" + (starsVisible() ? " · " + formatDecimal(teamTotal(team)) + " ★" : "");
 
     head.appendChild(nameEl);
     head.appendChild(totalEl);
@@ -197,7 +227,7 @@ function renderTeams(teams) {
       rowEl.appendChild(avatar);
       rowEl.appendChild(nm);
 
-      if (isAdminMode) {
+      if (starsVisible()) {
         const stars = document.createElement("span");
         stars.innerHTML = buildStarsHTML(keeper.rating);
         rowEl.appendChild(stars);
@@ -225,7 +255,7 @@ function renderTeams(teams) {
       rowEl.appendChild(avatar);
       rowEl.appendChild(nm);
 
-      if (isAdminMode && !isBench) {
+      if (starsVisible() && !isBench) {
         const stars = document.createElement("span");
         stars.innerHTML = buildStarsHTML(p.rating);
         rowEl.appendChild(stars);
@@ -398,6 +428,7 @@ document.addEventListener("DOMContentLoaded", function () {
   $("tm-back").addEventListener("click", function () { showScreen("s-checkin"); renderCheckin(); });
   $("tm-redraw").addEventListener("click", redraw);
   $("tm-share").addEventListener("click", shareTeams);
+  $("tm-stars-btn").addEventListener("click", toggleStars);
   $("tm-audit-btn").addEventListener("click", function () { renderAudit(); openSheet("audit"); });
   $("audit-close").addEventListener("click", function () { closeSheets(); });
 });
