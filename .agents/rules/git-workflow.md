@@ -1,78 +1,79 @@
 ---
 trigger: always_on
+description: Mandatory Git workflow for all development tasks in this project.
 ---
 
----
-trigger: always_on
-description: Git workflow rules for all development tasks.
----
+# Git Workflow
 
-# Git workflow
+All development tasks in this repository must follow this Git workflow.
 
-Every new development task must start from the latest version of the remote `main` branch.
-
-Each task must use its own dedicated Git branch.
-
-The normal workflow is:
+The standard lifecycle is:
 
 main
-→ update main from origin
-→ create task branch
+→ pull latest changes from origin
+→ create a dedicated task branch
 → develop
 → test
 → update Graphify
+→ review changes
 → commit
-→ push branch
+→ push task branch
 → user creates Pull Request
-→ user merges Pull Request into main
+→ user reviews and merges Pull Request into main
 
-The agent must NEVER merge the task branch into `main`.
+The agent must never merge a task branch into `main`.
 
-The user is responsible for creating and merging the Pull Request.
+The user is responsible for creating, reviewing and merging Pull Requests.
 
-## Starting a new task
+# Starting a New Task
 
-Before making any code changes:
+Every NEW development task must start from the latest remote `main`.
 
-1. Run:
+Before modifying any code, run:
 
-   git status --short
+git status --short
 
-2. Check the current branch:
+Then check the current branch:
 
-   git branch --show-current
+git branch --show-current
 
-3. Check for uncommitted changes.
+## Uncommitted Changes
 
-If unrelated uncommitted changes exist:
+If there are existing modified, staged or untracked files, inspect them before continuing.
 
-DO NOT:
+Never automatically:
 
-- discard them
-- reset them
-- stash them
-- commit them
-- overwrite them
+git reset --hard
+git clean -fd
+git checkout -- .
+git restore .
+git stash
 
-Stop and ask the user how to proceed.
+Do not discard, overwrite, stash or commit unrelated user changes.
 
-If the working tree is clean, start the new task from `main`.
+If existing changes cannot be clearly identified as belonging to the current task, stop and ask the user how to proceed.
 
-Run:
+## Return to Main
 
-git checkout main
+If the working tree is safe to continue, switch to `main`:
 
-Then update the local main branch:
+git switch main
+
+Then update it from GitHub:
 
 git pull origin main
 
-Only after the pull completes successfully should a new task branch be created.
+The pull must complete successfully before creating a new task branch.
 
-## Creating the task branch
+Never create a new development branch from another feature, fix, refactor, chore or test branch.
 
-Create exactly one branch for the current development task.
+Every new task must branch from the latest `main`.
 
-Use one of these prefixes:
+# Creating the Task Branch
+
+Create exactly one dedicated branch for each development task.
+
+Use these prefixes:
 
 feature/
 fix/
@@ -80,176 +81,261 @@ refactor/
 chore/
 test/
 
-Use short kebab-case names.
+Use short, descriptive kebab-case names.
 
 Examples:
 
 feature/player-speed-attribute
-feature/player-statistics
+feature/player-preferred-position
 fix/team-balancing-rating
 fix/admin-permissions
 refactor/team-generator
-chore/update-dependencies
+chore/update-agent-rules
+test/team-balancing-coverage
 
-Create the branch from the updated `main`:
+Create the branch using:
 
-git checkout -b <branch-name>
+git switch -c <branch-name>
 
-Never create a new development branch from another feature or fix branch.
+Example:
 
-Every new task must branch from the latest local `main` after:
+git switch -c feature/player-speed-attribute
 
-git checkout main
-git pull origin main
+# Continuing an Existing Task
 
-## Continuing the same task
+If the user is continuing work that already belongs to the current task branch, continue using the same branch.
 
-If the current conversation is continuing work that already belongs to an existing dedicated task branch, continue using that branch.
+Do not create a new branch for small adjustments, fixes or additions that are clearly part of the same task.
 
-Do not return to main and create another branch for small follow-up changes that are part of the same task.
+Example:
 
-Examples of the same task:
+Initial request:
 
-User:
-"Add player speed attribute."
+Add the player's preferred position.
 
 Branch:
 
-feature/player-speed-attribute
+feature/player-preferred-position
 
-Later the user says:
+Follow-up request:
 
-"Also show speed on the player edit page."
+Also show the preferred position on the player edit page.
 
 Continue using:
 
-feature/player-speed-attribute
+feature/player-preferred-position
 
-Do not create another branch.
+Do not return to `main` and do not create another branch.
 
-## During development
+A new branch should only be created when the user starts a genuinely new development task.
+
+# During Development
 
 Make only changes related to the current task.
 
-Preserve unrelated user changes.
+Preserve unrelated code and user changes.
 
-Do not use destructive Git commands such as:
+Follow the project architecture and coding standards.
 
-git reset --hard
-git clean -fd
-git checkout -- .
-git restore .
+Use Graphify to understand the affected code before performing broad repository searches.
 
-unless the user explicitly requests them.
+Do not make unrelated refactors unless explicitly requested or strictly necessary for the task.
 
-## Before committing
+# Tests
 
-After implementation is complete:
+Before considering implementation complete, run the relevant automated tests.
 
-1. Run the relevant tests.
-2. Run:
+Backend business logic changes must include corresponding tests as required by the project coding standards.
 
-   graphify update .
+If the full test suite is appropriate, run it.
 
-3. Review the changes:
+Example:
 
-   git diff
+pytest
 
-4. Review repository status:
+When a smaller targeted test suite is sufficient, run the relevant tests instead.
 
-   git status
+Do not commit code with known failing tests unless the user explicitly approves it.
 
-5. Verify that no unrelated files were modified.
+If tests cannot be executed, clearly report the reason.
 
-Stage only files intentionally related to the task.
+# Update Graphify
 
-Prefer:
+After source code changes are complete, update the Graphify knowledge graph:
 
-git add <file1> <file2> <file3>
+graphify update .
 
-Do not automatically use:
+This must happen before the final commit whenever source code was modified.
+
+# Application Version
+
+Before committing code changes, follow the application versioning rules defined in the project coding standards.
+
+If the task requires an `APP_VERSION` bump in `app.py`, perform it before staging the final commit.
+
+Configuration-only changes that do not modify application code should follow the rules defined in `coding-standards.md`.
+
+# Review Before Commit
+
+Before staging the final changes, run:
+
+git status
+
+Then review unstaged changes:
+
+git diff
+
+Inspect all modified and untracked files.
+
+Verify that:
+
+1. Every changed file belongs to the current task.
+2. Relevant tests were added or updated.
+3. Relevant tests passed.
+4. Graphify was updated when source code changed.
+5. APP_VERSION was updated when required.
+6. No `pyproject.toml` was introduced.
+7. No unrelated files were modified.
+8. No AI attribution was introduced.
+9. No `Co-Authored-By` trailer was introduced.
+
+# Staging Files
+
+Stage only files intentionally related to the current task.
+
+Prefer explicit file staging:
+
+git add <file1>
+git add <file2>
+git add <file3>
+
+Avoid automatically using:
 
 git add .
 git add -A
 
-unless all changed files were verified to belong to the current task.
+These commands may only be used if every changed and untracked file has already been reviewed and confirmed to belong to the current task.
 
-## Commit
+After staging, run:
+
+git status
+
+Then review exactly what will be committed:
+
+git diff --cached
+
+Do not commit until the staged changes have been reviewed.
+
+# Commit
 
 Every completed development task must have at least one commit.
 
-Use Conventional Commit style messages.
+Use concise Conventional Commit messages.
 
 Examples:
 
 feat: add player speed attribute
-feat: add player statistics
+feat: add player preferred position
 fix: improve team rating balance
 fix: correct admin permissions
 refactor: simplify team generator
 test: add balancing algorithm coverage
-chore: update project configuration
+chore: update agent rules
 
-Commit the staged changes:
+Never include:
+
+Co-Authored-By
+
+Never include references to:
+
+Claude
+Gemini
+Antigravity
+ChatGPT
+AI assistants
+AI-generated code
+
+The commit must use the configured Git user as the sole author.
+
+Create the commit using:
 
 git commit -m "<commit-message>"
 
-## Push
+# Push
 
 After the commit succeeds, push the task branch to GitHub.
 
-For the first push of the branch:
+For the first push of a new branch:
 
 git push -u origin <branch-name>
+
+Example:
+
+git push -u origin feature/player-speed-attribute
 
 For subsequent commits on the same branch:
 
 git push
 
-The agent should automatically push completed task commits to the remote task branch.
+Pushing the completed task branch is part of the normal workflow and does not require the user to explicitly request it.
 
-## Pull Request
+Never push directly to `main`.
 
-Do NOT create or merge a Pull Request unless the user explicitly asks.
+# Pull Request
 
-Do NOT merge the task branch into `main`.
+After pushing the branch, stop the Git workflow.
 
-After the branch has been pushed, report that it is ready for the user to create the Pull Request.
+Do not automatically create a Pull Request.
+
+Do not merge the branch into `main`.
+
+Do not switch back to `main` as part of completing the current task.
 
 The user will:
 
 1. Create the Pull Request.
-2. Review it.
-3. Merge it into `main`.
+2. Review the Pull Request.
+3. Merge the Pull Request into `main`.
 
-## Starting the next task
+After pushing, report that the branch is ready for the user to create the Pull Request.
 
-When the user starts a NEW task, do not continue working from the previous task branch.
+# Starting the Next Task
 
-Return to main:
+When the user starts a NEW task, begin the Git lifecycle again.
 
-git checkout main
+First inspect the repository:
 
-Update main from GitHub:
+git status --short
+
+Then switch to:
+
+git switch main
+
+Update local `main` from GitHub:
 
 git pull origin main
 
-Then create a new branch from the updated main:
+Only after the pull succeeds, create the new task branch:
 
-git checkout -b <new-task-branch>
+git switch -c <new-branch-name>
 
-This cycle must repeat for every new development task.
+Never assume that the previous task branch has already been merged.
 
-## Final report
+The remote `main` is the source of truth for new task branches.
 
-After completing and pushing a task, report:
+If the previous Pull Request has not yet been merged, the new branch must still be based on the current remote `main`, unless the user explicitly states that the new task depends on the previous unmerged branch.
 
-- branch name
-- commit hash
-- commit message
-- remote branch pushed
-- tests executed
-- Graphify update status
-- files changed
+# Final Report
 
-Finish with a clear message that the branch is ready for the user to create the Pull Request.
+After completing, committing and pushing a task, report:
+
+1. Branch name
+2. Commit hash
+3. Commit message
+4. Remote branch pushed
+5. Tests executed and results
+6. Graphify update status
+7. APP_VERSION change, when applicable
+8. Files changed
+
+Finish by clearly stating that the branch has been pushed and is ready for the user to create the Pull Request.
