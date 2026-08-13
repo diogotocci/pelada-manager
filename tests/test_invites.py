@@ -36,12 +36,17 @@ class FakeInviteStorage:
         self.invites = {}
         self.acceptances = []
         self.revoked = []
+        self._next_id = 1
 
     def add_invite(self, pelada_id, role, created_by, expires_at):
-        inv = {"id": 1, "pelada_id": pelada_id, "token": "tok123", "role": role,
+        invite_id = self._next_id
+        self._next_id += 1
+        token = "tok" + str(invite_id)
+        inv = {"id": invite_id, "pelada_id": pelada_id, "token": token, "role": role,
+               "created_by": created_by,
                "expires_at": expires_at.isoformat(), "revoked_at": None,
                "accepted_count": 0, "pelada_name": "Fumageiro"}
-        self.invites["tok123"] = inv
+        self.invites[token] = inv
         return inv
 
     def get_invite(self, token):
@@ -79,8 +84,9 @@ def _auth(user_id=1, pelada_id=None):
     return headers
 
 
-def _seed_invite(env, role="member", hours=24, revoked=False):
+def _seed_invite(env, role="member", hours=24, revoked=False, created_by=99):
     inv = {"id": 1, "pelada_id": 5, "token": "tok123", "role": role,
+           "created_by": created_by,
            "expires_at": _iso(hours), "revoked_at": (_iso(0) if revoked else None),
            "accepted_count": 0, "pelada_name": "Fumageiro"}
     env.invites.invites["tok123"] = inv
@@ -94,12 +100,30 @@ def test_admin_creates_invite(env):
     res = env.post("/api/peladas/5/invites", json={"role": "member", "ttl_hours": 24},
                    headers=_auth(pelada_id=5))
     assert res.status_code == 201
-    assert res.get_json()["token"] == "tok123"
+    data = res.get_json()
+    assert data["token"]
+    assert data["role"] == "member"
 
 
-def test_member_cannot_create_invite(env):
+def test_admin_creates_admin_invite(env):
+    env.users.role = "admin"
+    res = env.post("/api/peladas/5/invites", json={"role": "admin", "ttl_hours": 24},
+                   headers=_auth(pelada_id=5))
+    assert res.status_code == 201
+    assert res.get_json()["role"] == "admin"
+
+
+def test_member_creates_member_invite(env):
     env.users.role = "member"
-    res = env.post("/api/peladas/5/invites", json={"role": "member"}, headers=_auth(pelada_id=5))
+    res = env.post("/api/peladas/5/invites", json={"role": "member", "ttl_hours": 24},
+                   headers=_auth(pelada_id=5))
+    assert res.status_code == 201
+    assert res.get_json()["role"] == "member"
+
+
+def test_member_cannot_create_admin_invite(env):
+    env.users.role = "member"
+    res = env.post("/api/peladas/5/invites", json={"role": "admin"}, headers=_auth(pelada_id=5))
     assert res.status_code == 403
 
 
@@ -108,12 +132,66 @@ def test_invalid_invite_role_rejected(env):
     assert res.status_code == 400
 
 
-def test_revoke_requires_admin_of_that_pelada(env):
-    _seed_invite(env)
+def test_member_lists_only_own_invites(env):
+    """Members see only invites they created; admins/owners see all."""
     env.users.role = "member"
-    res = env.post("/api/invites/tok123/revoke", headers=_auth())
+    # Seed two invites: one created by user 1 (the caller), one by user 99.
+    env.invites.invites["tokA"] = {
+        "id": 10, "pelada_id": 5, "token": "tokA", "role": "member",
+        "created_by": 1, "expires_at": _iso(24), "revoked_at": None,
+        "accepted_count": 0, "pelada_name": "Fumageiro",
+    }
+    env.invites.invites["tokB"] = {
+        "id": 11, "pelada_id": 5, "token": "tokB", "role": "member",
+        "created_by": 99, "expires_at": _iso(24), "revoked_at": None,
+        "accepted_count": 0, "pelada_name": "Fumageiro",
+    }
+    res = env.get("/api/peladas/5/invites", headers=_auth(user_id=1, pelada_id=5))
+    assert res.status_code == 200
+    data = res.get_json()
+    assert len(data) == 1
+    assert data[0]["token"] == "tokA"
+
+
+def test_admin_lists_all_invites(env):
+    env.users.role = "admin"
+    env.invites.invites["tokA"] = {
+        "id": 10, "pelada_id": 5, "token": "tokA", "role": "member",
+        "created_by": 1, "expires_at": _iso(24), "revoked_at": None,
+        "accepted_count": 0, "pelada_name": "Fumageiro",
+    }
+    env.invites.invites["tokB"] = {
+        "id": 11, "pelada_id": 5, "token": "tokB", "role": "member",
+        "created_by": 99, "expires_at": _iso(24), "revoked_at": None,
+        "accepted_count": 0, "pelada_name": "Fumageiro",
+    }
+    res = env.get("/api/peladas/5/invites", headers=_auth(user_id=1, pelada_id=5))
+    assert res.status_code == 200
+    assert len(res.get_json()) == 2
+
+
+def test_member_revokes_own_invite(env):
+    _seed_invite(env, created_by=1)
+    env.users.role = "member"
+    res = env.post("/api/invites/tok123/revoke", headers=_auth(user_id=1))
+    assert res.status_code == 200
+    assert "tok123" in env.invites.revoked
+
+
+def test_member_cannot_revoke_others_invite(env):
+    _seed_invite(env, created_by=99)
+    env.users.role = "member"
+    res = env.post("/api/invites/tok123/revoke", headers=_auth(user_id=1))
     assert res.status_code == 403
     assert env.invites.revoked == []
+
+
+def test_admin_revokes_any_invite(env):
+    _seed_invite(env, created_by=99)
+    env.users.role = "admin"
+    res = env.post("/api/invites/tok123/revoke", headers=_auth(user_id=1))
+    assert res.status_code == 200
+    assert "tok123" in env.invites.revoked
 
 
 # --- preview ----------------------------------------------------------

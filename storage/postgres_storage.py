@@ -689,6 +689,7 @@ def _row_to_invite(row) -> Dict:
         "pelada_id": row["pelada_id"],
         "token": row["token"],
         "role": row["role"],
+        "created_by": row.get("created_by"),
         "expires_at": exp.isoformat() if exp is not None else None,
         "revoked_at": row["revoked_at"].isoformat() if row.get("revoked_at") is not None else None,
         "accepted_count": int(row.get("accepted_count", 0)),

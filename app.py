@@ -19,7 +19,7 @@ from services.team_balancer import balance_teams
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "3.4.12")
+APP_VERSION = os.getenv("APP_VERSION", "3.4.13")
 
 VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white", "pink"}
 
@@ -530,13 +530,16 @@ def delete_pelada(pelada_id):
 @app.route("/api/peladas/<int:pelada_id>/invites", methods=["POST"])
 def create_invite(pelada_id):
     pid, user, role = _require_membership()
-    if pid != pelada_id or role not in ("owner", "admin"):
-        abort(403, description="Admin or owner only")
+    if pid != pelada_id:
+        abort(403, description="Pelada mismatch")
 
     data = request.get_json(silent=True) or {}
     invite_role = data.get("role", "member")
     if invite_role not in VALID_INVITE_ROLES:
         abort(400, description="Invalid invite role")
+    # Members can only invite as member, never as admin.
+    if role == "member" and invite_role != "member":
+        abort(403, description="Members can only invite as member")
     try:
         ttl_hours = int(data.get("ttl_hours", 168))
     except (ValueError, TypeError):
@@ -552,9 +555,13 @@ def create_invite(pelada_id):
 @app.route("/api/peladas/<int:pelada_id>/invites", methods=["GET"])
 def list_invites(pelada_id):
     pid, user, role = _require_membership()
-    if pid != pelada_id or role not in ("owner", "admin"):
-        abort(403, description="Admin or owner only")
-    return jsonify(invite_storage.list_active_invites(pelada_id))
+    if pid != pelada_id:
+        abort(403, description="Pelada mismatch")
+    invites = invite_storage.list_active_invites(pelada_id)
+    # Members only see invites they created; admins/owners see all.
+    if role not in ("owner", "admin"):
+        invites = [i for i in invites if i.get("created_by") == user["id"]]
+    return jsonify(invites)
 
 
 @app.route("/api/invites/<token>/revoke", methods=["POST"])
@@ -565,8 +572,12 @@ def revoke_invite(token):
     invite = invite_storage.get_invite(token)
     if invite is None:
         abort(404, description="Invite not found")
-    if user_storage.get_role(invite["pelada_id"], user["id"]) not in ("owner", "admin"):
-        abort(403, description="Admin or owner only")
+    caller_role = user_storage.get_role(invite["pelada_id"], user["id"])
+    if caller_role is None:
+        abort(403, description="Not a member of this pelada")
+    # Admins/owners can revoke any invite; members only their own.
+    if caller_role == "member" and invite.get("created_by") != user["id"]:
+        abort(403, description="Can only revoke your own invites")
     invite_storage.revoke_invite(token)
     return jsonify({"ok": True})
 
