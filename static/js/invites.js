@@ -163,7 +163,14 @@ function openMembers() {
   inviteTtl = 168;
   $("mb-sub").textContent = currentPeladaName || "";
   $("mb-link-box").classList.add("hidden");
-  renderChipSelect($("mb-role"), INVITE_ROLE_OPTS, inviteRole, function (v) { inviteRole = v; });
+  var isAdmin = currentPeladaRole === "owner" || currentPeladaRole === "admin";
+  if (isAdmin) {
+    renderChipSelect($("mb-role"), INVITE_ROLE_OPTS, inviteRole, function (v) { inviteRole = v; });
+    $("mb-role").parentElement.classList.remove("hidden");
+  } else {
+    $("mb-role").innerHTML = "";
+    $("mb-role").parentElement.classList.add("hidden");
+  }
   renderChipSelect($("mb-ttl"), INVITE_TTL_OPTS, inviteTtl, function (v) { inviteTtl = v; });
   loadInvites();
   loadMembers();
