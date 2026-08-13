@@ -1,16 +1,16 @@
 # Graph Report - pelada-manager  (2026-08-13)
 
 ## Corpus Check
-- 41 files · ~41,299 words
+- 41 files · ~41,342 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 644 nodes · 1128 edges · 35 communities (28 shown, 7 thin omitted)
+- 647 nodes · 1133 edges · 35 communities (28 shown, 7 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 12 edges (avg confidence: 0.53)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `571a2c89`
+- Built from commit: `ac2775f6`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -55,7 +55,7 @@
 1. `_get_connection()` - 41 edges
 2. `Player` - 30 edges
 3. `balance_teams()` - 21 edges
-4. `_auth()` - 16 edges
+4. `_auth()` - 18 edges
 5. `_require_membership()` - 15 edges
 6. `_require_pelada()` - 14 edges
 7. `_auth()` - 14 edges
@@ -105,8 +105,8 @@ Cohesion: 0.07
 Nodes (14): _issue_session_token(), client(), FakeUserStorage, fixture, Google login: token exchange and the current-user endpoint. The Google token…, test_me_returns_the_logged_in_user(), _auth(), client() (+6 more)
 
 ### Community 6 - "test_invites.py"
-Cohesion: 0.10
-Nodes (25): _auth(), env(), FakeInviteStorage, FakeUserStorage, _iso(), fixture, Phase 3 invites: create/list/revoke, the public preview, and accepting an…, Members see only invites they created; admins/owners see all. (+17 more)
+Cohesion: 0.09
+Nodes (27): _auth(), env(), FakeInviteStorage, FakeUserStorage, _iso(), fixture, Phase 3 invites: create/list/revoke, the public preview, and accepting an…, Members see only invites they created; admins/owners see all. (+19 more)
 
 ### Community 7 - "admin.js"
 Cohesion: 0.20

@@ -30,6 +30,9 @@ class FakeUserStorage:
     def add_membership(self, pelada_id, user_id, role):
         self.memberships.append((pelada_id, user_id))
 
+    def list_members(self, pelada_id):
+        return [{"id": 1, "email": "u@x.com", "name": "U", "role": self.role, "picture": None}]
+
 
 class FakeInviteStorage:
     def __init__(self):
@@ -250,3 +253,19 @@ def test_accept_revoked_invite_is_410(env):
 def test_accept_requires_login(env):
     _seed_invite(env)
     assert env.post("/api/invites/tok123/accept").status_code == 401
+
+
+# --- list members -----------------------------------------------------
+
+def test_member_can_list_members(env):
+    env.users.role = "member"
+    res = env.get("/api/peladas/5/members", headers=_auth(pelada_id=5))
+    assert res.status_code == 200
+    assert isinstance(res.get_json(), list)
+
+
+def test_admin_can_list_members(env):
+    env.users.role = "admin"
+    res = env.get("/api/peladas/5/members", headers=_auth(pelada_id=5))
+    assert res.status_code == 200
+    assert isinstance(res.get_json(), list)
