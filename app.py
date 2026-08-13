@@ -19,7 +19,7 @@ from services.team_balancer import balance_teams
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "3.4.13")
+APP_VERSION = os.getenv("APP_VERSION", "3.4.14")
 
 VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white", "pink"}
 
@@ -625,8 +625,8 @@ def accept_invite(token):
 @app.route("/api/peladas/<int:pelada_id>/members", methods=["GET"])
 def list_members(pelada_id):
     pid, user, role = _require_membership()
-    if pid != pelada_id or role not in ("owner", "admin"):
-        abort(403, description="Admin or owner only")
+    if pid != pelada_id:
+        abort(403, description="Pelada mismatch")
     return jsonify(user_storage.list_members(pelada_id))
 
 
