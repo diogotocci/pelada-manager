@@ -3,7 +3,7 @@ import random
 import pytest
 
 from models import Player
-from services.team_balancer import _gk_advantage, balance_teams
+from services.team_balancer import _gk_advantage, balance_teams, pick_kickoff_team
 
 
 def mk(i, rating, gk=False, foot=1):
@@ -131,3 +131,16 @@ def test_gk_advantage_values():
     assert _gk_advantage(mk(1, 3.0, gk=True, foot=1)) == pytest.approx(0.5)
     assert _gk_advantage(mk(1, 3.0, gk=True, foot=3)) == pytest.approx(1.5)
     assert _gk_advantage(mk(1, 5.0, gk=True, foot=3)) == pytest.approx(3.5)
+
+
+# ---- kickoff ----------------------------------------------------------------
+
+def test_kickoff_needs_two_teams():
+    assert pick_kickoff_team([]) is None
+    assert pick_kickoff_team([{"players": []}]) is None
+
+
+def test_kickoff_picks_one_of_the_two_playing_teams():
+    teams = [{"players": []}, {"players": []}, {"players": []}]
+    picks = {pick_kickoff_team(teams) for _ in range(200)}
+    assert picks == {0, 1}

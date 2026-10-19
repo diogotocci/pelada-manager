@@ -100,6 +100,7 @@ async function performDraw(teamSize) {
 
     lastTeamSize = teamSize;
     lastDrawnTeams = data.teams;
+    lastKickoffTeam = typeof data.kickoff_team === "number" ? data.kickoff_team : null;
 
     renderTeams(lastDrawnTeams);
     showScreen("s-teams");
@@ -145,6 +146,7 @@ function teamTotal(team) {
 function renderTeams(teams) {
   const cardsEl = $("tm-cards");
   const balanceEl = $("tm-balance");
+  const kickoffEl = $("tm-kickoff");
   if (!cardsEl) return;
 
   $("tm-sub").textContent = gameDateLabel();
@@ -155,7 +157,19 @@ function renderTeams(teams) {
   cardsEl.innerHTML = "";
   balanceEl.innerHTML = "";
 
+  kickoffEl.innerHTML = "";
+  kickoffEl.classList.add("hidden");
+
   if (!teams || teams.length === 0) return;
+
+  // Kickoff: shown to everyone (not only admins), right below the scoreboard.
+  if (lastKickoffTeam !== null && teams.length >= 2) {
+    const kickoffColor = getBibColor(getTeamColorKey(lastKickoffTeam + 1));
+    kickoffEl.classList.remove("hidden");
+    kickoffEl.innerHTML =
+      kickoffBallSVG(20) +
+      "<span>Começa com a bola: <b>" + escapeHTML(kickoffColor.label) + "</b></span>";
+  }
 
   // Placar de equilíbrio: só para admin/dono e com o olho aberto.
   if (starsVisible() && teams.length >= 2) {
@@ -206,6 +220,17 @@ function renderTeams(teams) {
       : count + " na linha" + (starsVisible() ? " · " + formatDecimal(teamTotal(team)) + " ★" : "");
 
     head.appendChild(nameEl);
+
+    if (index === lastKickoffTeam && !isBench) {
+      const ballEl = document.createElement("span");
+      ballEl.className = "t-kickoff";
+      ballEl.setAttribute("role", "img");
+      ballEl.setAttribute("aria-label", "Começa com a bola");
+      ballEl.title = "Começa com a bola";
+      ballEl.innerHTML = kickoffBallSVG(20);
+      head.appendChild(ballEl);
+    }
+
     head.appendChild(totalEl);
 
     const body = document.createElement("div");
@@ -350,6 +375,9 @@ function buildShareText() {
   const lines = [];
   lines.push("⚽ Times — " + currentPeladaName);
   lines.push(gameDateLabel());
+  if (lastKickoffTeam !== null && lastDrawnTeams.length >= 2) {
+    lines.push("Começa com a bola: " + getBibColor(getTeamColorKey(lastKickoffTeam + 1)).label);
+  }
   lines.push("");
 
   lastDrawnTeams.forEach(function (team, index) {

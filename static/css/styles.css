@@ -414,6 +414,26 @@ input { font: inherit; }
   padding: 5px 9px;
 }
 
+.kickoff {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: var(--surface2);
+  font-size: .86rem;
+}
+.kickoff-ball {
+  flex: none;
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.7;
+  stroke-linejoin: round;
+}
+.team-head .t-kickoff { display: flex; flex: none; }
+
 .team-card { margin-top: 14px; }
 .team-head {
   display: flex;

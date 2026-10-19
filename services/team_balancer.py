@@ -1,6 +1,6 @@
 import random
 from dataclasses import replace
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from models import Player
 
@@ -75,6 +75,13 @@ def balance_teams(players: List[Player], team_size: int) -> List[Dict]:
     _recalculate_totals(teams)
 
     return teams
+
+
+def pick_kickoff_team(teams: List) -> Optional[int]:
+    """Randomly pick which of the two playing teams (index 0 or 1) starts with the ball."""
+    if len(teams) < 2:
+        return None
+    return random.randint(0, 1)
 
 
 def _outfield_count(team: Dict) -> int:
