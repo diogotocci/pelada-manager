@@ -44,6 +44,8 @@ Located in `services/team_balancer.py`.
 ### Goalkeeper Seeding
 - Only the first two goalkeepers are assigned as fixed goalkeepers (one per playing team). They occupy a slot (reducing outfield capacity by 1).
 - Any extra goalkeepers are treated as outfielders.
+- With two fixed goalkeepers, the keepers stay in goal when a bench team comes on. Bench teams therefore hold `team_size - 1` outfielders and are seeded with the average keeper advantage.
+- Teams are compared by strength per slot (scaled to a full team), so a smaller remainder team gets average players instead of the strongest ones.
 - Fixed goalkeepers contribute an "advantage" score to their team (`_gk_advantage`), which is a function of their `rating`, `gk_footwork`, and a baseline. This seeds the team so outfielders compensate for a weaker keeper.
 
 ### Outfielder Selection
