@@ -24,6 +24,8 @@ let helpReturnScreen = "s-home";
 let checkinState = {};
 let lastTeamSize = 5;
 let lastDrawnTeams = [];
+// Index (0 or 1) of the playing team that starts with the ball, from the draw.
+let lastKickoffTeam = null;
 
 const BIB_COLORS = [
   { key: "blue", label: "Azul", light: "#4da3ff", dark: "#2d7cff", emoji: "🔵" },
@@ -263,6 +265,14 @@ function gkGloveHTML(player) {
   return player && player.is_goalkeeper
     ? ' <span class="gk-glove" title="Goleiro fixo" aria-label="Goleiro fixo">🧤</span>'
     : "";
+}
+
+function kickoffBallSVG(size) {
+  return '<svg class="kickoff-ball" viewBox="0 0 24 24" width="' + size + '" height="' + size + '" aria-hidden="true">' +
+    '<circle cx="12" cy="12" r="9.5"/>' +
+    '<path d="M12 7.2l4.2 3-1.6 4.9H9.4L7.8 10.2z"/>' +
+    '<path d="M12 7.2V2.6M16.2 10.2l4.3-1.5M14.6 15.1l2.7 3.8M9.4 15.1l-2.7 3.8M7.8 10.2 3.5 8.7"/>' +
+    "</svg>";
 }
 
 function formatDecimal(value) {

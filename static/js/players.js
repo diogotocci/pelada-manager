@@ -11,6 +11,7 @@ function goHome() {
   players = [];
   checkinState = {};
   lastDrawnTeams = [];
+  lastKickoffTeam = null;
   currentPeladaRole = null;
   setAdminMode(false);
   localStorage.removeItem("pelada-current-id");
@@ -142,6 +143,7 @@ function enterPelada(pelada) {
   players = [];
   checkinState = {};
   lastDrawnTeams = [];
+  lastKickoffTeam = null;
 
   $("ci-title").textContent = pelada.name;
   $("sq-title").textContent = pelada.name;

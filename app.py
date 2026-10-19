@@ -15,11 +15,11 @@ from storage.postgres_storage import (
     ClientLogStorage,
     ensure_schema,
 )
-from services.team_balancer import balance_teams
+from services.team_balancer import balance_teams, pick_kickoff_team
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "3.4.16")
+APP_VERSION = os.getenv("APP_VERSION", "3.4.17")
 
 VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white", "pink"}
 
@@ -902,7 +902,7 @@ def draw_teams():
             entry["total_rating"] = team["total_rating"]
         result.append(entry)
 
-    return jsonify({"teams": result})
+    return jsonify({"teams": result, "kickoff_team": pick_kickoff_team(result)})
 
 
 if __name__ == "__main__":
