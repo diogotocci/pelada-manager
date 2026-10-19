@@ -101,7 +101,7 @@ def _create_empty_teams(outfield_count: int, team_size: int, keepers: List[Playe
         teams = []
         for index in range(team_count):
             capacity = team_size if index < full_teams else (remainder if remainder > 0 else team_size)
-            teams.append({"players": [], "total_rating": 0.0, "capacity": capacity, "seed": 0.0})
+            teams.append({"players": [], "total_rating": 0.0, "capacity": capacity, "seed": 0.0, "slots": capacity})
         return teams
 
     # With keepers: two playing teams (one keeper each, up to two), each keeper
@@ -115,20 +115,51 @@ def _create_empty_teams(outfield_count: int, team_size: int, keepers: List[Playe
             "total_rating": 0.0,
             "capacity": max(0, team_size - (1 if has_keeper else 0)),
             "seed": 0.0,
+            "slots": team_size,
         })
 
     # Overflow outfielders go to bench teams: full-size teams plus a final
     # smaller one for the remainder, so the two playing teams stay full.
+    # With two fixed keepers, the keepers stay in goal when a bench team comes
+    # on, so a bench team only brings outfielders (team_size - 1) and is seeded
+    # with the average keeper advantage it will play with.
+    keepers_stay = num_keepers >= 2 and team_size > 1
+    bench_size = team_size - 1 if keepers_stay else team_size
+    bench_seed = sum(_gk_advantage(k) for k in keepers[:2]) / 2 if keepers_stay else 0.0
+    keeper_slot = 1 if keepers_stay else 0
+
     playing_capacity = sum(t["capacity"] for t in teams)
     overflow = max(0, outfield_count - playing_capacity)
-    full_bench = overflow // team_size
-    rem_bench = overflow % team_size
+    full_bench = overflow // bench_size
+    rem_bench = overflow % bench_size
     for _ in range(full_bench):
-        teams.append({"players": [], "total_rating": 0.0, "capacity": team_size, "seed": 0.0})
+        teams.append({
+            "players": [], "total_rating": 0.0, "capacity": bench_size,
+            "seed": bench_seed, "slots": bench_size + keeper_slot,
+        })
     if rem_bench > 0:
-        teams.append({"players": [], "total_rating": 0.0, "capacity": rem_bench, "seed": 0.0})
+        teams.append({
+            "players": [], "total_rating": 0.0, "capacity": rem_bench,
+            "seed": bench_seed * rem_bench / bench_size, "slots": rem_bench + keeper_slot * rem_bench / bench_size,
+        })
 
     return teams
+
+
+def _strength(team: Dict, all_teams: List[Dict], total: float = None) -> float:
+    """
+    Team strength scaled to a full-size team, so a smaller remainder team is
+    compared by its per-slot level instead of its raw total. Without this, a
+    2-player remainder team can never reach the totals of 5-player teams and
+    the balancer keeps feeding it the strongest players.
+    Full-size teams (including keeper teams, whose keeper fills a slot) keep
+    a factor of 1.0, so their behaviour is unchanged.
+    """
+    if total is None:
+        total = team["total_rating"]
+    reference_slots = max(t.get("slots", t["capacity"]) for t in all_teams)
+    slots = max(team.get("slots", team["capacity"]), 1)
+    return (total + team.get("seed", 0.0)) * reference_slots / slots
 
 
 def _outfielders(players: List[Player]) -> List[Player]:
@@ -142,7 +173,7 @@ def _team_score_if_added(team: Dict, player: Player, all_teams: List[Dict]) -> f
     simulated_total = team["total_rating"] + player.rating
 
     projected_totals = [
-        (simulated_total + team.get("seed", 0.0)) if t is team else (t["total_rating"] + t.get("seed", 0.0))
+        _strength(t, all_teams, simulated_total) if t is team else _strength(t, all_teams)
         for t in all_teams
     ]
 
@@ -224,7 +255,7 @@ def _apply_attribute_aware_swaps(teams: List[Dict], max_attempts: int = 90) -> N
 
 
 def _overall_balance_score(teams: List[Dict]) -> float:
-    totals = [team["total_rating"] + team.get("seed", 0.0) for team in teams]
+    totals = [_strength(team, teams) for team in teams]
     rating_spread = max(totals) - min(totals)
 
     marking_totals = [_sum_attribute(_outfielders(team["players"]), "marking") for team in teams]
