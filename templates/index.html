@@ -324,6 +324,9 @@
           <input type="text" id="wz-name" placeholder="Ex.: Pelada do bairro">
           <p class="err" id="wz-err"></p>
         </div>
+        <p class="eyebrow">Tipo de pelada</p>
+        <div class="chip-select" id="wz-sport"></div>
+        <p class="hint" style="padding:6px 2px 0">Campo usa a posição de cada jogador no sorteio. Não dá para mudar depois.</p>
         <p class="eyebrow">Dia da pelada</p>
         <div class="weekdays" id="wz-weekday"></div>
         <p class="eyebrow">Colete do time 1</p>
@@ -358,7 +361,7 @@
           <label for="wz-player">Nome do jogador</label>
           <input type="text" id="wz-player" placeholder="Nome ou apelido">
         </div>
-        <div class="seg-row" style="padding:2px 0 14px">
+        <div class="seg-row" id="wz-gk-row" style="padding:2px 0 14px">
           <div style="display:flex;align-items:center;gap:9px;">
             <span style="font-size:1.15rem">🧤</span>
             <div>
@@ -367,6 +370,10 @@
             </div>
           </div>
           <button class="switch" id="wz-gk" role="switch" aria-label="É goleiro fixo"></button>
+        </div>
+        <div class="field hidden" id="wz-pos-row">
+          <label>Posição</label>
+          <div class="chip-select" id="wz-pos"></div>
         </div>
         <div class="field">
           <label id="wz-stars-label">Nível geral</label>
@@ -590,7 +597,7 @@
         <input type="text" id="pf-name" placeholder="Nome ou apelido">
         <p class="err" id="pf-err"></p>
       </div>
-      <div class="seg-row" style="padding:2px 0 14px">
+      <div class="seg-row" id="pf-gk-row" style="padding:2px 0 14px">
         <div style="display:flex;align-items:center;gap:9px;">
           <span style="font-size:1.15rem">🧤</span>
           <div>
@@ -599,6 +606,10 @@
           </div>
         </div>
         <button class="switch" id="pf-gk" role="switch" aria-label="É goleiro fixo"></button>
+      </div>
+      <div class="field hidden" id="pf-pos-row">
+        <label>Posição principal</label>
+        <div class="chip-select" id="pf-pos"></div>
       </div>
       <div class="field">
         <label id="pf-stars-label">Nível geral</label>
@@ -677,6 +688,21 @@
     <div class="s-actions">
       <button class="btn btn-ghost" id="cf-cancel">Cancelar</button>
       <button class="btn btn-danger-solid" id="cf-confirm">Confirmar</button>
+    </div>
+  </div>
+
+  <!-- Posição do dia (peladas de campo) -->
+  <div class="sheet" id="sh-daypos" role="dialog" aria-modal="true">
+    <div class="grab"></div>
+    <h3>Posição de hoje</h3>
+    <p class="s-sub" id="dp-sub"></p>
+    <div class="s-body">
+      <div class="chip-select" id="dp-opts"></div>
+      <p class="hint" id="dp-hint" style="padding-top:10px">Vale até o dia do jogo; depois volta para a posição principal.</p>
+    </div>
+    <div class="s-actions">
+      <button class="btn btn-ghost" id="dp-cancel">Cancelar</button>
+      <button class="btn btn-ghost" id="dp-reset">Usar a principal</button>
     </div>
   </div>
 

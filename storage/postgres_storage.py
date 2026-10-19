@@ -71,6 +71,21 @@ def ensure_schema() -> None:
                 $$;
             """)
 
+            # sport_type: 'futsal' (salao) or 'field' (campo/society). Fixed at
+            # creation; existing peladas default to futsal.
+            cur.execute("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'peladas' AND column_name = 'sport_type'
+                    ) THEN
+                        ALTER TABLE peladas ADD COLUMN sport_type TEXT NOT NULL DEFAULT 'futsal';
+                    END IF;
+                END
+                $$;
+            """)
+
             # One-time backfill for the two known peladas. Guarded by IS NULL
             # so it only seeds the initial value and never overrides a later
             # edit made through the admin UI. Saturday = 6, Monday = 1.
@@ -113,6 +128,33 @@ def ensure_schema() -> None:
                         WHERE table_name = 'players' AND column_name = 'gk_footwork'
                     ) THEN
                         ALTER TABLE players ADD COLUMN gk_footwork SMALLINT NOT NULL DEFAULT 1;
+                    END IF;
+                END
+                $$;
+            """)
+
+            # Field positions: a main position plus a temporary day position
+            # that applies up to and including day_position_until.
+            cur.execute("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'players' AND column_name = 'position'
+                    ) THEN
+                        ALTER TABLE players ADD COLUMN position TEXT;
+                    END IF;
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'players' AND column_name = 'day_position'
+                    ) THEN
+                        ALTER TABLE players ADD COLUMN day_position TEXT;
+                    END IF;
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'players' AND column_name = 'day_position_until'
+                    ) THEN
+                        ALTER TABLE players ADD COLUMN day_position_until DATE;
                     END IF;
                 END
                 $$;
@@ -263,6 +305,9 @@ def _row_to_player(row) -> Player:
         scoring=int(row["scoring"]),
         is_goalkeeper=bool(row.get("is_goalkeeper", False)),
         gk_footwork=int(row["gk_footwork"]) if row.get("gk_footwork") is not None else 1,
+        position=row.get("position"),
+        day_position=row.get("day_position"),
+        day_position_until=row.get("day_position_until"),
     )
 
 
@@ -275,6 +320,7 @@ def _row_to_pelada(row) -> Dict:
         "team1_color": row.get("team1_color") or "blue",
         "team2_color": row.get("team2_color") or "yellow",
         "game_weekday": int(weekday) if weekday is not None else None,
+        "sport_type": row.get("sport_type") or "futsal",
     }
 
 
@@ -283,26 +329,26 @@ class PeladaStorage:
         with _get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT p.id, p.name, p.team1_color, p.team2_color, p.game_weekday, COUNT(pl.id) AS player_count
+                    SELECT p.id, p.name, p.team1_color, p.team2_color, p.game_weekday, p.sport_type, COUNT(pl.id) AS player_count
                     FROM peladas p
                     LEFT JOIN players pl ON pl.pelada_id = p.id
-                    GROUP BY p.id, p.name, p.team1_color, p.team2_color, p.game_weekday
+                    GROUP BY p.id, p.name, p.team1_color, p.team2_color, p.game_weekday, p.sport_type
                     ORDER BY p.id
                 """)
                 return [_row_to_pelada(r) for r in cur.fetchall()]
 
-    def create_pelada_owned(self, name: str, owner_user_id: int, team1_color: str = "blue", team2_color: str = "yellow", game_weekday: Optional[int] = None) -> Dict:
+    def create_pelada_owned(self, name: str, owner_user_id: int, team1_color: str = "blue", team2_color: str = "yellow", game_weekday: Optional[int] = None, sport_type: str = "futsal") -> Dict:
         """Create a pelada (no password) and make the given user its owner, in
         one transaction. Returns the pelada with role='owner'."""
         with _get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO peladas (name, team1_color, team2_color, game_weekday)
-                    VALUES (%s, %s, %s, %s)
-                    RETURNING id, name, team1_color, team2_color, game_weekday, 0 AS player_count
+                    INSERT INTO peladas (name, team1_color, team2_color, game_weekday, sport_type)
+                    VALUES (%s, %s, %s, %s, %s)
+                    RETURNING id, name, team1_color, team2_color, game_weekday, sport_type, 0 AS player_count
                     """,
-                    (name, team1_color, team2_color, game_weekday),
+                    (name, team1_color, team2_color, game_weekday, sport_type),
                 )
                 pelada = _row_to_pelada(cur.fetchone())
                 cur.execute(
@@ -312,6 +358,19 @@ class PeladaStorage:
                 pelada["role"] = "owner"
                 return pelada
 
+    def get_pelada(self, pelada_id: int) -> Optional[Dict]:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, name, team1_color, team2_color, game_weekday, sport_type, 0 AS player_count
+                    FROM peladas WHERE id = %s
+                    """,
+                    (pelada_id,),
+                )
+                row = cur.fetchone()
+                return _row_to_pelada(row) if row else None
+
     def update_pelada_colors(self, pelada_id: int, team1_color: str, team2_color: str) -> Optional[Dict]:
         with _get_connection() as conn:
             with conn.cursor() as cur:
@@ -320,7 +379,7 @@ class PeladaStorage:
                     UPDATE peladas
                     SET team1_color = %s, team2_color = %s
                     WHERE id = %s
-                    RETURNING id, name, team1_color, team2_color, game_weekday, 0 AS player_count
+                    RETURNING id, name, team1_color, team2_color, game_weekday, sport_type, 0 AS player_count
                     """,
                     (team1_color, team2_color, pelada_id),
                 )
@@ -335,7 +394,7 @@ class PeladaStorage:
                     UPDATE peladas
                     SET game_weekday = %s
                     WHERE id = %s
-                    RETURNING id, name, team1_color, team2_color, game_weekday, 0 AS player_count
+                    RETURNING id, name, team1_color, team2_color, game_weekday, sport_type, 0 AS player_count
                     """,
                     (game_weekday, pelada_id),
                 )
@@ -562,12 +621,12 @@ class UserStorage:
                 cur.execute(
                     """
                     SELECT p.id, p.name, p.team1_color, p.team2_color, p.game_weekday,
-                           m.role, COUNT(pl.id) AS player_count
+                           p.sport_type, m.role, COUNT(pl.id) AS player_count
                     FROM pelada_members m
                     JOIN peladas p ON p.id = m.pelada_id
                     LEFT JOIN players pl ON pl.pelada_id = p.id
                     WHERE m.user_id = %s
-                    GROUP BY p.id, p.name, p.team1_color, p.team2_color, p.game_weekday, m.role
+                    GROUP BY p.id, p.name, p.team1_color, p.team2_color, p.game_weekday, p.sport_type, m.role
                     ORDER BY p.id
                     """,
                     (user_id,),
@@ -782,16 +841,17 @@ class PlayerStorage:
         scoring: int = 2,
         is_goalkeeper: bool = False,
         gk_footwork: int = 1,
+        position: Optional[str] = None,
     ) -> Player:
         with _get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO players (pelada_id, name, rating, active, marking, stamina, scoring, is_goalkeeper, gk_footwork)
-                    VALUES (%s, %s, %s, TRUE, %s, %s, %s, %s, %s)
+                    INSERT INTO players (pelada_id, name, rating, active, marking, stamina, scoring, is_goalkeeper, gk_footwork, position)
+                    VALUES (%s, %s, %s, TRUE, %s, %s, %s, %s, %s, %s)
                     RETURNING *
                     """,
-                    (pelada_id, name, rating, marking, stamina, scoring, is_goalkeeper, gk_footwork),
+                    (pelada_id, name, rating, marking, stamina, scoring, is_goalkeeper, gk_footwork, position),
                 )
                 return _row_to_player(cur.fetchone())
 
@@ -806,6 +866,7 @@ class PlayerStorage:
         scoring: Optional[int] = None,
         is_goalkeeper: Optional[bool] = None,
         gk_footwork: Optional[int] = None,
+        position: Optional[str] = None,
     ) -> Optional[Player]:
         with _get_connection() as conn:
             with conn.cursor() as cur:
@@ -818,11 +879,28 @@ class PlayerStorage:
                         stamina       = COALESCE(%s, stamina),
                         scoring       = COALESCE(%s, scoring),
                         is_goalkeeper = COALESCE(%s, is_goalkeeper),
-                        gk_footwork   = COALESCE(%s, gk_footwork)
+                        gk_footwork   = COALESCE(%s, gk_footwork),
+                        position      = COALESCE(%s, position)
                     WHERE id = %s AND pelada_id = %s
                     RETURNING *
                     """,
-                    (name, rating, marking, stamina, scoring, is_goalkeeper, gk_footwork, player_id, pelada_id),
+                    (name, rating, marking, stamina, scoring, is_goalkeeper, gk_footwork, position, player_id, pelada_id),
+                )
+                row = cur.fetchone()
+                return _row_to_player(row) if row else None
+
+    def set_day_position(self, pelada_id: int, player_id: int, position: Optional[str], until) -> Optional[Player]:
+        """Set (or clear, with position=None) a player's temporary day position."""
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE players
+                    SET day_position = %s, day_position_until = %s
+                    WHERE id = %s AND pelada_id = %s
+                    RETURNING *
+                    """,
+                    (position, until if position else None, player_id, pelada_id),
                 )
                 row = cur.fetchone()
                 return _row_to_player(row) if row else None

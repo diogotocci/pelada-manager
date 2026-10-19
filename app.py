@@ -1,4 +1,5 @@
 import os
+from dataclasses import replace
 import logging
 from datetime import datetime, timedelta, timezone
 from flask import Flask, render_template, jsonify, request, abort, Response
@@ -16,10 +17,20 @@ from storage.postgres_storage import (
     ensure_schema,
 )
 from services.team_balancer import balance_teams, pick_kickoff_team
+from services.positions import (
+    POSITION_GOALKEEPER,
+    POSITIONS,
+    SPORT_FIELD,
+    SPORT_FUTSAL,
+    SPORT_TYPES,
+    day_position_until,
+    effective_position,
+    today_local,
+)
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "3.4.17")
+APP_VERSION = os.getenv("APP_VERSION", "3.4.18")
 
 VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white", "pink"}
 
@@ -147,7 +158,10 @@ def _optional_pelada_id():
 
 
 def _player_json(player, is_admin):
-    """Members never receive ratings/attributes — only public fields."""
+    """Members never receive ratings/attributes — only public fields.
+    An expired day position is reported as None."""
+    if player.day_position and not _day_position_active(player):
+        player = replace(player, day_position=None, day_position_until=None)
     if is_admin:
         return player.to_dict()
     return {
@@ -155,7 +169,40 @@ def _player_json(player, is_admin):
         "name": player.name,
         "active": player.active,
         "is_goalkeeper": player.is_goalkeeper,
+        "position": player.position,
+        "day_position": player.day_position,
     }
+
+
+def _day_position_active(player, today=None) -> bool:
+    today = today or today_local()
+    return effective_position(None, player.day_position, player.day_position_until, today) is not None
+
+
+def _parse_position(value):
+    """Validate an optional field position. Returns it or None; 400 when invalid."""
+    if value is None:
+        return None
+    if value not in POSITIONS:
+        abort(400, description="Invalid position")
+    return value
+
+
+def _apply_day_positions(players, today=None):
+    """
+    Return copies of the players with their effective position for the draw:
+    the day position while it is valid, else the main position. The keeper flag
+    follows the effective position when one is set.
+    """
+    today = today or today_local()
+    result = []
+    for p in players:
+        position = effective_position(p.position, p.day_position, p.day_position_until, today)
+        if position is None:
+            result.append(p)
+        else:
+            result.append(replace(p, position=position, is_goalkeeper=position == POSITION_GOALKEEPER))
+    return result
 
 
 def _invite_status(invite) -> str:
@@ -327,12 +374,17 @@ def create_pelada():
 
     game_weekday = _parse_weekday(data.get("game_weekday"))
 
+    sport_type = data.get("sport_type", SPORT_FUTSAL)
+    if sport_type not in SPORT_TYPES:
+        abort(400, description="Invalid sport type")
+
     pelada = pelada_storage.create_pelada_owned(
         name=name,
         owner_user_id=user["id"],
         team1_color=team1_color,
         team2_color=team2_color,
         game_weekday=game_weekday,
+        sport_type=sport_type,
     )
     return jsonify(pelada), 201
 
@@ -712,6 +764,9 @@ def create_player():
     scoring = int(data.get("scoring", 2))
     is_goalkeeper = bool(data.get("is_goalkeeper", False))
     gk_footwork = int(data.get("gk_footwork", 1))
+    position = _parse_position(data.get("position"))
+    if position is not None:
+        is_goalkeeper = position == POSITION_GOALKEEPER
 
     if not name:
         abort(400, description="Name cannot be empty")
@@ -740,6 +795,7 @@ def create_player():
         scoring=scoring,
         is_goalkeeper=is_goalkeeper,
         gk_footwork=gk_footwork,
+        position=position,
     )
 
     return jsonify(_player_json(player, adm)), 201
@@ -778,6 +834,10 @@ def update_player(player_id):
     if is_goalkeeper is not None:
         is_goalkeeper = bool(is_goalkeeper)
 
+    position = _parse_position(data.get("position"))
+    if position is not None:
+        is_goalkeeper = position == POSITION_GOALKEEPER
+
     if marking is not None:
         marking = int(marking)
         if not _is_valid_attribute(marking):
@@ -808,8 +868,33 @@ def update_player(player_id):
         scoring=scoring,
         is_goalkeeper=is_goalkeeper,
         gk_footwork=gk_footwork,
+        position=position,
     )
 
+    if not updated_player:
+        abort(404, description="Player not found")
+
+    return jsonify(_player_json(updated_player, adm))
+
+
+@app.route("/api/players/<int:player_id>/day-position", methods=["PATCH"])
+def set_player_day_position(player_id):
+    """Any member may set the position a player plays on the next game day.
+    It reverts to the main position after that day. null clears it."""
+    pelada_id, adm = _require_pelada()
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or "position" not in data:
+        abort(400, description="Missing 'position' field")
+    position = _parse_position(data["position"])
+
+    pelada = pelada_storage.get_pelada(pelada_id)
+    if pelada is None:
+        abort(404, description="Pelada not found")
+    if pelada.get("sport_type") != SPORT_FIELD:
+        abort(400, description="Positions are only available in field peladas")
+
+    until = day_position_until(today_local(), pelada.get("game_weekday"))
+    updated_player = player_storage.set_day_position(pelada_id, player_id, position, until)
     if not updated_player:
         abort(404, description="Player not found")
 
@@ -890,7 +975,12 @@ def draw_teams():
     if len(players) == 0:
         abort(400, description="No active players to draw teams")
 
-    teams = balance_teams(players, team_size)
+    pelada = pelada_storage.get_pelada(pelada_id)
+    is_field = bool(pelada) and pelada.get("sport_type") == SPORT_FIELD
+    if is_field:
+        players = _apply_day_positions(players)
+
+    teams = balance_teams(players, team_size, spread_positions=is_field)
 
     result = []
     for idx, team in enumerate(teams, start=1):

@@ -10,6 +10,10 @@ from models import Player
 GK_BASELINE = 2.5
 GK_FOOT_BONUS = {1: 0.0, 2: 0.5, 3: 1.0}
 
+# Field peladas: penalty per extra player of one position beyond an even
+# spread (a team may hold at most one more of a position than another).
+POSITION_WEIGHT = 15.0
+
 
 def _gk_advantage(player: Player) -> float:
     footwork = getattr(player, "gk_footwork", 1)
@@ -17,7 +21,7 @@ def _gk_advantage(player: Player) -> float:
     return max(0.0, effective - GK_BASELINE)
 
 
-def balance_teams(players: List[Player], team_size: int) -> List[Dict]:
+def balance_teams(players: List[Player], team_size: int, spread_positions: bool = False) -> List[Dict]:
     """
     Build balanced teams considering:
     - total rating balance;
@@ -28,7 +32,9 @@ def balance_teams(players: List[Player], team_size: int) -> List[Dict]:
     - fixed goalkeepers (one per playing team, occupying a court slot; their
       "advantage above a baseline" seeds the team so the outfield fills to
       compensate a weaker/absent keeper on the other side);
-    - controlled random swaps for redraw variation.
+    - controlled random swaps for redraw variation;
+    - with spread_positions (field peladas), each outfield position spread as
+      evenly as possible across the full-size teams.
     """
     if team_size <= 0:
         raise ValueError("team_size must be > 0")
@@ -55,23 +61,41 @@ def balance_teams(players: List[Player], team_size: int) -> List[Dict]:
             teams[index]["players"].append(keeper)
             teams[index]["seed"] = _gk_advantage(keeper)
 
-    sorted_players = sorted(
-        outfielders,
-        key=lambda p: (-p.rating, random.random()),
-    )
+    if spread_positions:
+        # Place one position group at a time (largest group first, players
+        # without a position last) so every group is spread while all teams
+        # still have room; within a group, strongest first.
+        group_sizes: Dict[str, int] = {}
+        for p in outfielders:
+            if _position_of(p):
+                group_sizes[_position_of(p)] = group_sizes.get(_position_of(p), 0) + 1
+        sorted_players = sorted(
+            outfielders,
+            key=lambda p: (
+                -group_sizes.get(_position_of(p), 0) if _position_of(p) else 1,
+                _position_of(p) or "",
+                -p.rating,
+                random.random(),
+            ),
+        )
+    else:
+        sorted_players = sorted(
+            outfielders,
+            key=lambda p: (-p.rating, random.random()),
+        )
 
     for player in sorted_players:
         candidates = [t for t in teams if _outfield_count(t) < t["capacity"]]
 
         best_team = min(
             candidates,
-            key=lambda team: _team_score_if_added(team, player, teams),
+            key=lambda team: _team_score_if_added(team, player, teams, spread_positions),
         )
 
         best_team["players"].append(player)
         best_team["total_rating"] += player.rating
 
-    _apply_attribute_aware_swaps(teams, max_attempts=90)
+    _apply_attribute_aware_swaps(teams, max_attempts=180 if spread_positions else 90, spread_positions=spread_positions)
     _recalculate_totals(teams)
 
     return teams
@@ -166,7 +190,50 @@ def _outfielders(players: List[Player]) -> List[Player]:
     return [p for p in players if not getattr(p, "is_goalkeeper", False)]
 
 
-def _team_score_if_added(team: Dict, player: Player, all_teams: List[Dict]) -> float:
+def _position_of(player: Player) -> Optional[str]:
+    return getattr(player, "position", None)
+
+
+def _count_position(players: List[Player], position: str) -> int:
+    return sum(1 for p in players if _position_of(p) == position)
+
+
+def _full_size_teams(teams: List[Dict]) -> List[Dict]:
+    """Teams with the most slots: a smaller remainder team is left out of the
+    position spread, since it naturally holds fewer of every position."""
+    reference_slots = max(t.get("slots", t["capacity"]) for t in teams)
+    return [t for t in teams if t.get("slots", t["capacity"]) >= reference_slots]
+
+
+def _position_penalty_if_added(team: Dict, player: Player, all_teams: List[Dict]) -> float:
+    position = _position_of(player)
+    if not position:
+        return 0.0
+    here = _count_position(_outfielders(team["players"]), position) + 1
+    others = [
+        _count_position(_outfielders(t["players"]), position)
+        for t in _full_size_teams(all_teams) if t is not team
+    ]
+    if not others:
+        return 0.0
+    return max(0, here - min(others) - 1) * POSITION_WEIGHT
+
+
+def _position_spread_penalty(teams: List[Dict]) -> float:
+    full_teams = _full_size_teams(teams)
+    if len(full_teams) < 2:
+        return 0.0
+    positions = {
+        _position_of(p) for t in full_teams for p in _outfielders(t["players"]) if _position_of(p)
+    }
+    penalty = 0.0
+    for position in positions:
+        counts = [_count_position(_outfielders(t["players"]), position) for t in full_teams]
+        penalty += max(0, max(counts) - min(counts) - 1) * POSITION_WEIGHT
+    return penalty
+
+
+def _team_score_if_added(team: Dict, player: Player, all_teams: List[Dict], spread_positions: bool = False) -> float:
     # Only outfielders drive the spread/attribute penalties; the keeper's
     # contribution is captured by the team "seed".
     simulated_players = _outfielders(team["players"]) + [player]
@@ -194,8 +261,11 @@ def _team_score_if_added(team: Dict, player: Player, all_teams: List[Dict]) -> f
     variance_penalty = _rating_variance(simulated_players)
     size_penalty = len(simulated_players) / max(team["capacity"], 1)
 
+    position_penalty = _position_penalty_if_added(team, player, all_teams) if spread_positions else 0.0
+
     return (
-        rating_spread_penalty * 18.0
+        position_penalty
+        + rating_spread_penalty * 18.0
         + max(0, top_players_penalty - 1) * 6.0
         + max(0, weak_players_penalty - 1) * 6.0
         + max(0, very_top_players_penalty - 1) * 10.0
@@ -211,7 +281,7 @@ def _team_score_if_added(team: Dict, player: Player, all_teams: List[Dict]) -> f
     )
 
 
-def _apply_attribute_aware_swaps(teams: List[Dict], max_attempts: int = 90) -> None:
+def _apply_attribute_aware_swaps(teams: List[Dict], max_attempts: int = 90, spread_positions: bool = False) -> None:
     """
     Try small swaps between players with the same rating or a rating difference up to 0.5.
     A swap is kept only if it improves or preserves the overall team score.
@@ -239,22 +309,27 @@ def _apply_attribute_aware_swaps(teams: List[Dict], max_attempts: int = 90) -> N
         p1 = t1["players"][i]
         p2 = t2["players"][j]
 
-        if abs(p1.rating - p2.rating) > 0.5:
+        # Same-position swaps keep the position spread intact, so in field
+        # peladas they may trade a wider rating gap to fix the rating balance.
+        max_gap = 0.5
+        if spread_positions and _position_of(p1) and _position_of(p1) == _position_of(p2):
+            max_gap = 1.5
+        if abs(p1.rating - p2.rating) > max_gap:
             continue
 
-        current_score = _overall_balance_score(teams)
+        current_score = _overall_balance_score(teams, spread_positions)
 
         t1["players"][i], t2["players"][j] = p2, p1
         _recalculate_totals(teams)
 
-        new_score = _overall_balance_score(teams)
+        new_score = _overall_balance_score(teams, spread_positions)
 
         if new_score > current_score + 0.25:
             t1["players"][i], t2["players"][j] = p1, p2
             _recalculate_totals(teams)
 
 
-def _overall_balance_score(teams: List[Dict]) -> float:
+def _overall_balance_score(teams: List[Dict], spread_positions: bool = False) -> float:
     totals = [_strength(team, teams) for team in teams]
     rating_spread = max(totals) - min(totals)
 
@@ -279,8 +354,11 @@ def _overall_balance_score(teams: List[Dict]) -> float:
         concentrated_extremes += max(0, _count_attribute_value(players, "stamina", 1) - 1) * 4.0
         concentrated_extremes += max(0, _count_attribute_value(players, "stamina", 3) - 1) * 4.0
 
+    position_spread = _position_spread_penalty(teams) if spread_positions else 0.0
+
     return (
-        rating_spread * 20.0
+        position_spread
+        + rating_spread * 20.0
         + marking_spread * 3.5
         + scoring_spread * 3.0
         + stamina_spread * 2.5

@@ -134,6 +134,7 @@ function enterPelada(pelada) {
   currentTeam1Color = pelada.team1_color || "blue";
   currentTeam2Color = pelada.team2_color || "yellow";
   currentPeladaWeekday = pelada.game_weekday != null ? pelada.game_weekday : null;
+  currentPeladaSport = pelada.sport_type === "field" ? "field" : "futsal";
   currentPeladaRole = pelada.role || null;
   setAdminMode(pelada.role === "owner" || pelada.role === "admin");
 
@@ -209,6 +210,11 @@ function renderCheckin() {
   sorted.forEach(function (p) {
     const isPresent = !!checkinState[p.id];
 
+    if (isFieldPelada()) {
+      listEl.appendChild(buildFieldCheckinRow(p, isPresent));
+      return;
+    }
+
     const row = document.createElement("button");
     row.type = "button";
     row.className = "row " + (isPresent ? "checked" : "unchecked-dim");
@@ -246,6 +252,96 @@ function renderCheckin() {
     presentCount > 1 ? "Sortear times (" + presentCount + ")" : "Sortear times";
 }
 
+// Field peladas: the row holds the presence toggle plus a position chip that
+// opens the "position of the day" sheet (two separate buttons, never nested).
+function buildFieldCheckinRow(p, isPresent) {
+  const row = document.createElement("div");
+  row.className = "row " + (isPresent ? "checked" : "unchecked-dim");
+
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "row-toggle";
+  toggle.setAttribute("aria-pressed", String(isPresent));
+
+  const avatar = document.createElement("div");
+  avatar.className = "avatar" + (isPresent ? " hl" : "");
+  avatar.textContent = buildPlayerInitials(p.name);
+
+  const main = document.createElement("div");
+  main.className = "r-main";
+  main.innerHTML = '<span class="r-name">' + escapeHTML(p.name) + gkGloveHTML(p) + "</span>";
+
+  toggle.appendChild(avatar);
+  toggle.appendChild(main);
+
+  const position = getPosition(currentPosition(p));
+  const chip = document.createElement("button");
+  chip.type = "button";
+  chip.className = "pos-chip" + (p.day_position ? " day" : "");
+  chip.textContent = position ? position.short : "POS";
+  chip.setAttribute(
+    "aria-label",
+    "Posição de hoje de " + p.name + ": " + (position ? position.label : "sem posição")
+  );
+  chip.addEventListener("click", function () { openDayPositionSheet(p); });
+
+  const checkBtn = document.createElement("button");
+  checkBtn.type = "button";
+  checkBtn.className = "check-btn";
+  checkBtn.setAttribute("aria-label", (isPresent ? "Desmarcar " : "Marcar ") + p.name);
+  checkBtn.innerHTML = '<span class="check"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></span>';
+
+  function togglePresence() {
+    checkinState[p.id] = !checkinState[p.id];
+    renderCheckin();
+  }
+  toggle.addEventListener("click", togglePresence);
+  checkBtn.addEventListener("click", togglePresence);
+
+  row.appendChild(toggle);
+  row.appendChild(chip);
+  row.appendChild(checkBtn);
+  return row;
+}
+
+// ============================================================
+// Posição do dia (peladas de campo)
+// ============================================================
+
+let dayPositionPlayer = null;
+
+function openDayPositionSheet(player) {
+  dayPositionPlayer = player;
+  const main = getPosition(player.position);
+  $("dp-sub").textContent =
+    player.name + (main ? " · principal: " + main.label : " · sem posição principal");
+  renderPositionPicker($("dp-opts"), currentPosition(player), function (value) {
+    saveDayPosition(value === player.position ? null : value);
+  });
+  $("dp-reset").classList.toggle("hidden", !player.day_position);
+  openSheet("daypos");
+}
+
+async function saveDayPosition(position) {
+  const player = dayPositionPlayer;
+  if (!player) return;
+  try {
+    const updated = await fetchJSON("/api/players/" + player.id + "/day-position", {
+      method: "PATCH",
+      body: JSON.stringify({ position: position }),
+    });
+    players = players.map(function (p) { return p.id === updated.id ? updated : p; });
+    closeSheets();
+    renderCheckin();
+    renderSquad();
+    const pos = getPosition(currentPosition(updated));
+    showToast(updated.name + (pos ? " joga de " + pos.label.toLowerCase() + " hoje" : " sem posição hoje"));
+  } catch (err) {
+    console.error(err);
+    showToast("Erro ao trocar a posição.");
+  }
+}
+
 function checkAll(value) {
   players.forEach(function (p) { checkinState[p.id] = value; });
   renderCheckin();
@@ -281,11 +377,16 @@ function renderSquad() {
     const main = document.createElement("div");
     main.className = "r-main";
     let mainHTML = '<span class="r-name">' + escapeHTML(p.name) + gkGloveHTML(p) + "</span>";
+    const squadPosition = isFieldPelada() ? getPosition(p.position) : null;
+    if (squadPosition && !isAdminMode) {
+      mainHTML += '<span class="r-meta">' + escapeHTML(squadPosition.label) + "</span>";
+    }
     if (isAdminMode) {
       mainHTML +=
         '<span class="r-meta">' + buildStarsHTML(p.rating) +
         '<span class="rating-num">' + formatDecimal(p.rating) + "</span>" +
         (p.is_goalkeeper ? '<span class="rating-num">· pé ' + Number(p.gk_footwork != null ? p.gk_footwork : 1) + "</span>" : "") +
+        (squadPosition ? '<span class="rating-num">· ' + escapeHTML(squadPosition.label) + "</span>" : "") +
         "</span>";
     }
     main.innerHTML = mainHTML;
@@ -312,6 +413,7 @@ function renderSquad() {
 let editingPlayer = null;
 let pfRating = 3;
 let pfIsGK = false;
+let pfPosition = null;
 let pfAttrs = { marking: 2, stamina: 2, scoring: 2, footwork: 1 };
 
 function refreshPlayerSheet() {
@@ -319,6 +421,17 @@ function refreshPlayerSheet() {
     pfRating = value;
     refreshPlayerSheet();
   });
+
+  const field = isFieldPelada();
+  $("pf-gk-row").classList.toggle("hidden", field);
+  $("pf-pos-row").classList.toggle("hidden", !field);
+  if (field) {
+    renderPositionPicker($("pf-pos"), pfPosition, function (value) {
+      pfPosition = value;
+      pfIsGK = value === "goalkeeper";
+      refreshPlayerSheet();
+    });
+  }
 
   $("pf-gk").classList.toggle("on", pfIsGK);
   $("pf-stars-label").textContent = pfIsGK ? "Defesa · nível geral" : "Nível geral";
@@ -351,6 +464,7 @@ function openPlayerSheet(player) {
   $("pf-delete").classList.toggle("hidden", !player || !isAdminMode);
 
   pfIsGK = player ? !!player.is_goalkeeper : false;
+  pfPosition = player ? player.position || null : null;
   pfRating = player ? player.rating : 3;
   pfAttrs = player
     ? {
@@ -383,6 +497,9 @@ async function savePlayer() {
   }
 
   const payload = { name: name, rating: pfRating, is_goalkeeper: pfIsGK };
+  if (isFieldPelada() && pfPosition) {
+    payload.position = pfPosition;
+  }
   if (pfIsGK) {
     payload.gk_footwork = pfAttrs.footwork;
   } else {
@@ -684,28 +801,53 @@ async function submitFeedback() {
 // Nova pelada (wizard)
 // ============================================================
 
-let wizard = { c1: "blue", c2: "yellow", weekday: null, players: [] };
+let wizard = { c1: "blue", c2: "yellow", weekday: null, sport: "futsal", players: [] };
+
+const SPORT_OPTIONS = [
+  { value: "futsal", label: "Salão" },
+  { value: "field", label: "Campo / society" },
+];
 
 // Draft of the player currently being filled in on wizard step 2. Mirrors the
 // full player sheet (stars, extra attributes, goalkeeper) so peladas start with
 // complete players, not just a star rating.
-let wizardDraft = { rating: 3, isGK: false, marking: 2, stamina: 2, scoring: 2, footwork: 1 };
+let wizardDraft = { rating: 3, isGK: false, position: null, marking: 2, stamina: 2, scoring: 2, footwork: 1 };
 
 function resetWizardDraft() {
-  wizardDraft = { rating: 3, isGK: false, marking: 2, stamina: 2, scoring: 2, footwork: 1 };
+  wizardDraft = { rating: 3, isGK: false, position: null, marking: 2, stamina: 2, scoring: 2, footwork: 1 };
 }
 
 function openWizard() {
-  wizard = { c1: "blue", c2: "yellow", weekday: null, players: [] };
+  wizard = { c1: "blue", c2: "yellow", weekday: null, sport: "futsal", players: [] };
   resetWizardDraft();
   $("wz-name").value = "";
   $("wz-err").classList.remove("on");
   $("wz-player").value = "";
+  renderWizardSport();
   renderWizardWeekday();
   renderWizardSwatches();
   renderWizardForm();
   renderWizardPlayers();
   showScreen("s-wiz1");
+}
+
+function renderWizardSport() {
+  const container = $("wz-sport");
+  container.innerHTML = "";
+  SPORT_OPTIONS.forEach(function (opt) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "chip-opt" + (opt.value === wizard.sport ? " on" : "");
+    btn.textContent = opt.label;
+    btn.setAttribute("aria-pressed", String(opt.value === wizard.sport));
+    btn.addEventListener("click", function () {
+      wizard.sport = opt.value;
+      // Players already listed keep their data; positions only matter on campo.
+      renderWizardSport();
+      renderWizardForm();
+    });
+    container.appendChild(btn);
+  });
 }
 
 function renderWizardWeekday() {
@@ -725,6 +867,17 @@ function renderWizardForm() {
     wizardDraft.rating = value;
     renderWizardForm();
   });
+
+  const field = wizard.sport === "field";
+  $("wz-gk-row").classList.toggle("hidden", field);
+  $("wz-pos-row").classList.toggle("hidden", !field);
+  if (field) {
+    renderPositionPicker($("wz-pos"), wizardDraft.position, function (value) {
+      wizardDraft.position = value;
+      wizardDraft.isGK = value === "goalkeeper";
+      renderWizardForm();
+    });
+  }
 
   $("wz-gk").classList.toggle("on", wizardDraft.isGK);
   $("wz-stars-label").textContent = wizardDraft.isGK ? "Defesa · nível geral" : "Nível geral";
@@ -779,6 +932,9 @@ function renderWizardPlayers() {
       '<span class="r-name">' + escapeHTML(p.name) + gkGloveHTML(p) + "</span>" +
       '<span class="r-meta">' + buildStarsHTML(p.rating) +
       (p.is_goalkeeper ? '<span class="rating-num">· pé ' + Number(p.gk_footwork != null ? p.gk_footwork : 1) + "</span>" : "") +
+      (wizard.sport === "field" && getPosition(p.position)
+        ? '<span class="rating-num">· ' + escapeHTML(getPosition(p.position).label) + "</span>"
+        : "") +
       "</span>";
 
     const removeBtn = document.createElement("button");
@@ -807,6 +963,9 @@ function wizardAddPlayer() {
   if (!name) return;
 
   const player = { name: name, rating: wizardDraft.rating, is_goalkeeper: wizardDraft.isGK };
+  if (wizard.sport === "field" && wizardDraft.position) {
+    player.position = wizardDraft.position;
+  }
   if (wizardDraft.isGK) {
     player.gk_footwork = wizardDraft.footwork;
   } else {
@@ -834,6 +993,7 @@ async function wizardCreate() {
         team1_color: wizard.c1,
         team2_color: wizard.c2,
         game_weekday: wizard.weekday,
+        sport_type: wizard.sport,
       }),
     });
 
@@ -847,6 +1007,7 @@ async function wizardCreate() {
     // The creator is the owner; set the context so player creation is authorized
     // (requests carry the session token + this pelada id).
     currentPeladaId = pelada.id;
+    currentPeladaSport = pelada.sport_type === "field" ? "field" : "futsal";
     setAdminMode(true);
 
     for (const p of wizard.players) {
@@ -922,6 +1083,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Confirmação
   $("cf-cancel").addEventListener("click", function () { closeSheets(); });
+  $("dp-cancel").addEventListener("click", function () { closeSheets(); });
+  $("dp-reset").addEventListener("click", function () { saveDayPosition(null); });
   $("cf-confirm").addEventListener("click", function () {
     if (confirmAction) confirmAction();
   });
