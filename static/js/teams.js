@@ -262,6 +262,10 @@ function renderTeams(teams) {
     }
 
     const sortedPlayers = outfielders.slice().sort(function (a, b) {
+      if (isFieldPelada()) {
+        const byPosition = positionOrder(a.position) - positionOrder(b.position);
+        if (byPosition !== 0) return byPosition;
+      }
       return a.name.trim().localeCompare(b.name.trim(), "pt-BR", { sensitivity: "base" });
     });
 
@@ -279,6 +283,15 @@ function renderTeams(teams) {
 
       rowEl.appendChild(avatar);
       rowEl.appendChild(nm);
+
+      const teamPosition = isFieldPelada() ? getPosition(p.position) : null;
+      if (teamPosition) {
+        const tag = document.createElement("span");
+        tag.className = "pos-tag";
+        tag.textContent = teamPosition.short;
+        tag.title = teamPosition.label;
+        rowEl.appendChild(tag);
+      }
 
       if (starsVisible() && !isBench) {
         const stars = document.createElement("span");
@@ -403,7 +416,10 @@ function buildShareText() {
     if (keeper) {
       lines.push("🧤 " + keeper.name);
     }
-    sorted.forEach(function (p) { lines.push("• " + p.name); });
+    sorted.forEach(function (p) {
+      const sharePosition = isFieldPelada() ? getPosition(p.position) : null;
+      lines.push("• " + p.name + (sharePosition ? " (" + sharePosition.short + ")" : ""));
+    });
     lines.push("");
   });
 

@@ -29,8 +29,8 @@ class FakePeladaStorage:
         self.created = None
         self.deleted = None
 
-    def create_pelada_owned(self, name, owner_user_id, team1_color, team2_color, game_weekday):
-        self.created = {"name": name, "owner": owner_user_id}
+    def create_pelada_owned(self, name, owner_user_id, team1_color, team2_color, game_weekday, sport_type="futsal"):
+        self.created = {"name": name, "owner": owner_user_id, "sport_type": sport_type}
         return {"id": 9, "name": name, "role": "owner", "player_count": 0,
                 "team1_color": team1_color, "team2_color": team2_color, "game_weekday": game_weekday}
 

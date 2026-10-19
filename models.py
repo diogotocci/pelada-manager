@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import Dict
+from datetime import date
+from typing import Dict, Optional
 
 
 @dataclass
@@ -13,6 +14,11 @@ class Player:
     scoring: int = 2
     is_goalkeeper: bool = False
     gk_footwork: int = 1
+    # Field peladas only: main position and a temporary position for the next
+    # game day (see services/positions.py).
+    position: Optional[str] = None
+    day_position: Optional[str] = None
+    day_position_until: Optional[date] = None
 
     def to_dict(self) -> Dict:
         return {
@@ -25,4 +31,6 @@ class Player:
             "scoring": self.scoring,
             "is_goalkeeper": self.is_goalkeeper,
             "gk_footwork": self.gk_footwork,
+            "position": self.position,
+            "day_position": self.day_position,
         }

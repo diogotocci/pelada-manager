@@ -17,6 +17,8 @@ let currentPeladaName = "";
 let currentTeam1Color = "blue";
 let currentTeam2Color = "yellow";
 let currentPeladaWeekday = null;
+// "futsal" (salão) or "field" (campo/society); fixed when the pelada is created.
+let currentPeladaSport = "futsal";
 let currentPeladaRole = null;
 let isAdminMode = false;
 let helpReturnScreen = "s-home";
@@ -265,6 +267,50 @@ function gkGloveHTML(player) {
   return player && player.is_goalkeeper
     ? ' <span class="gk-glove" title="Goleiro fixo" aria-label="Goleiro fixo">🧤</span>'
     : "";
+}
+
+// ============================================================
+// Posições (só peladas de campo)
+// ============================================================
+
+const POSITIONS = [
+  { value: "goalkeeper", label: "Goleiro", short: "GOL" },
+  { value: "defender", label: "Zagueiro", short: "ZAG" },
+  { value: "fullback", label: "Lateral", short: "LAT" },
+  { value: "midfielder", label: "Meio campo", short: "MEI" },
+  { value: "forward", label: "Atacante", short: "ATA" },
+];
+
+function isFieldPelada() {
+  return currentPeladaSport === "field";
+}
+
+function getPosition(value) {
+  return POSITIONS.find(function (p) { return p.value === value; }) || null;
+}
+
+// Position the player plays today: the day position while set, else the main one.
+function currentPosition(player) {
+  return (player && (player.day_position || player.position)) || null;
+}
+
+function positionOrder(value) {
+  const index = POSITIONS.findIndex(function (p) { return p.value === value; });
+  return index === -1 ? POSITIONS.length : index;
+}
+
+function renderPositionPicker(container, selected, onSelect) {
+  if (!container) return;
+  container.innerHTML = "";
+  POSITIONS.forEach(function (pos) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "chip-opt" + (pos.value === selected ? " on" : "");
+    btn.textContent = pos.label;
+    btn.setAttribute("aria-pressed", String(pos.value === selected));
+    btn.addEventListener("click", function () { onSelect(pos.value); });
+    container.appendChild(btn);
+  });
 }
 
 function kickoffBallSVG(size) {

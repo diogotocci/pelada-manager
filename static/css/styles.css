@@ -434,6 +434,41 @@ input { font: inherit; }
 }
 .team-head .t-kickoff { display: flex; flex: none; }
 
+/* Field positions: check-in chip and team tag */
+.row-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+.check-btn { display: flex; align-items: center; justify-content: center; min-width: 32px; min-height: 40px; flex: none; }
+.pos-chip {
+  flex: none;
+  min-width: 46px;
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--muted);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+.pos-chip.day { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.pos-tag {
+  flex: none;
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+
 .team-card { margin-top: 14px; }
 .team-head {
   display: flex;
