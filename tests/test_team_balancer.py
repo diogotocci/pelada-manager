@@ -172,3 +172,34 @@ def test_remainder_team_with_keepers_stays_near_average():
         small_avgs.append(small["total_rating"] / len(small["players"]))
     roster_avg = sum(p.rating for p in line) / len(line)
     assert abs(sum(small_avgs) / len(small_avgs) - roster_avg) <= 0.5
+
+
+# ---- bench teams with two fixed keepers ------------------------------------
+
+def test_two_keepers_bench_teams_bring_only_outfielders():
+    # Fixed keepers stay in goal when a bench team comes on, so 13 outfielders
+    # at size 5 become 4 + 4 on court, a bench of 4 and a remainder of 1.
+    line = [mk(i, 3.0) for i in range(1, 14)]
+    gks = [mk(100, 3.0, gk=True), mk(101, 3.0, gk=True)]
+    teams = balance_teams(line + gks, 5)
+    assert [len(outfielders(t)) for t in teams] == [4, 4, 4, 1]
+    assert all(not keepers(t) for t in teams[2:])
+
+
+def test_two_keepers_bench_total_matches_playing_teams():
+    line = [mk(i, r) for i, r in enumerate([5, 5, 4.5, 4, 4, 3.5, 3.5, 3, 3, 2.5, 2, 2], start=1)]
+    gks = [mk(100, 3.0, gk=True, foot=2), mk(101, 3.0, gk=True, foot=2)]
+    bench_totals, playing_totals = [], []
+    for _ in range(60):
+        teams = balance_teams(list(line) + gks, 5)
+        playing_totals.extend(t["total_rating"] for t in teams[:2])
+        bench_totals.append(teams[2]["total_rating"])
+    playing_avg = sum(playing_totals) / len(playing_totals)
+    bench_avg = sum(bench_totals) / len(bench_totals)
+    assert abs(playing_avg - bench_avg) <= 1.0
+
+
+def test_one_keeper_keeps_full_size_bench():
+    line = [mk(i, 3.0) for i in range(1, 15)]  # 14 outfield + 1 keeper
+    teams = balance_teams(line + [mk(100, 3.0, gk=True)], 5)
+    assert [len(outfielders(t)) for t in teams] == [4, 5, 5]

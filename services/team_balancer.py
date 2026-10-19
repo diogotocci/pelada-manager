@@ -113,14 +113,28 @@ def _create_empty_teams(outfield_count: int, team_size: int, keepers: List[Playe
 
     # Overflow outfielders go to bench teams: full-size teams plus a final
     # smaller one for the remainder, so the two playing teams stay full.
+    # With two fixed keepers, the keepers stay in goal when a bench team comes
+    # on, so a bench team only brings outfielders (team_size - 1) and is seeded
+    # with the average keeper advantage it will play with.
+    keepers_stay = num_keepers >= 2 and team_size > 1
+    bench_size = team_size - 1 if keepers_stay else team_size
+    bench_seed = sum(_gk_advantage(k) for k in keepers[:2]) / 2 if keepers_stay else 0.0
+    keeper_slot = 1 if keepers_stay else 0
+
     playing_capacity = sum(t["capacity"] for t in teams)
     overflow = max(0, outfield_count - playing_capacity)
-    full_bench = overflow // team_size
-    rem_bench = overflow % team_size
+    full_bench = overflow // bench_size
+    rem_bench = overflow % bench_size
     for _ in range(full_bench):
-        teams.append({"players": [], "total_rating": 0.0, "capacity": team_size, "seed": 0.0, "slots": team_size})
+        teams.append({
+            "players": [], "total_rating": 0.0, "capacity": bench_size,
+            "seed": bench_seed, "slots": bench_size + keeper_slot,
+        })
     if rem_bench > 0:
-        teams.append({"players": [], "total_rating": 0.0, "capacity": rem_bench, "seed": 0.0, "slots": rem_bench})
+        teams.append({
+            "players": [], "total_rating": 0.0, "capacity": rem_bench,
+            "seed": bench_seed * rem_bench / bench_size, "slots": rem_bench + keeper_slot * rem_bench / bench_size,
+        })
 
     return teams
 
