@@ -87,7 +87,7 @@ class FakePeladas:
     def get_pelada(self, pelada_id):
         return self.pelada
 
-    def create_pelada_owned(self, name, owner_user_id, team1_color, team2_color, game_weekday, sport_type="futsal"):
+    def create_pelada_owned(self, name, owner_user_id, team1_color, team2_color, game_weekday, sport_type="futsal", **_settings):
         self.created = {"sport_type": sport_type}
         return {"id": 9, "name": name, "role": "owner", "sport_type": sport_type}
 

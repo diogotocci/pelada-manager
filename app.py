@@ -14,6 +14,7 @@ from storage.postgres_storage import (
     UserStorage,
     InviteStorage,
     ClientLogStorage,
+    MatchStatsStorage,
     ensure_schema,
 )
 from services.team_balancer import balance_teams, pick_kickoff_team
@@ -27,10 +28,20 @@ from services.positions import (
     effective_position,
     today_local,
 )
+from services.match_stats import (
+    TIMER_MAX_MINUTES,
+    TIMER_MIN_MINUTES,
+    day_ranking_until,
+    expired_dates,
+    is_day_visible,
+    parse_delta,
+    rank_rows,
+    stats_date,
+)
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "3.4.21")
+APP_VERSION = os.getenv("APP_VERSION", "3.4.22")
 
 VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white", "pink"}
 
@@ -62,6 +73,7 @@ feedback_storage = FeedbackStorage()
 user_storage = UserStorage()
 invite_storage = InviteStorage()
 clientlog_storage = ClientLogStorage()
+match_stats_storage = MatchStatsStorage()
 
 CLIENTLOG_MSG_MAX = 800
 CLIENTLOG_STACK_MAX = 6000
@@ -378,6 +390,11 @@ def create_pelada():
     if sport_type not in SPORT_TYPES:
         abort(400, description="Invalid sport type")
 
+    stats_enabled = bool(data.get("stats_enabled", False))
+    timer_enabled = bool(data.get("timer_enabled", True))
+    if stats_enabled and game_weekday is None:
+        abort(400, description="Stats require a game weekday")
+
     pelada = pelada_storage.create_pelada_owned(
         name=name,
         owner_user_id=user["id"],
@@ -385,6 +402,8 @@ def create_pelada():
         team2_color=team2_color,
         game_weekday=game_weekday,
         sport_type=sport_type,
+        stats_enabled=stats_enabled,
+        timer_enabled=timer_enabled,
     )
     return jsonify(pelada), 201
 
@@ -559,6 +578,38 @@ def update_pelada_weekday(pelada_id):
         abort(404, description="Pelada not found")
 
     return jsonify(pelada)
+
+
+@app.route("/api/peladas/<int:pelada_id>/match-settings", methods=["PATCH"])
+def update_match_settings(pelada_id):
+    """Admins turn goal/assist marking and the countdown timer on or off."""
+    pid, adm = _require_pelada()
+    if not adm or pid != pelada_id:
+        abort(403, description="Admin token required for this pelada")
+
+    data = request.get_json(silent=True) or {}
+    pelada = pelada_storage.get_pelada(pelada_id)
+    if pelada is None:
+        abort(404, description="Pelada not found")
+
+    stats_enabled = bool(data.get("stats_enabled", pelada.get("stats_enabled", False)))
+    timer_enabled = bool(data.get("timer_enabled", pelada.get("timer_enabled", True)))
+    timer_minutes = data.get("timer_minutes", pelada.get("timer_minutes", 8))
+    if isinstance(timer_minutes, bool):
+        abort(400, description="Invalid timer minutes")
+    try:
+        timer_minutes = int(timer_minutes)
+    except (ValueError, TypeError):
+        abort(400, description="Invalid timer minutes")
+    if not TIMER_MIN_MINUTES <= timer_minutes <= TIMER_MAX_MINUTES:
+        abort(400, description="Timer minutes out of range")
+    if stats_enabled and pelada.get("game_weekday") is None:
+        abort(400, description="Stats require a game weekday")
+
+    updated = pelada_storage.set_match_settings(pelada_id, stats_enabled, timer_enabled, timer_minutes)
+    if not updated:
+        abort(404, description="Pelada not found")
+    return jsonify(updated)
 
 
 @app.route("/api/peladas/<int:pelada_id>", methods=["DELETE"])
@@ -993,6 +1044,113 @@ def draw_teams():
         result.append(entry)
 
     return jsonify({"teams": result, "kickoff_team": pick_kickoff_team(result)})
+
+
+# ============================================================
+# Match stats (goals and assists) and rankings
+# ============================================================
+
+def _require_stats_pelada():
+    """Any member of a pelada with stats enabled. Returns (pelada_id, pelada)."""
+    pelada_id, _adm = _require_pelada()
+    pelada = pelada_storage.get_pelada(pelada_id)
+    if pelada is None:
+        abort(404, description="Pelada not found")
+    if not pelada.get("stats_enabled"):
+        abort(400, description="Stats are not enabled for this pelada")
+    return pelada_id, pelada
+
+
+def _visible_day_ranking(pelada_id, game_weekday, today):
+    """
+    Drop the days whose ranking is over and return (game_date, rows) of the
+    latest day still shown, or (None, []) when there is none.
+    """
+    rows = match_stats_storage.list_day_stats(pelada_id)
+    expired = expired_dates((r["game_date"] for r in rows), game_weekday, today)
+    if expired:
+        match_stats_storage.delete_days(pelada_id, expired)
+    visible = [r for r in rows if is_day_visible(r["game_date"], game_weekday, today)]
+    if not visible:
+        return None, []
+    latest = max(r["game_date"] for r in visible)
+    return latest, [r for r in visible if r["game_date"] == latest]
+
+
+def _ranking_json(rows):
+    return [
+        {"player_id": r["player_id"], "name": r["name"], "goals": r["goals"], "assists": r["assists"]}
+        for r in rank_rows(rows)
+    ]
+
+
+@app.route("/api/stats/today", methods=["GET"])
+def stats_today():
+    """Counts of the current game day, for the live marking screen."""
+    pelada_id, _pelada = _require_stats_pelada()
+    game_date = stats_date()
+    rows = [r for r in match_stats_storage.list_day_stats(pelada_id) if r["game_date"] == game_date]
+    return jsonify({
+        "date": game_date.isoformat(),
+        "counts": [{"player_id": r["player_id"], "goals": r["goals"], "assists": r["assists"]} for r in rows],
+    })
+
+
+@app.route("/api/stats/players/<int:player_id>", methods=["POST"])
+def change_player_stat(player_id):
+    """Any member adds or removes one goal or assist of any elenco player."""
+    pelada_id, pelada = _require_stats_pelada()
+    data = request.get_json(silent=True) or {}
+    parsed = parse_delta(data.get("field"), data.get("delta"))
+    if parsed is None:
+        abort(400, description="Invalid stat change")
+    field, delta = parsed
+
+    game_date = stats_date()
+    result = match_stats_storage.change_stat(pelada_id, player_id, game_date, field, delta)
+    if result is None:
+        abort(404, description="Player not found")
+
+    # Writes are the natural moment to drop old days, so the table stays small.
+    _visible_day_ranking(pelada_id, pelada.get("game_weekday"), game_date)
+    return jsonify(result)
+
+
+@app.route("/api/stats/day", methods=["GET"])
+def stats_day_ranking():
+    pelada_id, pelada = _require_stats_pelada()
+    weekday = pelada.get("game_weekday")
+    today = stats_date()
+    game_date, rows = _visible_day_ranking(pelada_id, weekday, today)
+    if game_date is None:
+        return jsonify({"date": None, "visible_until": None, "rows": []})
+    return jsonify({
+        "date": game_date.isoformat(),
+        "visible_until": day_ranking_until(game_date, weekday).isoformat(),
+        "rows": _ranking_json(rows),
+    })
+
+
+@app.route("/api/stats/year", methods=["GET"])
+def stats_year_ranking():
+    pelada_id, _pelada = _require_stats_pelada()
+    current_year = stats_date().year
+    raw_year = request.args.get("year", "")
+    if raw_year == "":
+        year = current_year
+    elif raw_year.isdigit() and 2000 <= int(raw_year) <= 2100:
+        year = int(raw_year)
+    else:
+        abort(400, description="Invalid year")
+
+    years = match_stats_storage.list_years(pelada_id)
+    if current_year not in years:
+        years = sorted(set(years) | {current_year})
+    return jsonify({
+        "year": year,
+        "years": years,
+        "rows": _ranking_json(match_stats_storage.list_year_stats(pelada_id, year)),
+    })
 
 
 if __name__ == "__main__":

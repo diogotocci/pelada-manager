@@ -1237,3 +1237,155 @@ input { font: inherit; }
 }
 .invite-link-actions { display: flex; gap: 8px; margin-top: 8px; }
 .invite-link-actions .btn { flex: 1; }
+
+/* ============================================================
+   Match day: timer, live marking and rankings
+   ============================================================ */
+
+.stat-ball { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; stroke-linecap: round; flex: none; }
+.stat-boot { fill: currentColor; stroke: none; flex: none; }
+
+.live-entry { margin-bottom: 10px; }
+.live-entry .stat-ico { display: flex; }
+
+/* Live marking */
+.live-timer {
+  flex: none;
+  margin: 0 18px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 14px;
+  border-radius: var(--radius);
+  background: #1a1f1c;
+  color: #fff;
+}
+[data-theme="dark"] .live-timer { background: var(--surface2); }
+.live-timer-main { flex: 1; display: flex; align-items: center; gap: 12px; min-height: 44px; color: inherit; text-align: left; }
+.live-timer-main svg { width: 22px; height: 22px; stroke: #4fc98c; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.live-timer-clock { font-size: 1.6rem; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.live-timer-clock.last { color: #ff8a8a; }
+.live-timer-status { font-size: .8rem; color: #b9c2bc; }
+.live-timer-toggle { min-height: 44px; padding: 0 16px; border-radius: 12px; font-size: .86rem; font-weight: 700; color: #4fc98c; background: rgba(255, 255, 255, .08); }
+
+.live-search {
+  flex: none;
+  margin: 0 18px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.live-search svg { width: 18px; height: 18px; stroke: var(--muted); stroke-width: 2; fill: none; flex: none; }
+.live-search input { flex: 1; min-width: 0; border: none; outline: none; background: transparent; color: var(--ink); font-size: 1rem; }
+
+.live-list .row.live-row { padding: 6px 8px 6px 14px; gap: 6px; }
+.stat-step {
+  display: flex;
+  align-items: center;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+}
+.stat-step.has { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+.stat-step .sb {
+  width: 38px;
+  height: 44px;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.stat-step .sb:disabled { opacity: .3; cursor: default; }
+.stat-step .sb:active:not(:disabled) { transform: scale(1.15); }
+.stat-step .sv { display: flex; flex-direction: column; align-items: center; min-width: 28px; gap: 1px; }
+.stat-step .sv-num { font-size: .9rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+
+/* Timer */
+.timer-body { display: flex; flex-direction: column; align-items: center; padding-top: 12px; }
+.timer-dial { position: relative; width: min(280px, 76vw); aspect-ratio: 1; margin: 6px auto 18px; }
+.timer-dial svg { width: 100%; height: 100%; display: block; }
+.timer-track { fill: none; stroke: var(--line); stroke-width: 14; }
+.timer-ring { fill: none; stroke: var(--accent); stroke-width: 14; stroke-linecap: round; transition: stroke-dashoffset .25s linear; }
+.timer-ring.last { stroke: var(--danger); }
+.timer-dial-text { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.timer-clock { font-size: 4.2rem; font-weight: 800; letter-spacing: -.04em; font-variant-numeric: tabular-nums; line-height: 1; }
+.timer-clock.last { color: var(--danger); }
+.timer-status { margin-top: 6px; font-size: .78rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.timer-lbl { text-align: center; font-size: .8rem; font-weight: 600; color: var(--muted); margin: 0 0 8px; }
+.timer-presets { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.timer-min { font-size: 1.5rem; min-width: 96px; }
+.timer-tools { display: flex; gap: 10px; justify-content: center; }
+.timer-done {
+  margin: 14px 0 0;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-line);
+  color: var(--warn-ink);
+  font-weight: 700;
+  text-align: center;
+}
+.timer-cta { flex-direction: column; }
+
+.mini-stepper { display: flex; align-items: center; gap: 4px; }
+.mini-stepper button {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.mini-stepper span { min-width: 58px; text-align: center; font-weight: 700; font-size: .9rem; font-variant-numeric: tabular-nums; }
+
+/* Rankings */
+.rank-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 8px 2px 10px; }
+.rank-when { font-size: 1.05rem; font-weight: 700; }
+.rank-until { font-size: .74rem; color: var(--muted); }
+.year-nav { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 10px; }
+.year-nav .icon-btn { width: 44px; height: 44px; background: var(--surface2); }
+.year-nav .icon-btn:disabled { opacity: .35; cursor: default; }
+.year-nav-main { display: flex; flex-direction: column; align-items: center; }
+
+.rank-highlights { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
+.rank-hl {
+  display: flex;
+  flex-direction: column;
+  padding: 11px 14px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  min-width: 0;
+}
+.rank-hl-lbl { font-size: .7rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.rank-hl-name { font-size: 1rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.rank-hl-val { font-size: .78rem; color: var(--accent); font-weight: 600; }
+
+.rank-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 52px 52px;
+  align-items: center;
+  gap: 6px;
+  min-height: 48px;
+  padding: 0 14px;
+  font-size: .95rem;
+}
+.rank-row + .rank-row { border-top: 1px solid var(--line); }
+.rank-row.rank-hd { min-height: 42px; font-size: .72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.rank-ico { display: flex; justify-content: center; color: var(--ink); }
+.rank-pos { font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rank-row.top1 .rank-pos { color: var(--star); }
+.rank-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rank-num { text-align: center; font-weight: 800; font-variant-numeric: tabular-nums; }
+.rank-num.g { color: var(--accent); }
+.rank-num.a { color: var(--muted); }
+#rk-share:disabled { opacity: .35; cursor: default; }
