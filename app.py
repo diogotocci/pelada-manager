@@ -19,6 +19,7 @@ from storage.postgres_storage import (
 )
 from services.team_balancer import balance_teams, pick_kickoff_team
 from services.positions import (
+    DOMINANT_FEET,
     POSITION_GOALKEEPER,
     POSITIONS,
     SPORT_FIELD,
@@ -41,7 +42,7 @@ from services.match_stats import (
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "3.4.24")
+APP_VERSION = os.getenv("APP_VERSION", "3.4.25")
 
 VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white", "pink"}
 
@@ -183,6 +184,7 @@ def _player_json(player, is_admin):
         "is_goalkeeper": player.is_goalkeeper,
         "position": player.position,
         "day_position": player.day_position,
+        "dominant_foot": player.dominant_foot,
     }
 
 
@@ -197,6 +199,15 @@ def _parse_position(value):
         return None
     if value not in POSITIONS:
         abort(400, description="Invalid position")
+    return value
+
+
+def _parse_dominant_foot(value):
+    """Validate an optional dominant foot. Returns it or None; 400 when invalid."""
+    if value is None:
+        return None
+    if value not in DOMINANT_FEET:
+        abort(400, description="Invalid dominant foot")
     return value
 
 
@@ -818,6 +829,7 @@ def create_player():
     position = _parse_position(data.get("position"))
     if position is not None:
         is_goalkeeper = position == POSITION_GOALKEEPER
+    dominant_foot = _parse_dominant_foot(data.get("dominant_foot"))
 
     if not name:
         abort(400, description="Name cannot be empty")
@@ -847,6 +859,7 @@ def create_player():
         is_goalkeeper=is_goalkeeper,
         gk_footwork=gk_footwork,
         position=position,
+        dominant_foot=dominant_foot,
     )
 
     return jsonify(_player_json(player, adm)), 201
@@ -889,6 +902,10 @@ def update_player(player_id):
     if position is not None:
         is_goalkeeper = position == POSITION_GOALKEEPER
 
+    # Optional: an explicit null clears it, a missing key keeps it.
+    set_dominant_foot = "dominant_foot" in data
+    dominant_foot = _parse_dominant_foot(data.get("dominant_foot"))
+
     if marking is not None:
         marking = int(marking)
         if not _is_valid_attribute(marking):
@@ -920,6 +937,8 @@ def update_player(player_id):
         is_goalkeeper=is_goalkeeper,
         gk_footwork=gk_footwork,
         position=position,
+        set_dominant_foot=set_dominant_foot,
+        dominant_foot=dominant_foot,
     )
 
     if not updated_player:

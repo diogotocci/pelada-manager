@@ -19,6 +19,7 @@ class Player:
     position: Optional[str] = None
     day_position: Optional[str] = None
     day_position_until: Optional[date] = None
+    dominant_foot: Optional[str] = None
 
     def to_dict(self) -> Dict:
         return {
@@ -33,4 +34,5 @@ class Player:
             "gk_footwork": self.gk_footwork,
             "position": self.position,
             "day_position": self.day_position,
+            "dominant_foot": self.dominant_foot,
         }

@@ -395,8 +395,12 @@ function renderSquad() {
     main.className = "r-main";
     let mainHTML = '<span class="r-name">' + escapeHTML(p.name) + gkGloveHTML(p) + "</span>";
     const squadPosition = isFieldPelada() ? getPosition(p.position) : null;
-    if (squadPosition && !isAdminMode) {
-      mainHTML += '<span class="r-meta">' + escapeHTML(squadPosition.label) + "</span>";
+    const squadFoot = isFieldPelada() ? footTagHTML(p.dominant_foot) : "";
+    if ((squadPosition || squadFoot) && !isAdminMode) {
+      mainHTML += '<span class="r-meta">' +
+        (squadPosition ? "<span>" + escapeHTML(squadPosition.label) + "</span>" : "") +
+        (squadPosition && squadFoot ? "<span>·</span>" : "") +
+        squadFoot + "</span>";
     }
     if (isAdminMode) {
       mainHTML +=
@@ -404,6 +408,7 @@ function renderSquad() {
         '<span class="rating-num">' + formatDecimal(p.rating) + "</span>" +
         (p.is_goalkeeper ? '<span class="rating-num">· pé ' + Number(p.gk_footwork != null ? p.gk_footwork : 1) + "</span>" : "") +
         (squadPosition ? '<span class="rating-num">· ' + escapeHTML(squadPosition.label) + "</span>" : "") +
+        (squadFoot ? '<span class="rating-num foot-tag">· ' + squadFoot + "</span>" : "") +
         "</span>";
     }
     main.innerHTML = mainHTML;
@@ -431,6 +436,7 @@ let editingPlayer = null;
 let pfRating = 3;
 let pfIsGK = false;
 let pfPosition = null;
+let pfFoot = null;
 let pfAttrs = { marking: 2, stamina: 2, scoring: 2, footwork: 1 };
 
 function refreshPlayerSheet() {
@@ -442,10 +448,15 @@ function refreshPlayerSheet() {
   const field = isFieldPelada();
   $("pf-gk-row").classList.toggle("hidden", field);
   $("pf-pos-row").classList.toggle("hidden", !field);
+  $("pf-foot-row").classList.toggle("hidden", !field);
   if (field) {
     renderPositionPicker($("pf-pos"), pfPosition, function (value) {
       pfPosition = value;
       pfIsGK = value === "goalkeeper";
+      refreshPlayerSheet();
+    });
+    renderFootPicker($("pf-foot"), pfFoot, function (value) {
+      pfFoot = value;
       refreshPlayerSheet();
     });
   }
@@ -482,6 +493,7 @@ function openPlayerSheet(player) {
 
   pfIsGK = player ? !!player.is_goalkeeper : false;
   pfPosition = player ? player.position || null : null;
+  pfFoot = player ? player.dominant_foot || null : null;
   pfRating = player ? player.rating : 3;
   pfAttrs = player
     ? {
@@ -516,6 +528,9 @@ async function savePlayer() {
   const payload = { name: name, rating: pfRating, is_goalkeeper: pfIsGK };
   if (isFieldPelada() && pfPosition) {
     payload.position = pfPosition;
+  }
+  if (isFieldPelada()) {
+    payload.dominant_foot = pfFoot;
   }
   if (pfIsGK) {
     payload.gk_footwork = pfAttrs.footwork;
@@ -829,10 +844,10 @@ const SPORT_OPTIONS = [
 // Draft of the player currently being filled in on wizard step 2. Mirrors the
 // full player sheet (stars, extra attributes, goalkeeper) so peladas start with
 // complete players, not just a star rating.
-let wizardDraft = { rating: 3, isGK: false, position: null, marking: 2, stamina: 2, scoring: 2, footwork: 1 };
+let wizardDraft = { rating: 3, isGK: false, position: null, foot: null, marking: 2, stamina: 2, scoring: 2, footwork: 1 };
 
 function resetWizardDraft() {
-  wizardDraft = { rating: 3, isGK: false, position: null, marking: 2, stamina: 2, scoring: 2, footwork: 1 };
+  wizardDraft = { rating: 3, isGK: false, position: null, foot: null, marking: 2, stamina: 2, scoring: 2, footwork: 1 };
 }
 
 function openWizard() {
@@ -899,10 +914,15 @@ function renderWizardForm() {
   const field = wizard.sport === "field";
   $("wz-gk-row").classList.toggle("hidden", field);
   $("wz-pos-row").classList.toggle("hidden", !field);
+  $("wz-foot-row").classList.toggle("hidden", !field);
   if (field) {
     renderPositionPicker($("wz-pos"), wizardDraft.position, function (value) {
       wizardDraft.position = value;
       wizardDraft.isGK = value === "goalkeeper";
+      renderWizardForm();
+    });
+    renderFootPicker($("wz-foot"), wizardDraft.foot, function (value) {
+      wizardDraft.foot = value;
       renderWizardForm();
     });
   }
@@ -969,6 +989,9 @@ function renderWizardPlayers() {
       (wizard.sport === "field" && getPosition(p.position)
         ? '<span class="rating-num">· ' + escapeHTML(getPosition(p.position).label) + "</span>"
         : "") +
+      (wizard.sport === "field" && p.dominant_foot
+        ? '<span class="rating-num foot-tag">· ' + footTagHTML(p.dominant_foot) + "</span>"
+        : "") +
       "</span>";
 
     const removeBtn = document.createElement("button");
@@ -999,6 +1022,9 @@ function wizardAddPlayer() {
   const player = { name: name, rating: wizardDraft.rating, is_goalkeeper: wizardDraft.isGK };
   if (wizard.sport === "field" && wizardDraft.position) {
     player.position = wizardDraft.position;
+  }
+  if (wizard.sport === "field" && wizardDraft.foot) {
+    player.dominant_foot = wizardDraft.foot;
   }
   if (wizardDraft.isGK) {
     player.gk_footwork = wizardDraft.footwork;
