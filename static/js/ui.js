@@ -391,10 +391,8 @@ const HELP_ITEMS = [
       "<b>times com a for\u00e7a somada parecida</b>, espalhando os melhores e os " +
       "mais fracos entre os lados. <b class=\"g\">N\u00e3o \u00e9 aleat\u00f3rio</b> \u2014 \u00e9 " +
       "equilibrado." +
-      "<p style=\"margin-top:8px\">Na pelada de <b>campo/society</b> o sorteio " +
-      "tamb\u00e9m olha a <b>posi\u00e7\u00e3o</b>: cada posi\u00e7\u00e3o \u00e9 dividida por igual entre os " +
-      "times e, dentro dela, as <b>estrelas tamb\u00e9m ficam equilibradas</b> (n\u00e3o " +
-      "cai o zagueiro 5\u2605 e o 4\u2605 do mesmo lado).</p>"
+      "<p style=\"margin-top:8px\">No <b>campo/society</b> o sorteio tamb\u00e9m olha a " +
+      "<b>posi\u00e7\u00e3o</b> de cada um \u2014 veja as regras abaixo.</p>"
   },
   {
     ico: "\ud83d\udd11",
@@ -451,6 +449,32 @@ const HELP_ITEMS = [
       "<p>Ela vale <b>at\u00e9 o dia do jogo passar</b>; depois volta sozinha pra " +
       "posi\u00e7\u00e3o principal.</p>" +
       "</div>"
+  },
+  {
+    ico: "\u2696\ufe0f",
+    title: "Regras do sorteio no campo/society",
+    tag: false,
+    body:
+      "No <b>campo/society</b>, al\u00e9m das estrelas, o sorteio segue estas " +
+      "regras, nesta ordem de prioridade:" +
+      "<div class=\"help-sub\">" +
+      "<p><b>1. Posi\u00e7\u00f5es divididas por igual</b> \u2014 cada posi\u00e7\u00e3o de linha " +
+      "(zagueiro, lateral, meio campo, atacante) \u00e9 espalhada entre os times. " +
+      "Um time pode ter <b>no m\u00e1ximo 1 a mais</b> de uma posi\u00e7\u00e3o que o outro.</p>" +
+      "<p><b>2. Estrelas equilibradas dentro da posi\u00e7\u00e3o</b> \u2014 a soma de estrelas " +
+      "de cada posi\u00e7\u00e3o fica parecida dos dois lados. Com 4 zagueiros (5\u2605, " +
+      "4\u2605, 3\u2605, 2\u2605), cada time leva um forte e um fraco, e n\u00e3o os dois " +
+      "craques juntos.</p>" +
+      "<p><b>3. For\u00e7a total parecida</b> \u2014 no fim, a soma de estrelas e os " +
+      "atributos de cada time tamb\u00e9m ficam equilibrados, como no sal\u00e3o.</p>" +
+      "</div>" +
+      "<p style=\"margin-top:8px\">Vale a <b>posi\u00e7\u00e3o do dia</b> de cada um. " +
+      "<b>Goleiro</b> segue a regra do goleiro fixo (at\u00e9 2 no gol; os demais " +
+      "jogam na linha). As regras de posi\u00e7\u00e3o valem para os <b>times completos</b>; " +
+      "o time que sobra com menos gente n\u00e3o entra na conta.</p>" +
+      "<p style=\"margin-top:8px\">A forma\u00e7\u00e3o <b class=\"g\">n\u00e3o \u00e9 fixa</b>: o app " +
+      "s\u00f3 divide o que tem. Se a conta n\u00e3o fecha (1 zagueiro s\u00f3, 3 laterais), " +
+      "aparece o <b>aviso de desequil\u00edbrio</b>.</p>"
   },
   {
     ico: "\u26a0\ufe0f",
