@@ -244,6 +244,8 @@ function renderCheckin() {
     listEl.appendChild(row);
   });
 
+  renderPositionWarningBanner();
+
   $("ci-count").textContent = presentCount;
   $("ci-count-lbl").textContent =
     "presente" + (presentCount === 1 ? "" : "s") + " · de " + total;
@@ -309,9 +311,12 @@ function buildFieldCheckinRow(p, isPresent) {
 // ============================================================
 
 let dayPositionPlayer = null;
+// Set when the sheet was opened from "Ajustar posições", so saving goes back there.
+let dayPositionReturnToFix = false;
 
-function openDayPositionSheet(player) {
+function openDayPositionSheet(player, returnToFix) {
   dayPositionPlayer = player;
+  dayPositionReturnToFix = !!returnToFix;
   const main = getPosition(player.position);
   $("dp-sub").textContent =
     player.name + (main ? " · principal: " + main.label : " · sem posição principal");
@@ -322,18 +327,27 @@ function openDayPositionSheet(player) {
   openSheet("daypos");
 }
 
+async function requestDayPosition(player, position) {
+  const updated = await fetchJSON("/api/players/" + player.id + "/day-position", {
+    method: "PATCH",
+    body: JSON.stringify({ position: position }),
+  });
+  players = players.map(function (p) { return p.id === updated.id ? updated : p; });
+  return updated;
+}
+
 async function saveDayPosition(position) {
   const player = dayPositionPlayer;
   if (!player) return;
   try {
-    const updated = await fetchJSON("/api/players/" + player.id + "/day-position", {
-      method: "PATCH",
-      body: JSON.stringify({ position: position }),
-    });
-    players = players.map(function (p) { return p.id === updated.id ? updated : p; });
+    const updated = await requestDayPosition(player, position);
     closeSheets();
     renderCheckin();
     renderSquad();
+    if (dayPositionReturnToFix) {
+      dayPositionReturnToFix = false;
+      openPositionFixSheet();
+    }
     const pos = getPosition(currentPosition(updated));
     showToast(updated.name + (pos ? " joga de " + pos.label.toLowerCase() + " hoje" : " sem posição hoje"));
   } catch (err) {
@@ -1083,7 +1097,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Confirmação
   $("cf-cancel").addEventListener("click", function () { closeSheets(); });
-  $("dp-cancel").addEventListener("click", function () { closeSheets(); });
+  $("dp-cancel").addEventListener("click", function () {
+    if (dayPositionReturnToFix) {
+      dayPositionReturnToFix = false;
+      openPositionFixSheet();
+    } else {
+      closeSheets();
+    }
+  });
   $("dp-reset").addEventListener("click", function () { saveDayPosition(null); });
   $("cf-confirm").addEventListener("click", function () {
     if (confirmAction) confirmAction();

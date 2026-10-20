@@ -57,6 +57,8 @@ function renderDrawSheet() {
       (bench > 0 ? " · " + bench + " de fora aguardando" : "");
     summaryEl.style.color = "";
   }
+
+  renderDrawPositionWarning();
 }
 
 function stepTeamSize(delta) {
@@ -153,6 +155,7 @@ function renderTeams(teams) {
   $("tm-audit-btn").classList.toggle("hidden", !isAdminMode);
   $("tm-stars-btn").classList.toggle("hidden", !isAdminMode);
   updateStarsToggle();
+  updateTeamsViewToggle();
 
   cardsEl.innerHTML = "";
   balanceEl.innerHTML = "";
@@ -184,7 +187,13 @@ function renderTeams(teams) {
     balanceEl.classList.add("hidden");
   }
 
+  // Pitch view: the two playing teams are drawn on the field/court and only
+  // the bench teams keep their cards below it.
+  const showPitch = teamsView === "pitch" && teams.length >= 2;
+  if (showPitch) cardsEl.appendChild(buildPitchEl(teams));
+
   teams.forEach(function (team, index) {
+    if (showPitch && index < 2) return;
     const teamNumber = index + 1;
     const colorKey = getTeamColorKey(teamNumber);
     const isBench = colorKey == null;
@@ -430,6 +439,11 @@ function buildShareText() {
 async function shareTeams() {
   if (!lastDrawnTeams.length) {
     showToast("Sorteie os times primeiro.");
+    return;
+  }
+
+  if (teamsView === "pitch") {
+    await sharePitchImage();
     return;
   }
 
