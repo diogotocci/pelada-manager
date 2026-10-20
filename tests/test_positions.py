@@ -204,6 +204,38 @@ def test_field_draw_keeps_rating_balance():
     assert sum(spreads) / len(spreads) <= 2.0
 
 
+def _position_star_gap(teams, position):
+    sums = [sum(p.rating for p in t["players"] if p.position == position) for t in teams]
+    return max(sums) - min(sums)
+
+
+def test_field_draw_splits_strong_and_weak_of_each_position():
+    # Two 5-star and two 3-star fullbacks/forwards: each team gets one of each
+    # per position, never both strong fullbacks on one side and both strong
+    # forwards on the other.
+    spec = [("fullback", 5), ("fullback", 5), ("fullback", 3), ("fullback", 3),
+            ("forward", 5), ("forward", 5), ("forward", 3), ("forward", 3)]
+    for _ in range(30):
+        players = [Player(i, "P" + str(i), float(r), position=pos) for i, (pos, r) in enumerate(spec)]
+        teams = balance_teams(players, 4, spread_positions=True)
+        for position in ("fullback", "forward"):
+            assert _position_star_gap(teams, position) == 0, position
+
+
+def test_field_draw_balances_stars_within_each_position():
+    # Totals alone allow stacking stars in one position per team; the draw
+    # must keep each position's stars close (best possible here: 1 star).
+    spec = [("defender", 3), ("defender", 2), ("defender", 4), ("defender", 5),
+            ("midfielder", 4), ("midfielder", 5), ("midfielder", 4), ("midfielder", 2),
+            ("forward", 2), ("forward", 5), ("forward", 3), ("forward", 4)]
+    random.seed(3)
+    for _ in range(30):
+        players = [Player(i, "P" + str(i), float(r), position=pos) for i, (pos, r) in enumerate(spec)]
+        teams = balance_teams(players, 6, spread_positions=True)
+        gap = sum(_position_star_gap(teams, pos) for pos in ("defender", "midfielder", "forward"))
+        assert gap <= 1.0, gap
+
+
 def test_futsal_draw_ignores_positions():
     # Without spread_positions the positions have no effect (same seed, same teams).
     random.seed(1)

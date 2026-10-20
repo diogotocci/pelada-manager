@@ -66,7 +66,7 @@ Located in `services/team_balancer.py`.
 - Each pelada has a `sport_type`: `futsal` (salão, default and all pre-existing peladas) or `field` (campo/society). It is chosen at creation and cannot be changed later.
 - Field peladas give each player a main `position`: goalkeeper, defender, fullback, midfielder or forward (`services/positions.py`). Goalkeeper keeps `is_goalkeeper` in sync, so the fixed-keeper rules still apply.
 - Any member can set a player's `day_position` (`PATCH /api/players/<id>/day-position`). It lasts until the pelada's next game day (`game_weekday`, or the end of today when unset, Brazil time) and then the main position applies again.
-- In field peladas the draw uses the effective position and spreads each outfield position as evenly as possible across the full-size teams (`balance_teams(..., spread_positions=True)`); the attributes are the same as futsal.
+- In field peladas the draw uses the effective position and spreads each outfield position as evenly as possible across the full-size teams, both in count and in stars (strong and weak players of one position are split between teams, not stacked on one side while the totals still match) (`balance_teams(..., spread_positions=True)`); the attributes are the same as futsal.
 
 ## Authentication
 - Handled via Google One Tap (Google Identity Services).
