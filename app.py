@@ -30,7 +30,7 @@ from services.positions import (
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "3.4.20")
+APP_VERSION = os.getenv("APP_VERSION", "3.4.21")
 
 VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white", "pink"}
 

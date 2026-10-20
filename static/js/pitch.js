@@ -61,25 +61,54 @@ function byName(a, b) {
   return a.name.trim().localeCompare(b.name.trim(), "pt-BR", { sensitivity: "base" });
 }
 
+// Horizontal spots (0 = left touchline, 1 = right) for players spread evenly.
+function evenSpots(count) {
+  const spots = [];
+  for (let i = 0; i < count; i++) spots.push((i + 1) / (count + 1));
+  return spots;
+}
+
+// Defensive line: fullbacks on the wings, defenders in the middle.
+function defenseSlots(fullbacks, defenders) {
+  if (fullbacks.length === 0) {
+    const spots = evenSpots(defenders.length);
+    return defenders.map(function (p, i) { return { player: p, x: spots[i] }; });
+  }
+  const leftCount = Math.ceil(fullbacks.length / 2);
+  const slots = [];
+  fullbacks.slice(0, leftCount).forEach(function (p, i) { slots.push({ player: p, x: 0.15 + i * 0.16 }); });
+  fullbacks.slice(leftCount).forEach(function (p, i) { slots.push({ player: p, x: 0.85 - i * 0.16 }); });
+  const inner = defenders.length === 1
+    ? [0.5]
+    : defenders.map(function (_, i) { return 0.36 + (0.28 * i) / (defenders.length - 1); });
+  defenders.forEach(function (p, i) { slots.push({ player: p, x: inner[i] }); });
+  return slots.sort(function (a, b) { return a.x - b.x; });
+}
+
+function evenSlots(list) {
+  const spots = evenSpots(list.length);
+  return list.map(function (p, i) { return { player: p, x: spots[i] }; });
+}
+
+// Society: one band per sector at a fixed depth (0 = own goal line, 1 = halfway
+// line), so a missing sector leaves its band empty instead of shifting the rest.
 function fieldRows(outfielders) {
   const of = function (position) {
     return outfielders.filter(function (p) { return p.position === position; }).sort(byName);
   };
-  const fullbacks = of("fullback");
-  const defenders = of("defender");
-  const midfielders = of("midfielder");
-  const forwards = of("forward");
   const unknown = outfielders.filter(function (p) {
     return ["fullback", "defender", "midfielder", "forward"].indexOf(p.position) === -1;
   }).sort(byName);
 
-  // Fullbacks go on the wings of the defensive line, defenders in the middle.
-  const half = Math.ceil(fullbacks.length / 2);
-  const defense = fullbacks.slice(0, half).concat(defenders, fullbacks.slice(half));
-
-  return [defense, midfielders.concat(unknown), forwards];
+  return [
+    { depth: 0.34, slots: defenseSlots(of("fullback"), of("defender")) },
+    { depth: 0.67, slots: evenSlots(of("midfielder").concat(unknown)) },
+    { depth: 0.94, slots: evenSlots(of("forward")) },
+  ];
 }
 
+// Formation of one team: rows of { player, x } slots with their depth from the
+// team's own goal line (0) to the halfway line (1).
 function buildFormation(team) {
   const keeper = teamGoalkeeper(team);
   let rows;
@@ -88,16 +117,27 @@ function buildFormation(team) {
     rows = fieldRows(teamOutfielders(team));
   } else {
     const shuffled = shuffledOutfielders(team);
+    const sizes = futsalRowSizes(shuffled.length);
     rows = [];
     let start = 0;
-    futsalRowSizes(shuffled.length).forEach(function (size) {
-      rows.push(shuffled.slice(start, start + size));
+    sizes.forEach(function (size, r) {
+      rows.push({
+        depth: sizes.length === 1 ? 0.67 : 0.34 + (0.6 * r) / (sizes.length - 1),
+        slots: evenSlots(shuffled.slice(start, start + size)),
+      });
       start += size;
     });
   }
 
-  if (keeper) rows.unshift([keeper]);
-  return rows.filter(function (row) { return row.length > 0; });
+  rows.unshift({ depth: 0, slots: keeper ? [{ player: keeper, x: 0.5 }] : [] });
+  return rows.filter(function (row) { return row.slots.length > 0; });
+}
+
+// Position tag shown next to the name (society outfielders only).
+function pitchPositionTag(player) {
+  if (!isFieldPelada() || player.is_goalkeeper) return "";
+  const position = getPosition(player.position);
+  return position ? position.short : "";
 }
 
 // Readable text color over a bib color.
@@ -142,15 +182,15 @@ function buildPitchEl(teams) {
     half.className = "pitch-half " + (index === 0 ? "top" : "bottom");
     half.setAttribute("aria-hidden", "true");
 
-    const rows = buildFormation(team);
-    if (index === 1) rows.reverse();
-
-    rows.forEach(function (row) {
-      const rowEl = document.createElement("div");
-      rowEl.className = "pitch-row";
-      row.forEach(function (p) {
+    buildFormation(team).forEach(function (row) {
+      // Top team defends the top goal; the bottom team is mirrored.
+      const depth = index === 0 ? row.depth : 1 - row.depth;
+      row.slots.forEach(function (slot) {
+        const p = slot.player;
         const chip = document.createElement("div");
         chip.className = "pc";
+        chip.style.left = (slot.x * 100) + "%";
+        chip.style.top = "calc(4px + (100% - 64px) * " + depth + ")";
         const av = document.createElement("span");
         av.className = "pc-av";
         av.style.background = color.dark;
@@ -158,12 +198,21 @@ function buildPitchEl(teams) {
         av.textContent = buildPlayerInitials(p.name);
         const nm = document.createElement("span");
         nm.className = "pc-nm";
-        nm.textContent = p.name;
+        const nmText = document.createElement("span");
+        nmText.className = "pc-nm-text";
+        nmText.textContent = p.name;
+        nm.appendChild(nmText);
+        const posTag = pitchPositionTag(p);
+        if (posTag) {
+          const tagEl = document.createElement("span");
+          tagEl.className = "pc-pos";
+          tagEl.textContent = posTag;
+          nm.appendChild(tagEl);
+        }
         chip.appendChild(av);
         chip.appendChild(nm);
-        rowEl.appendChild(chip);
+        half.appendChild(chip);
       });
-      half.appendChild(rowEl);
     });
 
     const tag = document.createElement("span");
@@ -304,8 +353,7 @@ function drawPlayerChip(ctx, theme, p, color, cx, cy) {
   ctx.textBaseline = "middle";
   ctx.fillText(buildPlayerInitials(p.name), cx, cy + 1);
 
-  const position = isFieldPelada() ? getPosition(p.position) : null;
-  const tag = position && !p.is_goalkeeper ? position.short : "";
+  const tag = pitchPositionTag(p);
   ctx.font = "700 22px Inter, system-ui, sans-serif";
   const name = fitText(ctx, p.name, tag ? 150 : 190);
   const nameW = ctx.measureText(name).width;
@@ -333,19 +381,15 @@ function drawPlayerChip(ctx, theme, p, color, cx, cy) {
 
 function drawHalf(ctx, theme, team, index, x, y, w, h) {
   const color = getBibColor(getTeamColorKey(index + 1));
-  const rows = buildFormation(team);
-  if (index === 1) rows.reverse();
+  // Keep the whole chip block (circle + name) inside the half.
+  const top = y + 8;
+  const usable = h - 16 - CHIP_BLOCK_H;
 
-  const padTop = index === 0 ? 16 : 28;
-  const padBottom = index === 0 ? 28 : 16;
-  const step = (h - padTop - padBottom) / rows.length;
-
-  rows.forEach(function (row, r) {
-    // Center the whole chip block (circle + name) in its row band.
-    const cy = y + padTop + step * r + (step - CHIP_BLOCK_H) / 2 + CHIP_RADIUS;
-    row.forEach(function (p, c) {
-      const cx = x + (w * (c + 1)) / (row.length + 1);
-      drawPlayerChip(ctx, theme, p, color, cx, cy);
+  buildFormation(team).forEach(function (row) {
+    const depth = index === 0 ? row.depth : 1 - row.depth;
+    const cy = top + usable * depth + CHIP_RADIUS;
+    row.slots.forEach(function (slot) {
+      drawPlayerChip(ctx, theme, slot.player, color, x + w * slot.x, cy);
     });
   });
 
@@ -448,23 +492,24 @@ async function drawPitchImage(teams) {
   });
 }
 
+// Returns false when the image could not be generated, so the caller can fall
+// back to sharing the text.
 async function sharePitchImage() {
   let blob;
   try {
     blob = await drawPitchImage(lastDrawnTeams);
   } catch (err) {
     console.error(err);
-    showToast("Não foi possível gerar a imagem.");
-    return;
+    return false;
   }
 
   const file = new File([blob], "times.png", { type: "image/png" });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
       await navigator.share({ files: [file] });
-      return;
+      return true;
     } catch (err) {
-      if (err && err.name === "AbortError") return;
+      if (err && err.name === "AbortError") return true;
       console.error(err);
     }
   }
@@ -479,6 +524,7 @@ async function sharePitchImage() {
   link.remove();
   setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
   showToast("Imagem salva");
+  return true;
 }
 
 document.addEventListener("DOMContentLoaded", function () {

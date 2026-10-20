@@ -70,7 +70,8 @@ Located in `services/team_balancer.py`.
 
 ## Pitch View and Position Warnings (frontend only)
 - The teams screen has a "Lista / Campinho" toggle (`static/js/pitch.js`, persisted in `localStorage` as `tj-teams-view`). Campinho draws the two playing teams on a field: society rows by position (goalkeeper, fullbacks on the wings of the defensive line, midfielders, forwards; players without a position join the midfield); futsal on a wooden court with random spots (1-2-1 for 4 outfielders), cached per drawn team so toggling keeps the layout. Bench teams stay as cards below.
-- In Campinho view, "Compartilhar" shares a 1080x1350 PNG drawn on a canvas (Web Share API with files, download as fallback); in Lista view it keeps sharing the text.
+- "Compartilhar" always shares a 1080x1350 PNG of the pitch drawn on a canvas, whatever the screen view (Web Share API with files, download as fallback; the text is shared only if the image cannot be drawn).
+- Society layout: each sector sits at a fixed depth (goalkeeper, defensive line, midfield, attack), fullbacks on the wings with defenders in the middle, and each chip shows the position tag.
 - Field peladas warn about position imbalance among present outfielders (`static/js/position-warnings.js`): a position with exactly 1 player (cannot be split between the two sides) or an odd count of 3 or more. A position nobody plays is not flagged. The warning shows as a banner on the check-in list and inside the draw sheet, with a suggested single day-position change; "Ajustar posições" opens a sheet to change day positions in one tap. Drawing anyway is always allowed.
 
 ## Authentication

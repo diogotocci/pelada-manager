@@ -1,16 +1,16 @@
 # Graph Report - pelada-manager  (2026-10-20)
 
 ## Corpus Check
-- 45 files · ~49,021 words
+- 45 files · ~49,590 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 773 nodes · 1442 edges · 39 communities (32 shown, 7 thin omitted)
+- 778 nodes · 1454 edges · 39 communities (32 shown, 7 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 23 edges (avg confidence: 0.6)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `bdd73274`
+- Built from commit: `e9001821`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -137,8 +137,8 @@ Cohesion: 0.16
 Nodes (21): acceptInvite(), detectInviteFromUrl(), generateInvite(), getPendingInvite(), handleInviteAfterAuth(), INVITE_ROLE_OPTS, INVITE_TTL_OPTS, inviteErrorHTML() (+13 more)
 
 ### Community 13 - "pitch.js"
-Cohesion: 0.21
-Nodes (17): buildFormation(), buildPitchEl(), byName(), drawHalf(), drawPitchFloor(), drawPitchImage(), drawPlayerChip(), fieldRows() (+9 more)
+Cohesion: 0.18
+Nodes (21): buildFormation(), buildPitchEl(), byName(), defenseSlots(), drawHalf(), drawPitchFloor(), drawPitchImage(), drawPlayerChip() (+13 more)
 
 ### Community 14 - "teams.js"
 Cohesion: 0.23
@@ -150,7 +150,7 @@ Nodes (17): Application Version, Commit, Continuing an Existing Task, Creating t
 
 ### Community 16 - "Pelada Manager - Project Context"
 Cohesion: 0.11
-Nodes (17): Additional Balancing Attributes, Architecture, Authentication, Authorization & Role Permission Matrix, Database Model, Directory Structure, Domain Model, Goalkeeper Seeding (+9 more)
+Nodes (18): Additional Balancing Attributes, Architecture, Authentication, Authorization & Role Permission Matrix, Database Model, Directory Structure, Domain Model, Goalkeeper Seeding (+10 more)
 
 ### Community 17 - "test_clientlog.py"
 Cohesion: 0.14
@@ -213,7 +213,7 @@ Cohesion: 0.50
 Nodes (3): For --cluster-only, For --update (incremental re-extraction), graphify reference: incremental update and cluster-only
 
 ## Knowledge Gaps
-- **112 isolated node(s):** `feedbackList`, `usefulList`, `CATEGORY`, `INVITE_ROLE_OPTS`, `INVITE_TTL_OPTS` (+107 more)
+- **113 isolated node(s):** `feedbackList`, `usefulList`, `CATEGORY`, `INVITE_ROLE_OPTS`, `INVITE_TTL_OPTS` (+108 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **7 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
@@ -221,7 +221,7 @@ Nodes (3): For --cluster-only, For --update (incremental re-extraction), graphif
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `balance_teams()` connect `Player` to `app.py`, `test_positions.py`?**
-  _High betweenness centrality (0.030) - this node is a cross-community bridge._
+  _High betweenness centrality (0.029) - this node is a cross-community bridge._
 - **Why does `Player` connect `Player` to `_get_connection`, `test_positions.py`?**
   _High betweenness centrality (0.024) - this node is a cross-community bridge._
 - **Why does `UserStorage` connect `_get_connection` to `app.py`, `Player`?**
@@ -229,7 +229,7 @@ _Questions this graph is uniquely positioned to answer:_
 - **Are the 9 inferred relationships involving `Player` (e.g. with `ClientLogStorage` and `FeedbackStorage`) actually correct?**
   _`Player` has 9 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `feedbackList`, `usefulList`, `CATEGORY` to the rest of the system?**
-  _112 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _113 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `app.py` be split into smaller, more focused modules?**
   _Cohesion score 0.06220095693779904 - nodes in this community are weakly interconnected._
 - **Should `_get_connection` be split into smaller, more focused modules?**
