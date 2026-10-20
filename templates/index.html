@@ -184,6 +184,9 @@
           <h1 id="ci-title">Pelada</h1>
           <p class="sub" id="ci-date"></p>
         </div>
+        <button class="icon-btn timer-open hidden" id="ci-timer-btn" aria-label="Cronômetro">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6M19 6l-1.5 1.5"/></svg>
+        </button>
         <button class="icon-btn" id="ci-menu-btn" aria-label="Ajustes">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.5-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.5 2 1.5A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.5 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.5-2-1.5c.1-.4.1-.8.1-1.2z"/></svg>
         </button>
@@ -221,6 +224,10 @@
           <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>
           Hoje
         </button>
+        <button class="tab tab-ranking hidden" data-tab="ranking">
+          <svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3"/></svg>
+          Ranking
+        </button>
         <button class="tab" data-tab="elenco">
           <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           Elenco
@@ -242,12 +249,19 @@
           <h1>Times de hoje</h1>
           <p class="sub" id="tm-sub"></p>
         </div>
+        <button class="icon-btn timer-open hidden" id="tm-timer-btn" aria-label="Cronômetro">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6M19 6l-1.5 1.5"/></svg>
+        </button>
         <button class="icon-btn hidden" id="tm-stars-btn" aria-label="Ocultar estrelas"></button>
         <button class="icon-btn hidden" id="tm-audit-btn" aria-label="Auditoria do sorteio">
           <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
         </button>
       </div>
       <div class="scroll">
+        <button type="button" class="btn btn-ghost live-entry hidden" id="tm-live-btn">
+          <span class="stat-ico" aria-hidden="true"></span>
+          Marcar gols e assistências
+        </button>
         <div class="view-toggle" role="group" aria-label="Modo de exibição">
           <button type="button" id="tm-view-list" aria-pressed="true">Lista</button>
           <button type="button" id="tm-view-pitch" aria-pressed="false">Campinho</button>
@@ -307,11 +321,172 @@
           <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>
           Hoje
         </button>
+        <button class="tab tab-ranking hidden" data-tab="ranking">
+          <svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3"/></svg>
+          Ranking
+        </button>
         <button class="tab on" data-tab="elenco">
           <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           Elenco
         </button>
       </nav>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       Ranking (dia e ano) — só peladas com estatísticas
+       ============================================================ -->
+  <section class="screen" id="s-ranking">
+    <div class="frame">
+      <div class="appbar">
+        <button class="icon-btn" id="rk-back" aria-label="Voltar">
+          <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="grow">
+          <h1 id="rk-title">Ranking</h1>
+          <p class="sub">Gols e assistências</p>
+        </div>
+        <button class="icon-btn timer-open hidden" id="rk-timer-btn" aria-label="Cronômetro">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6M19 6l-1.5 1.5"/></svg>
+        </button>
+        <button class="icon-btn" id="rk-menu-btn" aria-label="Ajustes">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.5-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.5 2 1.5A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.5 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.5-2-1.5c.1-.4.1-.8.1-1.2z"/></svg>
+        </button>
+      </div>
+      <div class="scroll">
+        <div class="view-toggle" role="group" aria-label="Período do ranking">
+          <button type="button" id="rk-view-day" aria-pressed="true" class="on">Do dia</button>
+          <button type="button" id="rk-view-year" aria-pressed="false">Do ano</button>
+        </div>
+        <div id="rk-day">
+          <div class="rank-head">
+            <span class="rank-when" id="rk-day-date"></span>
+            <span class="rank-until" id="rk-day-until"></span>
+          </div>
+        </div>
+        <div id="rk-year" class="hidden">
+          <div class="year-nav">
+            <button class="icon-btn" id="rk-year-prev" aria-label="Ano anterior">
+              <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+            <div class="year-nav-main">
+              <span class="rank-when" id="rk-year-label"></span>
+              <span class="rank-until">Soma todas as peladas do ano</span>
+            </div>
+            <button class="icon-btn" id="rk-year-next" aria-label="Próximo ano">
+              <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="rank-highlights hidden" id="rk-highlights"></div>
+        <p class="empty hidden" id="rk-empty"></p>
+        <div class="card rank-table hidden" id="rk-table"></div>
+        <p class="hint hidden" id="rk-note" style="padding:8px 2px">Desempate: assistências.</p>
+        <div class="spacer-lg"></div>
+      </div>
+      <div class="cta-bar">
+        <button class="btn btn-ghost" id="rk-live-btn">Marcar gols</button>
+        <button class="btn btn-primary" id="rk-share">
+          <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
+          Compartilhar
+        </button>
+      </div>
+      <nav class="tabbar">
+        <button class="tab" data-tab="hoje">
+          <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>
+          Hoje
+        </button>
+        <button class="tab tab-ranking on" data-tab="ranking">
+          <svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3"/></svg>
+          Ranking
+        </button>
+        <button class="tab" data-tab="elenco">
+          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Elenco
+        </button>
+      </nav>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       Jogo ao vivo — marcar gols e assistências (qualquer membro)
+       ============================================================ -->
+  <section class="screen" id="s-live">
+    <div class="frame">
+      <div class="appbar">
+        <button class="icon-btn" id="lv-back" aria-label="Voltar">
+          <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="grow">
+          <h1>Jogo ao vivo</h1>
+          <p class="sub" id="lv-sub">Todo o elenco</p>
+        </div>
+      </div>
+      <div class="live-timer hidden" id="lv-timer">
+        <button type="button" class="live-timer-main" id="lv-timer-open" aria-label="Abrir cronômetro">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6M19 6l-1.5 1.5"/></svg>
+          <span class="live-timer-clock" id="lv-timer-clock">08:00</span>
+          <span class="live-timer-status" id="lv-timer-status">pronto</span>
+        </button>
+        <button type="button" class="live-timer-toggle" id="lv-timer-toggle">Começar</button>
+      </div>
+      <div class="live-search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+        <input type="search" id="lv-search" placeholder="Buscar jogador" aria-label="Buscar jogador" autocomplete="off">
+      </div>
+      <div class="scroll">
+        <p class="empty hidden" id="lv-empty"></p>
+        <div class="card rowlist live-list" id="lv-list"></div>
+        <p class="hint" style="padding:8px 2px">Lista com o elenco inteiro. Quem chegou depois do sorteio também pode ser marcado.</p>
+        <div class="spacer-md"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       Cronômetro (contagem regressiva, roda só neste aparelho)
+       ============================================================ -->
+  <section class="screen" id="s-timer">
+    <div class="frame">
+      <div class="appbar">
+        <button class="icon-btn" id="tr-back" aria-label="Voltar">
+          <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="grow">
+          <h1>Cronômetro</h1>
+          <p class="sub" id="tr-sub"></p>
+        </div>
+      </div>
+      <div class="scroll timer-body">
+        <div class="timer-dial">
+          <svg viewBox="0 0 280 280" aria-hidden="true">
+            <circle class="timer-track" cx="140" cy="140" r="126"/>
+            <circle class="timer-ring" id="tr-ring" cx="140" cy="140" r="126" transform="rotate(-90 140 140)"/>
+          </svg>
+          <div class="timer-dial-text">
+            <span class="timer-clock" id="tr-clock" role="timer" aria-live="off">08:00</span>
+            <span class="timer-status" id="tr-status">pronto</span>
+          </div>
+        </div>
+        <div id="tr-setup">
+          <p class="timer-lbl">Duração do jogo</p>
+          <div class="timer-presets" id="tr-presets"></div>
+          <div class="stepper">
+            <button class="st-btn" id="tr-minus" aria-label="Menos um minuto">−</button>
+            <span class="st-val timer-min" id="tr-minutes">8 min</span>
+            <button class="st-btn" id="tr-plus" aria-label="Mais um minuto">+</button>
+          </div>
+        </div>
+        <div class="timer-tools hidden" id="tr-tools">
+          <button class="btn btn-ghost btn-sm" id="tr-add">+1 min</button>
+          <button class="btn btn-ghost btn-sm" id="tr-reset">Zerar</button>
+        </div>
+        <p class="timer-done hidden" id="tr-done">Fim de jogo!</p>
+      </div>
+      <div class="cta-bar timer-cta">
+        <button class="btn btn-primary" id="tr-toggle">Começar</button>
+        <button class="btn btn-ghost hidden" id="tr-live">Marcar gols e assistências</button>
+      </div>
     </div>
   </section>
 
@@ -341,6 +516,22 @@
         <p class="hint" style="padding:6px 2px 0">Campo usa a posição de cada jogador no sorteio. Não dá para mudar depois.</p>
         <p class="eyebrow">Dia da pelada</p>
         <div class="weekdays" id="wz-weekday"></div>
+        <p class="err" id="wz-weekday-err">Escolha o dia da pelada.</p>
+        <p class="eyebrow">Durante o jogo</p>
+        <div class="seg-row">
+          <div>
+            <span class="seg-lbl">Marcar gols e assistências</span>
+            <p class="hint" style="margin:2px 0 0">Ranking do dia e do ano. Dá para mudar depois.</p>
+          </div>
+          <button class="switch" id="wz-stats" role="switch" aria-label="Marcar gols e assistências"></button>
+        </div>
+        <div class="seg-row">
+          <div>
+            <span class="seg-lbl">Cronômetro do jogo</span>
+            <p class="hint" style="margin:2px 0 0">Contagem regressiva com apito no fim</p>
+          </div>
+          <button class="switch on" id="wz-timer" role="switch" aria-label="Cronômetro do jogo"></button>
+        </div>
         <p class="eyebrow">Colete do time 1</p>
         <div class="swatches" id="wz-c1"></div>
         <p class="eyebrow">Colete do time 2</p>
@@ -671,6 +862,29 @@
         <p class="eyebrow">Colete do time 2</p>
         <div class="swatches" id="mn-c2"></div>
         <p class="err" id="mn-same">Os dois times estão com a mesma cor.</p>
+        <p class="eyebrow">Durante o jogo</p>
+        <div class="seg-row">
+          <div>
+            <span class="seg-lbl">Marcar gols e assistências</span>
+            <p class="hint" style="margin:2px 0 0">Libera a marcação ao vivo e a aba Ranking</p>
+          </div>
+          <button class="switch" id="mn-stats" role="switch" aria-label="Marcar gols e assistências"></button>
+        </div>
+        <div class="seg-row">
+          <div>
+            <span class="seg-lbl">Cronômetro do jogo</span>
+            <p class="hint" style="margin:2px 0 0">Contagem regressiva com apito no fim</p>
+          </div>
+          <button class="switch" id="mn-timer" role="switch" aria-label="Cronômetro do jogo"></button>
+        </div>
+        <div class="seg-row" id="mn-tmin-row">
+          <span class="seg-lbl">Duração padrão</span>
+          <div class="mini-stepper">
+            <button type="button" id="mn-tmin-minus" aria-label="Menos um minuto">−</button>
+            <span id="mn-tmin">8 min</span>
+            <button type="button" id="mn-tmin-plus" aria-label="Mais um minuto">+</button>
+          </div>
+        </div>
         <div class="spacer-md"></div>
       </div>
       <button class="btn btn-ghost" id="mn-members">
@@ -761,6 +975,7 @@
   <script src="{{ url_for('static', filename='js/teams.js') }}?v={{ app_version }}"></script>
   <script src="{{ url_for('static', filename='js/pitch.js') }}?v={{ app_version }}"></script>
   <script src="{{ url_for('static', filename='js/position-warnings.js') }}?v={{ app_version }}"></script>
+  <script src="{{ url_for('static', filename='js/match.js') }}?v={{ app_version }}"></script>
   <script src="{{ url_for('static', filename='js/compare.js') }}?v={{ app_version }}"></script>
   <script src="{{ url_for('static', filename='js/invites.js') }}?v={{ app_version }}"></script>
 

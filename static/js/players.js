@@ -136,6 +136,7 @@ function enterPelada(pelada) {
   currentPeladaWeekday = pelada.game_weekday != null ? pelada.game_weekday : null;
   currentPeladaSport = pelada.sport_type === "field" ? "field" : "futsal";
   currentPeladaRole = pelada.role || null;
+  applyMatchSettings(pelada);
   setAdminMode(pelada.role === "owner" || pelada.role === "admin");
 
   localStorage.setItem("pelada-current-id", String(pelada.id));
@@ -177,6 +178,8 @@ function setTab(tab) {
   if (tab === "hoje") {
     showScreen("s-checkin");
     renderCheckin();
+  } else if (tab === "ranking" && currentStatsEnabled) {
+    openRanking();
   } else {
     showScreen("s-squad");
     renderSquad();
@@ -685,6 +688,7 @@ function renderMenuSheet() {
     renderSwatches($("mn-c1"), currentTeam1Color, function (key) { saveColors(key, currentTeam2Color); });
     renderSwatches($("mn-c2"), currentTeam2Color, function (key) { saveColors(currentTeam1Color, key); });
     $("mn-same").classList.toggle("on", currentTeam1Color === currentTeam2Color);
+    renderMatchSettings();
   }
 }
 
@@ -815,7 +819,7 @@ async function submitFeedback() {
 // Nova pelada (wizard)
 // ============================================================
 
-let wizard = { c1: "blue", c2: "yellow", weekday: null, sport: "futsal", players: [] };
+let wizard = { c1: "blue", c2: "yellow", weekday: null, sport: "futsal", stats: false, timer: true, players: [] };
 
 const SPORT_OPTIONS = [
   { value: "futsal", label: "Salão" },
@@ -832,10 +836,12 @@ function resetWizardDraft() {
 }
 
 function openWizard() {
-  wizard = { c1: "blue", c2: "yellow", weekday: null, sport: "futsal", players: [] };
+  wizard = { c1: "blue", c2: "yellow", weekday: null, sport: "futsal", stats: false, timer: true, players: [] };
   resetWizardDraft();
   $("wz-name").value = "";
   $("wz-err").classList.remove("on");
+  $("wz-weekday-err").classList.remove("on");
+  renderWizardMatchSwitches();
   $("wz-player").value = "";
   renderWizardSport();
   renderWizardWeekday();
@@ -867,8 +873,16 @@ function renderWizardSport() {
 function renderWizardWeekday() {
   renderWeekdayPicker($("wz-weekday"), wizard.weekday, function (value) {
     wizard.weekday = value;
+    $("wz-weekday-err").classList.remove("on");
     renderWizardWeekday();
   });
+}
+
+function renderWizardMatchSwitches() {
+  $("wz-stats").classList.toggle("on", wizard.stats);
+  $("wz-stats").setAttribute("aria-checked", String(wizard.stats));
+  $("wz-timer").classList.toggle("on", wizard.timer);
+  $("wz-timer").setAttribute("aria-checked", String(wizard.timer));
 }
 
 function renderWizardSwatches() {
@@ -922,8 +936,14 @@ function wizardNext() {
     errEl.classList.add("on");
     return;
   }
-
   errEl.classList.remove("on");
+
+  // Every pelada has a game day: the daily ranking lasts until the next one.
+  if (wizard.weekday == null) {
+    $("wz-weekday-err").classList.add("on");
+    return;
+  }
+
   showScreen("s-wiz2");
   setTimeout(function () { $("wz-player").focus(); }, 100);
 }
@@ -1008,6 +1028,8 @@ async function wizardCreate() {
         team2_color: wizard.c2,
         game_weekday: wizard.weekday,
         sport_type: wizard.sport,
+        stats_enabled: wizard.stats,
+        timer_enabled: wizard.timer,
       }),
     });
 
@@ -1131,6 +1153,8 @@ document.addEventListener("DOMContentLoaded", function () {
   $("wz-back").addEventListener("click", function () { showScreen("s-wiz1"); });
   $("wz-next").addEventListener("click", wizardNext);
   $("wz-gk").addEventListener("click", toggleWizardGK);
+  $("wz-stats").addEventListener("click", function () { wizard.stats = !wizard.stats; renderWizardMatchSwitches(); });
+  $("wz-timer").addEventListener("click", function () { wizard.timer = !wizard.timer; renderWizardMatchSwitches(); });
   $("wz-add").addEventListener("click", wizardAddPlayer);
   $("wz-create").addEventListener("click", wizardCreate);
   $("wz-player").addEventListener("keydown", function (e) {

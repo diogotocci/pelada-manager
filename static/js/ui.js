@@ -20,6 +20,10 @@ let currentPeladaWeekday = null;
 // "futsal" (salão) or "field" (campo/society); fixed when the pelada is created.
 let currentPeladaSport = "futsal";
 let currentPeladaRole = null;
+// Goal/assist marking + rankings (opt-in) and the countdown timer (default on).
+let currentStatsEnabled = false;
+let currentTimerEnabled = true;
+let currentTimerMinutes = 8;
 let isAdminMode = false;
 let helpReturnScreen = "s-home";
 
@@ -486,6 +490,18 @@ const HELP_ITEMS = [
       "Cada pelada escolhe as <b>cores dos coletes</b> e o <b>dia</b> do jogo. " +
       "D\u00e1 pra <b>compartilhar os times no WhatsApp</b> j\u00e1 com a data do " +
       "pr\u00f3ximo jogo."
+  },
+  {
+    ico: "\u23f1\ufe0f",
+    title: "Cron\u00f4metro, gols e ranking",
+    tag: false,
+    body:
+      "O <b>cron\u00f4metro</b> faz a contagem regressiva do jogo e apita no fim " +
+      "(roda s\u00f3 no celular de quem iniciou). Se a pelada marca " +
+      "<b>gols e assist\u00eancias</b>, qualquer membro marca durante o jogo, " +
+      "inclusive quem chegou depois do sorteio. O <b>ranking do dia</b> fica at\u00e9 " +
+      "a v\u00e9spera da pr\u00f3xima pelada e o <b>ranking do ano</b> soma tudo. " +
+      "O admin liga ou desliga isso nos ajustes."
   },
   {
     ico: "\ud83d\udee1\ufe0f",

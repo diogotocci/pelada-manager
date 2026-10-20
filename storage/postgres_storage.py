@@ -86,6 +86,34 @@ def ensure_schema() -> None:
                 $$;
             """)
 
+            # Match stats (goals/assists per game day) and the countdown timer.
+            # Stats are opt-in per pelada; the timer is on for every pelada by
+            # default, existing ones included.
+            cur.execute("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'peladas' AND column_name = 'stats_enabled'
+                    ) THEN
+                        ALTER TABLE peladas ADD COLUMN stats_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+                    END IF;
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'peladas' AND column_name = 'timer_enabled'
+                    ) THEN
+                        ALTER TABLE peladas ADD COLUMN timer_enabled BOOLEAN NOT NULL DEFAULT TRUE;
+                    END IF;
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'peladas' AND column_name = 'timer_minutes'
+                    ) THEN
+                        ALTER TABLE peladas ADD COLUMN timer_minutes SMALLINT NOT NULL DEFAULT 8;
+                    END IF;
+                END
+                $$;
+            """)
+
             # One-time backfill for the two known peladas. Guarded by IS NULL
             # so it only seeds the initial value and never overrides a later
             # edit made through the admin UI. Saturday = 6, Monday = 1.
@@ -158,6 +186,30 @@ def ensure_schema() -> None:
                     END IF;
                 END
                 $$;
+            """)
+
+            # Goals/assists of each player on one game day. Kept only while that
+            # day's ranking is shown (until the day before the next game), so
+            # this table stays small; the yearly totals live in player_year_stats.
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS player_day_stats (
+                    pelada_id  INTEGER NOT NULL REFERENCES peladas(id) ON DELETE CASCADE,
+                    player_id  INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+                    game_date  DATE NOT NULL,
+                    goals      SMALLINT NOT NULL DEFAULT 0,
+                    assists    SMALLINT NOT NULL DEFAULT 0,
+                    PRIMARY KEY (pelada_id, game_date, player_id)
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS player_year_stats (
+                    pelada_id  INTEGER NOT NULL REFERENCES peladas(id) ON DELETE CASCADE,
+                    player_id  INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+                    year       SMALLINT NOT NULL,
+                    goals      INTEGER NOT NULL DEFAULT 0,
+                    assists    INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (pelada_id, year, player_id)
+                )
             """)
 
             # The old password rate-limit table is no longer used (no passwords).
@@ -321,6 +373,9 @@ def _row_to_pelada(row) -> Dict:
         "team2_color": row.get("team2_color") or "yellow",
         "game_weekday": int(weekday) if weekday is not None else None,
         "sport_type": row.get("sport_type") or "futsal",
+        "stats_enabled": bool(row.get("stats_enabled", False)),
+        "timer_enabled": bool(row.get("timer_enabled", True)),
+        "timer_minutes": int(row["timer_minutes"]) if row.get("timer_minutes") is not None else 8,
     }
 
 
@@ -329,26 +384,28 @@ class PeladaStorage:
         with _get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT p.id, p.name, p.team1_color, p.team2_color, p.game_weekday, p.sport_type, COUNT(pl.id) AS player_count
+                    SELECT p.id, p.name, p.team1_color, p.team2_color, p.game_weekday, p.sport_type,
+                           p.stats_enabled, p.timer_enabled, p.timer_minutes, COUNT(pl.id) AS player_count
                     FROM peladas p
                     LEFT JOIN players pl ON pl.pelada_id = p.id
-                    GROUP BY p.id, p.name, p.team1_color, p.team2_color, p.game_weekday, p.sport_type
+                    GROUP BY p.id, p.name, p.team1_color, p.team2_color, p.game_weekday, p.sport_type,
+                             p.stats_enabled, p.timer_enabled, p.timer_minutes
                     ORDER BY p.id
                 """)
                 return [_row_to_pelada(r) for r in cur.fetchall()]
 
-    def create_pelada_owned(self, name: str, owner_user_id: int, team1_color: str = "blue", team2_color: str = "yellow", game_weekday: Optional[int] = None, sport_type: str = "futsal") -> Dict:
+    def create_pelada_owned(self, name: str, owner_user_id: int, team1_color: str = "blue", team2_color: str = "yellow", game_weekday: Optional[int] = None, sport_type: str = "futsal", stats_enabled: bool = False, timer_enabled: bool = True) -> Dict:
         """Create a pelada (no password) and make the given user its owner, in
         one transaction. Returns the pelada with role='owner'."""
         with _get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO peladas (name, team1_color, team2_color, game_weekday, sport_type)
-                    VALUES (%s, %s, %s, %s, %s)
-                    RETURNING id, name, team1_color, team2_color, game_weekday, sport_type, 0 AS player_count
+                    INSERT INTO peladas (name, team1_color, team2_color, game_weekday, sport_type, stats_enabled, timer_enabled)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id, name, team1_color, team2_color, game_weekday, sport_type, stats_enabled, timer_enabled, timer_minutes, 0 AS player_count
                     """,
-                    (name, team1_color, team2_color, game_weekday, sport_type),
+                    (name, team1_color, team2_color, game_weekday, sport_type, stats_enabled, timer_enabled),
                 )
                 pelada = _row_to_pelada(cur.fetchone())
                 cur.execute(
@@ -363,7 +420,7 @@ class PeladaStorage:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    SELECT id, name, team1_color, team2_color, game_weekday, sport_type, 0 AS player_count
+                    SELECT id, name, team1_color, team2_color, game_weekday, sport_type, stats_enabled, timer_enabled, timer_minutes, 0 AS player_count
                     FROM peladas WHERE id = %s
                     """,
                     (pelada_id,),
@@ -379,7 +436,7 @@ class PeladaStorage:
                     UPDATE peladas
                     SET team1_color = %s, team2_color = %s
                     WHERE id = %s
-                    RETURNING id, name, team1_color, team2_color, game_weekday, sport_type, 0 AS player_count
+                    RETURNING id, name, team1_color, team2_color, game_weekday, sport_type, stats_enabled, timer_enabled, timer_minutes, 0 AS player_count
                     """,
                     (team1_color, team2_color, pelada_id),
                 )
@@ -394,9 +451,24 @@ class PeladaStorage:
                     UPDATE peladas
                     SET game_weekday = %s
                     WHERE id = %s
-                    RETURNING id, name, team1_color, team2_color, game_weekday, sport_type, 0 AS player_count
+                    RETURNING id, name, team1_color, team2_color, game_weekday, sport_type, stats_enabled, timer_enabled, timer_minutes, 0 AS player_count
                     """,
                     (game_weekday, pelada_id),
+                )
+                row = cur.fetchone()
+                return _row_to_pelada(row) if row else None
+
+    def set_match_settings(self, pelada_id: int, stats_enabled: bool, timer_enabled: bool, timer_minutes: int) -> Optional[Dict]:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE peladas
+                    SET stats_enabled = %s, timer_enabled = %s, timer_minutes = %s
+                    WHERE id = %s
+                    RETURNING id, name, team1_color, team2_color, game_weekday, sport_type, stats_enabled, timer_enabled, timer_minutes, 0 AS player_count
+                    """,
+                    (stats_enabled, timer_enabled, timer_minutes, pelada_id),
                 )
                 row = cur.fetchone()
                 return _row_to_pelada(row) if row else None
@@ -621,12 +693,14 @@ class UserStorage:
                 cur.execute(
                     """
                     SELECT p.id, p.name, p.team1_color, p.team2_color, p.game_weekday,
-                           p.sport_type, m.role, COUNT(pl.id) AS player_count
+                           p.sport_type, p.stats_enabled, p.timer_enabled, p.timer_minutes,
+                           m.role, COUNT(pl.id) AS player_count
                     FROM pelada_members m
                     JOIN peladas p ON p.id = m.pelada_id
                     LEFT JOIN players pl ON pl.pelada_id = p.id
                     WHERE m.user_id = %s
-                    GROUP BY p.id, p.name, p.team1_color, p.team2_color, p.game_weekday, p.sport_type, m.role
+                    GROUP BY p.id, p.name, p.team1_color, p.team2_color, p.game_weekday, p.sport_type,
+                             p.stats_enabled, p.timer_enabled, p.timer_minutes, m.role
                     ORDER BY p.id
                     """,
                     (user_id,),
@@ -960,3 +1034,146 @@ class PlayerStorage:
                     (pelada_id,),
                 )
                 return [_row_to_player(r) for r in cur.fetchall()]
+
+
+class MatchStatsStorage:
+    """
+    Goals and assists per game day plus the yearly totals. Every change updates
+    both in one transaction; a decrement only applies to what the day has.
+    """
+
+    def change_stat(self, pelada_id: int, player_id: int, game_date, field: str, delta: int) -> Optional[Dict]:
+        """Add delta (1 or -1) to a player's goals or assists on game_date.
+        Returns the player's day totals, or None when the player is not in the pelada."""
+        if field not in ("goals", "assists"):
+            raise ValueError("Invalid stat field")
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT 1 FROM players WHERE id = %s AND pelada_id = %s",
+                    (player_id, pelada_id),
+                )
+                if cur.fetchone() is None:
+                    return None
+
+                if delta > 0:
+                    cur.execute(
+                        f"""
+                        INSERT INTO player_day_stats (pelada_id, game_date, player_id, {field})
+                        VALUES (%s, %s, %s, 1)
+                        ON CONFLICT (pelada_id, game_date, player_id)
+                        DO UPDATE SET {field} = player_day_stats.{field} + 1
+                        """,
+                        (pelada_id, game_date, player_id),
+                    )
+                    cur.execute(
+                        f"""
+                        INSERT INTO player_year_stats (pelada_id, year, player_id, {field})
+                        VALUES (%s, %s, %s, 1)
+                        ON CONFLICT (pelada_id, year, player_id)
+                        DO UPDATE SET {field} = player_year_stats.{field} + 1
+                        """,
+                        (pelada_id, game_date.year, player_id),
+                    )
+                else:
+                    cur.execute(
+                        f"""
+                        UPDATE player_day_stats
+                        SET {field} = {field} - 1
+                        WHERE pelada_id = %s AND game_date = %s AND player_id = %s AND {field} > 0
+                        """,
+                        (pelada_id, game_date, player_id),
+                    )
+                    if cur.rowcount > 0:
+                        cur.execute(
+                            f"""
+                            UPDATE player_year_stats
+                            SET {field} = GREATEST({field} - 1, 0)
+                            WHERE pelada_id = %s AND year = %s AND player_id = %s
+                            """,
+                            (pelada_id, game_date.year, player_id),
+                        )
+
+                cur.execute(
+                    """
+                    SELECT goals, assists FROM player_day_stats
+                    WHERE pelada_id = %s AND game_date = %s AND player_id = %s
+                    """,
+                    (pelada_id, game_date, player_id),
+                )
+                row = cur.fetchone()
+                return {
+                    "player_id": player_id,
+                    "goals": int(row["goals"]) if row else 0,
+                    "assists": int(row["assists"]) if row else 0,
+                }
+
+    def list_day_stats(self, pelada_id: int) -> List[Dict]:
+        """Every stored day row of the pelada, with the player name."""
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT s.game_date, s.player_id, p.name, s.goals, s.assists
+                    FROM player_day_stats s
+                    JOIN players p ON p.id = s.player_id
+                    WHERE s.pelada_id = %s
+                    ORDER BY s.game_date, s.player_id
+                    """,
+                    (pelada_id,),
+                )
+                return [
+                    {
+                        "game_date": r["game_date"],
+                        "player_id": r["player_id"],
+                        "name": r["name"],
+                        "goals": int(r["goals"]),
+                        "assists": int(r["assists"]),
+                    }
+                    for r in cur.fetchall()
+                ]
+
+    def delete_days(self, pelada_id: int, dates: List) -> None:
+        if not dates:
+            return
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "DELETE FROM player_day_stats WHERE pelada_id = %s AND game_date = ANY(%s)",
+                    (pelada_id, list(dates)),
+                )
+
+    def list_year_stats(self, pelada_id: int, year: int) -> List[Dict]:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT s.player_id, p.name, s.goals, s.assists
+                    FROM player_year_stats s
+                    JOIN players p ON p.id = s.player_id
+                    WHERE s.pelada_id = %s AND s.year = %s
+                    """,
+                    (pelada_id, year),
+                )
+                return [
+                    {
+                        "player_id": r["player_id"],
+                        "name": r["name"],
+                        "goals": int(r["goals"]),
+                        "assists": int(r["assists"]),
+                    }
+                    for r in cur.fetchall()
+                ]
+
+    def list_years(self, pelada_id: int) -> List[int]:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT DISTINCT year FROM player_year_stats
+                    WHERE pelada_id = %s AND (goals > 0 OR assists > 0)
+                    ORDER BY year
+                    """,
+                    (pelada_id,),
+                )
+                return [int(r["year"]) for r in cur.fetchall()]
