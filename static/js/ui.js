@@ -388,9 +388,11 @@ const HELP_ITEMS = [
     tag: false,
     body:
       "As <b>estrelas</b> de cada jogador definem a for\u00e7a dele. O app monta " +
-      "<b>2 times com a for\u00e7a somada parecida</b>, espalhando os melhores e os " +
+      "<b>times com a for\u00e7a somada parecida</b>, espalhando os melhores e os " +
       "mais fracos entre os lados. <b class=\"g\">N\u00e3o \u00e9 aleat\u00f3rio</b> \u2014 \u00e9 " +
-      "equilibrado."
+      "equilibrado." +
+      "<p style=\"margin-top:8px\">No <b>campo/society</b> o sorteio tamb\u00e9m olha a " +
+      "<b>posi\u00e7\u00e3o</b> de cada um \u2014 veja as regras abaixo.</p>"
   },
   {
     ico: "\ud83d\udd11",
@@ -399,7 +401,13 @@ const HELP_ITEMS = [
     body:
       "Voc\u00ea entra no app com sua <b>conta Google</b> \u2014 sem senha de grupo. Ao " +
       "criar uma pelada, voc\u00ea vira o <b>dono</b> dela. Na tela inicial aparecem " +
-      "s\u00f3 as peladas de que voc\u00ea participa."
+      "s\u00f3 as peladas de que voc\u00ea participa." +
+      "<div class=\"help-sub\">" +
+      "<p><b>Tipo:</b> <b>Sal\u00e3o</b> ou <b>Campo / society</b>. O tipo " +
+      "<b>n\u00e3o muda depois</b> de criada.</p>" +
+      "<p><b>Dia da pelada:</b> agora \u00e9 <b>obrigat\u00f3rio</b> \u2014 \u00e9 ele que define " +
+      "at\u00e9 quando valem a posi\u00e7\u00e3o do dia e o ranking do dia.</p>" +
+      "</div>"
   },
   {
     ico: "\ud83d\udc64",
@@ -412,8 +420,9 @@ const HELP_ITEMS = [
       "a propriedade e faz tudo que o admin faz.</p>" +
       "<p><b>Admin:</b> cadastra e edita jogadores, v\u00ea e ajusta as notas, " +
       "atributos, cores e dia, e <b>convida</b> gente.</p>" +
-      "<p><b>Membro:</b> marca presen\u00e7a e sorteia. Pode cadastrar jogador, mas " +
-      "depois <b>n\u00e3o v\u00ea nem edita</b> as notas.</p>" +
+      "<p><b>Membro:</b> marca presen\u00e7a, sorteia, troca a posi\u00e7\u00e3o do dia e marca " +
+      "gols. Pode cadastrar jogador, mas depois <b>n\u00e3o v\u00ea nem edita</b> as " +
+      "notas.</p>" +
       "</div>"
   },
   {
@@ -424,6 +433,63 @@ const HELP_ITEMS = [
       "Cada jogador tem de <b>1 a 5 estrelas</b> (pode ter meia estrela). Quanto " +
       "mais estrelas, mais forte no sorteio. <b>S\u00f3 admin e dono</b> definem e " +
       "enxergam as estrelas."
+  },
+  {
+    ico: "\ud83c\udfdf\ufe0f",
+    title: "Posi\u00e7\u00f5es (campo/society)",
+    tag: false,
+    body:
+      "Na pelada de <b>campo/society</b> cada jogador tem uma <b>posi\u00e7\u00e3o " +
+      "principal</b>: <b>Goleiro</b>, <b>Zagueiro</b>, <b>Lateral</b>, " +
+      "<b>Meio campo</b> ou <b>Atacante</b>. No sal\u00e3o n\u00e3o tem posi\u00e7\u00e3o." +
+      "<div class=\"help-sub\">" +
+      "<p><b>Posi\u00e7\u00e3o do dia:</b> na presen\u00e7a, toque na posi\u00e7\u00e3o de algu\u00e9m pra " +
+      "trocar <b>s\u00f3 por hoje</b> (faltou zagueiro? algu\u00e9m quebra o galho). " +
+      "Qualquer pessoa da pelada pode trocar.</p>" +
+      "<p>Ela vale <b>at\u00e9 o dia do jogo passar</b>; depois volta sozinha pra " +
+      "posi\u00e7\u00e3o principal.</p>" +
+      "</div>"
+  },
+  {
+    ico: "\u2696\ufe0f",
+    title: "Regras do sorteio no campo/society",
+    tag: false,
+    body:
+      "No <b>campo/society</b>, al\u00e9m das estrelas, o sorteio segue estas " +
+      "regras, nesta ordem de prioridade:" +
+      "<div class=\"help-sub\">" +
+      "<p><b>1. Posi\u00e7\u00f5es divididas por igual</b> \u2014 cada posi\u00e7\u00e3o de linha " +
+      "(zagueiro, lateral, meio campo, atacante) \u00e9 espalhada entre os times. " +
+      "Um time pode ter <b>no m\u00e1ximo 1 a mais</b> de uma posi\u00e7\u00e3o que o outro.</p>" +
+      "<p><b>2. Estrelas equilibradas dentro da posi\u00e7\u00e3o</b> \u2014 a soma de estrelas " +
+      "de cada posi\u00e7\u00e3o fica parecida dos dois lados. Com 4 zagueiros (5\u2605, " +
+      "4\u2605, 3\u2605, 2\u2605), cada time leva um forte e um fraco, e n\u00e3o os dois " +
+      "craques juntos.</p>" +
+      "<p><b>3. For\u00e7a total parecida</b> \u2014 no fim, a soma de estrelas e os " +
+      "atributos de cada time tamb\u00e9m ficam equilibrados, como no sal\u00e3o.</p>" +
+      "</div>" +
+      "<p style=\"margin-top:8px\">Vale a <b>posi\u00e7\u00e3o do dia</b> de cada um. " +
+      "<b>Goleiro</b> segue a regra do goleiro fixo (at\u00e9 2 no gol; os demais " +
+      "jogam na linha). As regras de posi\u00e7\u00e3o valem para os <b>times completos</b>; " +
+      "o time que sobra com menos gente n\u00e3o entra na conta.</p>" +
+      "<p style=\"margin-top:8px\">A forma\u00e7\u00e3o <b class=\"g\">n\u00e3o \u00e9 fixa</b>: o app " +
+      "s\u00f3 divide o que tem. Se a conta n\u00e3o fecha (1 zagueiro s\u00f3, 3 laterais), " +
+      "aparece o <b>aviso de desequil\u00edbrio</b>.</p>"
+  },
+  {
+    ico: "\u26a0\ufe0f",
+    title: "Aviso de desequil\u00edbrio por posi\u00e7\u00e3o",
+    tag: false,
+    body:
+      "Na presen\u00e7a do <b>campo/society</b>, o app avisa quando uma posi\u00e7\u00e3o de " +
+      "linha n\u00e3o fecha certinho:" +
+      "<div class=\"help-sub\">" +
+      "<p><b>S\u00f3 1 jogador</b> na posi\u00e7\u00e3o \u2014 n\u00e3o d\u00e1 pra ter um de cada lado.</p>" +
+      "<p><b>N\u00famero \u00edmpar</b> (ex.: 3 laterais) \u2014 um time fica com um a mais.</p>" +
+      "</div>" +
+      "<p style=\"margin-top:8px\">Toque no aviso: o app <b class=\"g\">sugere " +
+      "quem trocar de posi\u00e7\u00e3o hoje</b> pra resolver. \u00c9 s\u00f3 um aviso \u2014 d\u00e1 pra " +
+      "sortear assim mesmo.</p>"
   },
   {
     ico: "\u26bd",
@@ -464,6 +530,28 @@ const HELP_ITEMS = [
       "</div>"
   },
   {
+    ico: "\ud83c\udfb2",
+    title: "Bola de sa\u00edda",
+    tag: false,
+    body:
+      "A cada sorteio o app tamb\u00e9m <b>sorteia quem come\u00e7a com a bola</b>. Aparece " +
+      "logo abaixo do placar, com a <b>cor do colete</b> do time \u2014 " +
+      "<b class=\"g\">acabou a discuss\u00e3o do par ou \u00edmpar</b>."
+  },
+  {
+    ico: "\ud83d\uddfa\ufe0f",
+    title: "Lista, campinho e compartilhar",
+    tag: false,
+    body:
+      "Depois do sorteio, veja os times em <b>Lista</b> ou no <b>Campinho</b>. " +
+      "No campo/society cada um aparece no setor da sua posi\u00e7\u00e3o, com a sigla " +
+      "(ZAG, LAT, MEI, ATA); no sal\u00e3o aparece numa <b>quadra de madeira</b> " +
+      "(1-2-1)." +
+      "<p style=\"margin-top:8px\">O bot\u00e3o <b>Compartilhar</b> manda " +
+      "<b class=\"g\">sempre a imagem do campinho</b> no WhatsApp, com a data do " +
+      "pr\u00f3ximo jogo \u2014 n\u00e3o importa qual vis\u00e3o est\u00e1 aberta.</p>"
+  },
+  {
     ico: "\ud83d\udd17",
     title: "Convidar pra pelada",
     tag: true,
@@ -484,24 +572,52 @@ const HELP_ITEMS = [
   },
   {
     ico: "\ud83c\udfbd",
-    title: "Coletes, dia e compartilhar",
+    title: "Coletes e dia",
     tag: false,
     body:
       "Cada pelada escolhe as <b>cores dos coletes</b> e o <b>dia</b> do jogo. " +
-      "D\u00e1 pra <b>compartilhar os times no WhatsApp</b> j\u00e1 com a data do " +
-      "pr\u00f3ximo jogo."
+      "O admin muda isso quando quiser nos <b>ajustes</b>."
   },
   {
     ico: "\u23f1\ufe0f",
-    title: "Cron\u00f4metro, gols e ranking",
+    title: "Cron\u00f4metro",
     tag: false,
     body:
-      "O <b>cron\u00f4metro</b> faz a contagem regressiva do jogo e apita no fim " +
-      "(roda s\u00f3 no celular de quem iniciou). Se a pelada marca " +
-      "<b>gols e assist\u00eancias</b>, qualquer membro marca durante o jogo, " +
-      "inclusive quem chegou depois do sorteio. O <b>ranking do dia</b> fica at\u00e9 " +
-      "a v\u00e9spera da pr\u00f3xima pelada e o <b>ranking do ano</b> soma tudo. " +
-      "O admin liga ou desliga isso nos ajustes."
+      "Escolha os minutos e o <b>cron\u00f4metro</b> faz a contagem regressiva, com " +
+      "<b>apito no fim</b>. Ele roda <b>s\u00f3 no celular de quem iniciou</b>. Vem " +
+      "<b>ligado</b> por padr\u00e3o; nos ajustes o admin desliga e define a " +
+      "<b>dura\u00e7\u00e3o padr\u00e3o</b>."
+  },
+  {
+    ico: "\ud83e\udd45",
+    title: "Gols e assist\u00eancias",
+    tag: false,
+    body:
+      "Se a pelada tem <b>Marcar gols e assist\u00eancias</b> ligado (escolhido ao " +
+      "criar ou depois nos ajustes), aparece o bot\u00e3o de marcar nos times e a " +
+      "aba <b>Ranking</b>." +
+      "<div class=\"help-sub\">" +
+      "<p><b>Qualquer membro marca</b>, durante o jogo, com o <b>+</b> e " +
+      "<b>\u2212</b> de bola (gol) e chuteira (assist\u00eancia).</p>" +
+      "<p>A lista \u00e9 o <b>elenco inteiro</b> em ordem alfab\u00e9tica \u2014 d\u00e1 pra marcar " +
+      "at\u00e9 quem <b>chegou depois do sorteio</b>.</p>" +
+      "</div>"
+  },
+  {
+    ico: "\ud83c\udfc6",
+    title: "Ranking do dia e do ano",
+    tag: false,
+    body:
+      "A aba <b>Ranking</b> ordena por <b>gols</b> e desempata por " +
+      "<b>assist\u00eancias</b>:" +
+      "<div class=\"help-sub\">" +
+      "<p><b>Do dia:</b> fica no ar <b>at\u00e9 a v\u00e9spera da pr\u00f3xima pelada</b>, " +
+      "depois some pra come\u00e7ar a pr\u00f3xima rodada.</p>" +
+      "<p><b>Do ano:</b> soma todas as peladas do ano e <b>zera em 1\u00ba de " +
+      "janeiro</b>. D\u00e1 pra ver anos anteriores.</p>" +
+      "</div>" +
+      "<p style=\"margin-top:8px\">Os dois d\u00e1 pra <b class=\"g\">compartilhar no " +
+      "WhatsApp</b>.</p>"
   },
   {
     ico: "\ud83d\udee1\ufe0f",
