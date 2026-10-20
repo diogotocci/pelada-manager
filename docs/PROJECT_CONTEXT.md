@@ -68,6 +68,11 @@ Located in `services/team_balancer.py`.
 - Any member can set a player's `day_position` (`PATCH /api/players/<id>/day-position`). It lasts until the pelada's next game day (`game_weekday`, or the end of today when unset, Brazil time) and then the main position applies again.
 - In field peladas the draw uses the effective position and spreads each outfield position as evenly as possible across the full-size teams, both in count and in stars (strong and weak players of one position are split between teams, not stacked on one side while the totals still match) (`balance_teams(..., spread_positions=True)`); the attributes are the same as futsal.
 
+## Pitch View and Position Warnings (frontend only)
+- The teams screen has a "Lista / Campinho" toggle (`static/js/pitch.js`, persisted in `localStorage` as `tj-teams-view`). Campinho draws the two playing teams on a field: society rows by position (goalkeeper, fullbacks on the wings of the defensive line, midfielders, forwards; players without a position join the midfield); futsal on a wooden court with random spots (1-2-1 for 4 outfielders), cached per drawn team so toggling keeps the layout. Bench teams stay as cards below.
+- In Campinho view, "Compartilhar" shares a 1080x1350 PNG drawn on a canvas (Web Share API with files, download as fallback); in Lista view it keeps sharing the text.
+- Field peladas warn about position imbalance among present outfielders (`static/js/position-warnings.js`): a position with exactly 1 player (cannot be split between the two sides) or an odd count of 3 or more. A position nobody plays is not flagged. The warning shows as a banner on the check-in list and inside the draw sheet, with a suggested single day-position change; "Ajustar posições" opens a sheet to change day positions in one tap. Drawing anyway is always allowed.
+
 ## Authentication
 - Handled via Google One Tap (Google Identity Services).
 - Frontend sends the `credential` token to `POST /api/auth/google`.

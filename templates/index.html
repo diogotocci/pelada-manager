@@ -197,6 +197,14 @@
           <button class="btn btn-ghost btn-sm" id="ci-mark-all">Marcar todos</button>
           <button class="btn btn-ghost btn-sm" id="ci-clear">Limpar</button>
         </div>
+        <button type="button" class="pos-warning hidden" id="ci-pos-warning">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.5v.01"/></svg>
+          <span class="pw-main">
+            <span class="pw-title">Desequilíbrio por posição</span>
+            <span class="pw-text" id="ci-pos-warning-text"></span>
+          </span>
+          <svg class="pw-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
         <p class="eyebrow">Quem está aí?</p>
         <p class="empty hidden" id="ci-empty">Ninguém no elenco ainda.<br>Adicione jogadores na aba Elenco.</p>
         <div class="card rowlist" id="ci-list"></div>
@@ -240,6 +248,10 @@
         </button>
       </div>
       <div class="scroll">
+        <div class="view-toggle" role="group" aria-label="Modo de exibição">
+          <button type="button" id="tm-view-list" aria-pressed="true">Lista</button>
+          <button type="button" id="tm-view-pitch" aria-pressed="false">Campinho</button>
+        </div>
         <div class="card balance" id="tm-balance"></div>
         <div class="kickoff hidden" id="tm-kickoff"></div>
         <div id="tm-cards"></div>
@@ -579,6 +591,8 @@
         <button class="st-btn" id="dr-plus" aria-label="Mais">+</button>
       </div>
       <p class="stepper-sub" id="dr-summary"></p>
+      <div class="pos-warning-box hidden" id="dr-pos-warning"></div>
+      <button class="btn btn-ghost btn-sm pos-adjust-btn hidden" id="dr-adjust">Ajustar posições</button>
     </div>
     <div class="s-actions">
       <button class="btn btn-ghost" id="dr-cancel">Cancelar</button>
@@ -706,6 +720,22 @@
     </div>
   </div>
 
+  <!-- Ajustar posições do dia (avisos de desequilíbrio) -->
+  <div class="sheet" id="sh-posfix" role="dialog" aria-modal="true">
+    <div class="grab"></div>
+    <h3>Ajustar posições do dia</h3>
+    <p class="s-sub">Troque a posição de hoje de alguém para equilibrar os times.</p>
+    <div class="s-body">
+      <div class="pos-warning-box" id="fx-warning"></div>
+      <div class="pos-counts" id="fx-counts"></div>
+      <div class="card rowlist" id="fx-list"></div>
+    </div>
+    <div class="s-actions">
+      <button class="btn btn-ghost" id="fx-close">Fechar</button>
+      <button class="btn btn-primary" id="fx-draw">Sortear</button>
+    </div>
+  </div>
+
   <!-- Auditoria -->
   <div class="sheet" id="sh-audit" role="dialog" aria-modal="true">
     <div class="grab"></div>
@@ -729,6 +759,8 @@
   <script src="{{ url_for('static', filename='js/auth.js') }}?v={{ app_version }}"></script>
   <script src="{{ url_for('static', filename='js/players.js') }}?v={{ app_version }}"></script>
   <script src="{{ url_for('static', filename='js/teams.js') }}?v={{ app_version }}"></script>
+  <script src="{{ url_for('static', filename='js/pitch.js') }}?v={{ app_version }}"></script>
+  <script src="{{ url_for('static', filename='js/position-warnings.js') }}?v={{ app_version }}"></script>
   <script src="{{ url_for('static', filename='js/compare.js') }}?v={{ app_version }}"></script>
   <script src="{{ url_for('static', filename='js/invites.js') }}?v={{ app_version }}"></script>
 
