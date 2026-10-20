@@ -13,6 +13,9 @@ GK_FOOT_BONUS = {1: 0.0, 2: 0.5, 3: 1.0}
 # Field peladas: penalty per extra player of one position beyond an even
 # spread (a team may hold at most one more of a position than another).
 POSITION_WEIGHT = 15.0
+# Field peladas: penalty per star of difference between teams within one
+# position (e.g. two 5-star fullbacks on one side and two 3-star on the other).
+POSITION_RATING_WEIGHT = 8.0
 
 
 def _gk_advantage(player: Player) -> float:
@@ -34,7 +37,7 @@ def balance_teams(players: List[Player], team_size: int, spread_positions: bool 
       compensate a weaker/absent keeper on the other side);
     - controlled random swaps for redraw variation;
     - with spread_positions (field peladas), each outfield position spread as
-      evenly as possible across the full-size teams.
+      evenly as possible across the full-size teams, in count and in stars.
     """
     if team_size <= 0:
         raise ValueError("team_size must be > 0")
@@ -233,6 +236,25 @@ def _position_spread_penalty(teams: List[Dict]) -> float:
     return penalty
 
 
+def _position_rating_penalty(teams: List[Dict]) -> float:
+    """Star gap between full-size teams within each position, so strong and
+    weak players of the same position are split instead of stacked."""
+    full_teams = _full_size_teams(teams)
+    if len(full_teams) < 2:
+        return 0.0
+    positions = {
+        _position_of(p) for t in full_teams for p in _outfielders(t["players"]) if _position_of(p)
+    }
+    penalty = 0.0
+    for position in positions:
+        sums = [
+            sum(p.rating for p in _outfielders(t["players"]) if _position_of(p) == position)
+            for t in full_teams
+        ]
+        penalty += (max(sums) - min(sums)) * POSITION_RATING_WEIGHT
+    return penalty
+
+
 def _team_score_if_added(team: Dict, player: Player, all_teams: List[Dict], spread_positions: bool = False) -> float:
     # Only outfielders drive the spread/attribute penalties; the keeper's
     # contribution is captured by the team "seed".
@@ -261,7 +283,12 @@ def _team_score_if_added(team: Dict, player: Player, all_teams: List[Dict], spre
     variance_penalty = _rating_variance(simulated_players)
     size_penalty = len(simulated_players) / max(team["capacity"], 1)
 
-    position_penalty = _position_penalty_if_added(team, player, all_teams) if spread_positions else 0.0
+    position_penalty = 0.0
+    if spread_positions:
+        position_penalty = _position_penalty_if_added(team, player, all_teams)
+        team["players"].append(player)
+        position_penalty += _position_rating_penalty(all_teams)
+        team["players"].pop()
 
     return (
         position_penalty
@@ -310,11 +337,10 @@ def _apply_attribute_aware_swaps(teams: List[Dict], max_attempts: int = 90, spre
         p2 = t2["players"][j]
 
         # Same-position swaps keep the position spread intact, so in field
-        # peladas they may trade a wider rating gap to fix the rating balance.
-        max_gap = 0.5
-        if spread_positions and _position_of(p1) and _position_of(p1) == _position_of(p2):
-            max_gap = 1.5
-        if abs(p1.rating - p2.rating) > max_gap:
+        # peladas they may trade any rating gap to fix the per-position and
+        # total balance (the swap is still kept only if the score improves).
+        same_position = spread_positions and _position_of(p1) and _position_of(p1) == _position_of(p2)
+        if not same_position and abs(p1.rating - p2.rating) > 0.5:
             continue
 
         current_score = _overall_balance_score(teams, spread_positions)
@@ -354,7 +380,9 @@ def _overall_balance_score(teams: List[Dict], spread_positions: bool = False) ->
         concentrated_extremes += max(0, _count_attribute_value(players, "stamina", 1) - 1) * 4.0
         concentrated_extremes += max(0, _count_attribute_value(players, "stamina", 3) - 1) * 4.0
 
-    position_spread = _position_spread_penalty(teams) if spread_positions else 0.0
+    position_spread = 0.0
+    if spread_positions:
+        position_spread = _position_spread_penalty(teams) + _position_rating_penalty(teams)
 
     return (
         position_spread
