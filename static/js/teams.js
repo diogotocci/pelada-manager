@@ -442,10 +442,9 @@ async function shareTeams() {
     return;
   }
 
-  if (teamsView === "pitch") {
-    await sharePitchImage();
-    return;
-  }
+  // Sharing always sends the pitch image, whatever the screen view; the text
+  // is the fallback when the image cannot be drawn.
+  if (lastDrawnTeams.length >= 2 && await sharePitchImage()) return;
 
   const text = buildShareText();
 
