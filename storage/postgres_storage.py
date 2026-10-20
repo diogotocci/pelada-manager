@@ -184,6 +184,12 @@ def ensure_schema() -> None:
                     ) THEN
                         ALTER TABLE players ADD COLUMN day_position_until DATE;
                     END IF;
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'players' AND column_name = 'dominant_foot'
+                    ) THEN
+                        ALTER TABLE players ADD COLUMN dominant_foot TEXT;
+                    END IF;
                 END
                 $$;
             """)
@@ -360,6 +366,7 @@ def _row_to_player(row) -> Player:
         position=row.get("position"),
         day_position=row.get("day_position"),
         day_position_until=row.get("day_position_until"),
+        dominant_foot=row.get("dominant_foot"),
     )
 
 
@@ -916,16 +923,17 @@ class PlayerStorage:
         is_goalkeeper: bool = False,
         gk_footwork: int = 1,
         position: Optional[str] = None,
+        dominant_foot: Optional[str] = None,
     ) -> Player:
         with _get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO players (pelada_id, name, rating, active, marking, stamina, scoring, is_goalkeeper, gk_footwork, position)
-                    VALUES (%s, %s, %s, TRUE, %s, %s, %s, %s, %s, %s)
+                    INSERT INTO players (pelada_id, name, rating, active, marking, stamina, scoring, is_goalkeeper, gk_footwork, position, dominant_foot)
+                    VALUES (%s, %s, %s, TRUE, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING *
                     """,
-                    (pelada_id, name, rating, marking, stamina, scoring, is_goalkeeper, gk_footwork, position),
+                    (pelada_id, name, rating, marking, stamina, scoring, is_goalkeeper, gk_footwork, position, dominant_foot),
                 )
                 return _row_to_player(cur.fetchone())
 
@@ -941,7 +949,11 @@ class PlayerStorage:
         is_goalkeeper: Optional[bool] = None,
         gk_footwork: Optional[int] = None,
         position: Optional[str] = None,
+        set_dominant_foot: bool = False,
+        dominant_foot: Optional[str] = None,
     ) -> Optional[Player]:
+        """None leaves a field unchanged; the dominant foot is optional, so it is
+        only written (null included) when set_dominant_foot is True."""
         with _get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -954,11 +966,13 @@ class PlayerStorage:
                         scoring       = COALESCE(%s, scoring),
                         is_goalkeeper = COALESCE(%s, is_goalkeeper),
                         gk_footwork   = COALESCE(%s, gk_footwork),
-                        position      = COALESCE(%s, position)
+                        position      = COALESCE(%s, position),
+                        dominant_foot = CASE WHEN %s THEN %s ELSE dominant_foot END
                     WHERE id = %s AND pelada_id = %s
                     RETURNING *
                     """,
-                    (name, rating, marking, stamina, scoring, is_goalkeeper, gk_footwork, position, player_id, pelada_id),
+                    (name, rating, marking, stamina, scoring, is_goalkeeper, gk_footwork, position,
+                     set_dominant_foot, dominant_foot, player_id, pelada_id),
                 )
                 row = cur.fetchone()
                 return _row_to_player(row) if row else None

@@ -317,6 +317,48 @@ function renderPositionPicker(container, selected, onSelect) {
   });
 }
 
+// Dominant foot (field peladas only, optional): a cleat seen from above. The
+// left one is the right one mirrored.
+const DOMINANT_FEET = [
+  { value: "left", label: "Esquerdo" },
+  { value: "right", label: "Direito" },
+];
+
+const FOOT_PATH = "M10.6 1.5C13.6 1.5 16.2 3.6 16.6 7.2C16.9 9.8 15.6 12.2 15.4 14.4C15.2 16.6 16 18.8 15.6 20.4C15.1 22.2 13.6 22.9 12 22.9C10.2 22.9 8.8 22 8.5 20.2C8.2 18.2 8.6 15.6 8.4 13.4C8.2 11 7 8.8 7.1 6C7.2 3.4 8.6 1.5 10.6 1.5ZM9.8 18.3a2.2 2.8 0 1 0 4.4 0a2.2 2.8 0 1 0 -4.4 0ZM10.3 8.6h3.3v1.1h-3.3ZM10.2 10.6h3.4v1.1h-3.4ZM10.2 12.6h3.5v1.1h-3.5Z";
+
+function getDominantFoot(value) {
+  return DOMINANT_FEET.find(function (f) { return f.value === value; }) || null;
+}
+
+function footIconSVG(foot, size) {
+  const mirror = foot === "left" ? ' transform="matrix(-1 0 0 1 24 0)"' : "";
+  return '<svg class="foot-icon" viewBox="0 0 24 24" width="' + size + '" height="' + size + '" aria-hidden="true">' +
+    '<path fill="currentColor" fill-rule="evenodd"' + mirror + ' d="' + FOOT_PATH + '"/></svg>';
+}
+
+// "[icon] Pé esquerdo" for the meta line under a player's name; empty when unset.
+function footTagHTML(value) {
+  const foot = getDominantFoot(value);
+  if (!foot) return "";
+  return '<span class="foot-tag">' + footIconSVG(foot.value, 14) + "Pé " + foot.label.toLowerCase() + "</span>";
+}
+
+// Tapping the selected foot again clears it (the field is optional).
+function renderFootPicker(container, selected, onSelect) {
+  if (!container) return;
+  container.innerHTML = "";
+  DOMINANT_FEET.forEach(function (foot) {
+    const on = foot.value === selected;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "foot-opt" + (on ? " on" : "");
+    btn.setAttribute("aria-pressed", String(on));
+    btn.innerHTML = footIconSVG(foot.value, 26) + "<span>" + foot.label + "</span>";
+    btn.addEventListener("click", function () { onSelect(on ? null : foot.value); });
+    container.appendChild(btn);
+  });
+}
+
 function kickoffBallSVG(size) {
   return '<svg class="kickoff-ball" viewBox="0 0 24 24" width="' + size + '" height="' + size + '" aria-hidden="true">' +
     '<circle cx="12" cy="12" r="9.5"/>' +
@@ -448,6 +490,8 @@ const HELP_ITEMS = [
       "Qualquer pessoa da pelada pode trocar.</p>" +
       "<p>Ela vale <b>at\u00e9 o dia do jogo passar</b>; depois volta sozinha pra " +
       "posi\u00e7\u00e3o principal.</p>" +
+      "<p><b>P\u00e9 dominante:</b> opcional, no cadastro (direito ou esquerdo). " +
+      "Aparece no elenco ao lado da posi\u00e7\u00e3o e n\u00e3o muda o sorteio.</p>" +
       "</div>"
   },
   {

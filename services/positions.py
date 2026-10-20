@@ -11,6 +11,10 @@ SPORT_TYPES = (SPORT_FUTSAL, SPORT_FIELD)
 POSITION_GOALKEEPER = "goalkeeper"
 POSITIONS = (POSITION_GOALKEEPER, "defender", "fullback", "midfielder", "forward")
 
+# Field peladas only: optional dominant foot shown on the player. Informative,
+# it does not enter the draw.
+DOMINANT_FEET = ("right", "left")
+
 # Brazil has no daylight saving time since 2019, so a fixed offset is enough
 # and avoids depending on tzdata being available on the deployment runtime.
 GAME_TIMEZONE = timezone(timedelta(hours=-3))

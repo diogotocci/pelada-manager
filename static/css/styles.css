@@ -1225,6 +1225,25 @@ input { font: inherit; }
 }
 .chip-opt.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 
+/* Dominant foot (field peladas) */
+.foot-select { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.foot-opt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  border-radius: calc(var(--radius) - 2px);
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  font-size: .9rem;
+  font-weight: 700;
+}
+.foot-opt.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.foot-tag { display: inline-flex; align-items: center; gap: 4px; }
+.foot-icon { flex: none; }
+
 .invite-link { margin-top: 12px; }
 .invite-link input {
   width: 100%;

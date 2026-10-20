@@ -29,7 +29,7 @@ def test_member_receives_only_public_fields():
     data = app._player_json(player, False)
 
     # Exactly the public fields — no more.
-    assert set(data.keys()) == {"id", "name", "active", "is_goalkeeper", "position", "day_position"}
+    assert set(data.keys()) == {"id", "name", "active", "is_goalkeeper", "position", "day_position", "dominant_foot"}
 
     # Ratings/attributes must never leak to a non-admin (this is the #33 fix).
     for sensitive in ("rating", "marking", "stamina", "scoring", "gk_footwork"):
