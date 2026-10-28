@@ -18,7 +18,7 @@ from storage.postgres_storage import (
     MatchStatsStorage,
     ensure_schema,
 )
-from services.team_balancer import balance_teams, pick_kickoff_team
+from services.team_balancer import balance_teams_with_group, pick_kickoff_team
 from services.positions import (
     DOMINANT_FEET,
     POSITION_GOALKEEPER,
@@ -43,7 +43,7 @@ from services.match_stats import (
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "3.4.26")
+APP_VERSION = os.getenv("APP_VERSION", "3.4.27")
 
 VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white", "gray", "pink"}
 # Custom bib colors (picked with the color picker) are stored as "#rrggbb".
@@ -189,7 +189,9 @@ def _player_json(player, is_admin):
     if player.day_position and not _day_position_active(player):
         player = replace(player, day_position=None, day_position_until=None)
     if is_admin:
-        return player.to_dict()
+        data = player.to_dict()
+        data["panelinha"] = _in_panelinha(player)
+        return data
     return {
         "id": player.id,
         "name": player.name,
@@ -204,6 +206,12 @@ def _player_json(player, is_admin):
 def _day_position_active(player, today=None) -> bool:
     today = today or today_local()
     return effective_position(None, player.day_position, player.day_position_until, today) is not None
+
+
+def _in_panelinha(player, today=None) -> bool:
+    """Whether the player is in the admin's panelinha (it lapses after the game day)."""
+    until = player.panelinha_until
+    return until is not None and (today or today_local()) <= until
 
 
 def _parse_position(value):
@@ -984,6 +992,34 @@ def set_player_day_position(player_id):
     return jsonify(_player_json(updated_player, adm))
 
 
+@app.route("/api/panelinha", methods=["PUT"])
+def set_panelinha():
+    """Admins only: the players to keep on the same team in an admin's draw. Replaces the previous panelinha; it lapses after the next
+    game day, and unchecking a player takes them out."""
+    pelada_id, adm = _require_pelada()
+    if not adm:
+        abort(403, description="Admin token required")
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not isinstance(data.get("player_ids"), list):
+        abort(400, description="'player_ids' must be a list")
+    try:
+        player_ids = {int(i) for i in data["player_ids"]}
+    except (ValueError, TypeError):
+        abort(400, description="'player_ids' must contain integers")
+
+    pelada = pelada_storage.get_pelada(pelada_id)
+    if pelada is None:
+        abort(404, description="Pelada not found")
+
+    # Check-in is local until the draw, so stored "active" flags may be stale:
+    # keep any player of this pelada; the draw's set-active-batch drops the
+    # ones left unchecked.
+    player_ids &= {p.id for p in player_storage.get_all_players(pelada_id)}
+    until = day_position_until(today_local(), pelada.get("game_weekday"))
+    updated = player_storage.set_panelinha(pelada_id, sorted(player_ids), until)
+    return jsonify([_player_json(p, adm) for p in updated])
+
+
 @app.route("/api/players/<int:player_id>", methods=["DELETE"])
 def delete_player(player_id):
     pelada_id, adm = _require_pelada()
@@ -1063,7 +1099,9 @@ def draw_teams():
     if is_field:
         players = _apply_day_positions(players)
 
-    teams = balance_teams(players, team_size, spread_positions=is_field)
+    # The panelinha only applies when an admin draws.
+    group_ids = [p.id for p in players if _in_panelinha(p)] if adm else []
+    teams, group_info = balance_teams_with_group(players, team_size, group_ids, spread_positions=is_field)
 
     result = []
     for idx, team in enumerate(teams, start=1):
@@ -1075,7 +1113,10 @@ def draw_teams():
             entry["total_rating"] = team["total_rating"]
         result.append(entry)
 
-    return jsonify({"teams": result, "kickoff_team": pick_kickoff_team(result)})
+    response = {"teams": result, "kickoff_team": pick_kickoff_team(result)}
+    if group_info is not None:
+        response["panelinha"] = group_info
+    return jsonify(response)
 
 
 # ============================================================

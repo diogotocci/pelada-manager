@@ -20,6 +20,9 @@ class Player:
     day_position: Optional[str] = None
     day_position_until: Optional[date] = None
     dominant_foot: Optional[str] = None
+    # Admin-only "panelinha": kept on one team in an admin's draw up to and
+    # including this date (the next game day).
+    panelinha_until: Optional[date] = None
 
     def to_dict(self) -> Dict:
         return {

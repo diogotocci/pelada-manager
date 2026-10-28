@@ -32,6 +32,7 @@ let lastTeamSize = 5;
 let lastDrawnTeams = [];
 // Index (0 or 1) of the playing team that starts with the ball, from the draw.
 let lastKickoffTeam = null;
+let lastPanelinha = null;
 
 const BIB_COLORS = [
   { key: "blue", label: "Azul", light: "#4da3ff", dark: "#2d7cff" },
