@@ -149,6 +149,11 @@ function inkOver(hex) {
   return 0.299 * r + 0.587 * g + 0.114 * b > 150 ? "#1a1f1c" : "#ffffff";
 }
 
+function isVeryLight(hex) {
+  const n = parseInt(String(hex).replace("#", ""), 16);
+  return 0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255) > 200;
+}
+
 function teamLabel(index) {
   return getBibColor(getTeamColorKey(index + 1)).label;
 }
@@ -445,7 +450,8 @@ async function drawPitchImage(teams) {
     ctx.fillStyle = theme.ink;
     ctx.fillText(prefix, pillX + 22, 141);
     ctx.font = "700 24px Inter, system-ui, sans-serif";
-    ctx.fillStyle = kickoffColor.key === "white" ? theme.ink : kickoffColor.dark;
+    // Very light bibs (white, light customs) would vanish on the light pill.
+    ctx.fillStyle = isVeryLight(kickoffColor.dark) ? theme.ink : kickoffColor.dark;
     ctx.fillText(kickoffColor.label, pillX + 22 + prefixW, 141);
   }
 
@@ -492,8 +498,7 @@ async function drawPitchImage(teams) {
   });
 }
 
-// Returns false when the image could not be generated, so the caller can fall
-// back to sharing the text.
+// Returns false when the image could not be generated.
 async function sharePitchImage() {
   let blob;
   try {

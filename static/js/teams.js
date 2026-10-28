@@ -393,80 +393,15 @@ function renderAudit() {
 // Compartilhar times
 // ============================================================
 
-function buildShareText() {
-  const lines = [];
-  lines.push("⚽ Times — " + currentPeladaName);
-  lines.push(gameDateLabel());
-  if (lastKickoffTeam !== null && lastDrawnTeams.length >= 2) {
-    lines.push("Começa com a bola: " + getBibColor(getTeamColorKey(lastKickoffTeam + 1)).label);
-  }
-  lines.push("");
-
-  lastDrawnTeams.forEach(function (team, index) {
-    const colorKey = getTeamColorKey(index + 1);
-    const keeper = teamGoalkeeper(team);
-    const sorted = teamOutfielders(team).slice().sort(function (a, b) {
-      return a.name.trim().localeCompare(b.name.trim(), "pt-BR", { sensitivity: "base" });
-    });
-
-    if (colorKey == null) {
-      lines.push("🪑 De fora");
-      (team.players || []).slice().sort(function (a, b) {
-        return a.name.trim().localeCompare(b.name.trim(), "pt-BR", { sensitivity: "base" });
-      }).forEach(function (p) { lines.push("• " + p.name); });
-      lines.push("");
-      return;
-    }
-
-    const color = getBibColor(colorKey);
-    // Count everyone on court, goalkeeper included (matches the app card).
-    const total = sorted.length + (keeper ? 1 : 0);
-    lines.push(color.emoji + " " + color.label + " (" + total + ")");
-    if (keeper) {
-      lines.push("🧤 " + keeper.name);
-    }
-    sorted.forEach(function (p) {
-      const sharePosition = isFieldPelada() ? getPosition(p.position) : null;
-      lines.push("• " + p.name + (sharePosition ? " (" + sharePosition.short + ")" : ""));
-    });
-    lines.push("");
-  });
-
-  lines.push("timejusto.xyz");
-  return lines.join("\n");
-}
-
 async function shareTeams() {
   if (!lastDrawnTeams.length) {
     showToast("Sorteie os times primeiro.");
     return;
   }
 
-  // Sharing always sends the pitch image, whatever the screen view; the text
-  // is the fallback when the image cannot be drawn.
-  if (lastDrawnTeams.length >= 2 && await sharePitchImage()) return;
-
-  const text = buildShareText();
-
-  if (navigator.share) {
-    try {
-      await navigator.share({ text: text });
-    } catch (err) {
-      if (err && err.name === "AbortError") return;
-      copyShareText(text);
-    }
-  } else {
-    copyShareText(text);
-  }
-}
-
-function copyShareText(text) {
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text)
-      .then(function () { showToast("Escalação copiada"); })
-      .catch(function () { showToast("Não foi possível compartilhar."); });
-  } else {
-    showToast("Não foi possível compartilhar.");
+  // Sharing always sends the pitch image, whatever the screen view.
+  if (lastDrawnTeams.length < 2 || !await sharePitchImage()) {
+    showToast("Não foi possível gerar a imagem.");
   }
 }
 

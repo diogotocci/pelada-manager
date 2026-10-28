@@ -1,4 +1,5 @@
 import os
+import re
 from dataclasses import replace
 import logging
 from datetime import datetime, timedelta, timezone
@@ -42,9 +43,21 @@ from services.match_stats import (
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "3.4.25")
+APP_VERSION = os.getenv("APP_VERSION", "3.4.26")
 
-VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white", "pink"}
+VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white", "gray", "pink"}
+# Custom bib colors (picked with the color picker) are stored as "#rrggbb".
+CUSTOM_BIB_COLOR_RE = re.compile(r"^#[0-9a-f]{6}$")
+
+
+def _normalize_bib_color(value):
+    """Return a preset key or a lowercase "#rrggbb", or None when invalid."""
+    if not isinstance(value, str):
+        return None
+    if value in VALID_BIB_COLORS:
+        return value
+    value = value.strip().lower()
+    return value if CUSTOM_BIB_COLOR_RE.match(value) else None
 
 VALID_FEEDBACK_CATEGORIES = {"bug", "suggestion", "other"}
 FEEDBACK_SUBJECT_MAX = 120
@@ -390,9 +403,9 @@ def create_pelada():
     if not name:
         abort(400, description="Name cannot be empty")
 
-    team1_color = data.get("team1_color", "blue")
-    team2_color = data.get("team2_color", "yellow")
-    if team1_color not in VALID_BIB_COLORS or team2_color not in VALID_BIB_COLORS:
+    team1_color = _normalize_bib_color(data.get("team1_color", "blue"))
+    team2_color = _normalize_bib_color(data.get("team2_color", "yellow"))
+    if team1_color is None or team2_color is None:
         abort(400, description="Invalid bib color")
 
     game_weekday = _parse_weekday(data.get("game_weekday"))
@@ -560,10 +573,10 @@ def update_pelada_colors(pelada_id):
         abort(403, description="Admin token required for this pelada")
 
     data = request.get_json(silent=True) or {}
-    team1_color = data.get("team1_color")
-    team2_color = data.get("team2_color")
+    team1_color = _normalize_bib_color(data.get("team1_color"))
+    team2_color = _normalize_bib_color(data.get("team2_color"))
 
-    if team1_color not in VALID_BIB_COLORS or team2_color not in VALID_BIB_COLORS:
+    if team1_color is None or team2_color is None:
         abort(400, description="Invalid bib color")
 
     pelada = pelada_storage.update_pelada_colors(pelada_id, team1_color, team2_color)

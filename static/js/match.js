@@ -718,6 +718,16 @@ async function drawRankingImage(rows) {
   });
 }
 
+function copyShareText(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text)
+      .then(function () { showToast("Escalação copiada"); })
+      .catch(function () { showToast("Não foi possível compartilhar."); });
+  } else {
+    showToast("Não foi possível compartilhar.");
+  }
+}
+
 function buildRankingText(rows) {
   const head = rankingTitle();
   const lines = [head.eyebrow + " — " + head.title, ""];

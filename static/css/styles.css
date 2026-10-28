@@ -838,6 +838,17 @@ input { font: inherit; }
 }
 .swatch .inner { position: absolute; inset: 3px; border-radius: inherit; border: 1px solid rgba(0, 0, 0, .15); }
 .swatch.on { border-color: var(--ink); }
+.swatch-custom { cursor: pointer; background-clip: padding-box; }
+.swatch-custom input[type="color"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
 
 .weekdays { display: flex; gap: 6px; flex-wrap: wrap; padding: 4px 0; }
 .wd {

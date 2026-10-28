@@ -23,3 +23,18 @@ def test_parse_weekday_valid():
 def test_parse_weekday_invalid(bad):
     with pytest.raises(BadRequest):
         app._parse_weekday(bad)
+
+
+@pytest.mark.parametrize("value", ["blue", "gray", "pink"])
+def test_normalize_bib_color_accepts_presets(value):
+    assert app._normalize_bib_color(value) == value
+
+
+def test_normalize_bib_color_accepts_custom_hex():
+    assert app._normalize_bib_color("#6D28D9") == "#6d28d9"
+    assert app._normalize_bib_color(" #0a0b0c ") == "#0a0b0c"
+
+
+@pytest.mark.parametrize("bad", [None, 3, "", "purple", "#abc", "#12345g", "6d28d9", "#6d28d9ff"])
+def test_normalize_bib_color_rejects_invalid(bad):
+    assert app._normalize_bib_color(bad) is None

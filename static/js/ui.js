@@ -34,14 +34,15 @@ let lastDrawnTeams = [];
 let lastKickoffTeam = null;
 
 const BIB_COLORS = [
-  { key: "blue", label: "Azul", light: "#4da3ff", dark: "#2d7cff", emoji: "🔵" },
-  { key: "yellow", label: "Amarelo", light: "#ffd94d", dark: "#f5be18", emoji: "🟡" },
-  { key: "green", label: "Verde", light: "#4ade80", dark: "#16a34a", emoji: "🟢" },
-  { key: "red", label: "Vermelho", light: "#f87171", dark: "#dc2626", emoji: "🔴" },
-  { key: "orange", label: "Laranja", light: "#fb923c", dark: "#ea580c", emoji: "🟠" },
-  { key: "black", label: "Preto", light: "#4b5563", dark: "#111827", emoji: "⚫" },
-  { key: "white", label: "Branco", light: "#f9fafb", dark: "#d1d5db", emoji: "⚪" },
-  { key: "pink", label: "Rosa", light: "#f472b6", dark: "#db2777", emoji: "🩷" },
+  { key: "blue", label: "Azul", light: "#4da3ff", dark: "#2d7cff" },
+  { key: "yellow", label: "Amarelo", light: "#ffd94d", dark: "#f5be18" },
+  { key: "green", label: "Verde", light: "#4ade80", dark: "#16a34a" },
+  { key: "red", label: "Vermelho", light: "#f87171", dark: "#dc2626" },
+  { key: "orange", label: "Laranja", light: "#fb923c", dark: "#ea580c" },
+  { key: "black", label: "Preto", light: "#4b5563", dark: "#111827" },
+  { key: "white", label: "Branco", light: "#f9fafb", dark: "#d1d5db" },
+  { key: "gray", label: "Cinza", light: "#b8bfc7", dark: "#7b8490" },
+  { key: "pink", label: "Rosa", light: "#f472b6", dark: "#db2777" },
 ];
 
 // Weekday values follow JS Date.getDay(): 0=Sunday ... 6=Saturday.
@@ -220,7 +221,78 @@ function renderSeg(element, value, onPick) {
 // Bib colors
 // ============================================================
 
+const CUSTOM_BIB_RE = /^#[0-9a-f]{6}$/i;
+const CUSTOM_SWATCH_RING = "conic-gradient(#ef4444, #f59e0b, #eab308, #22c55e, #06b6d4, #3b82f6, #8b5cf6, #ec4899, #ef4444)";
+
+function isCustomBibColor(key) {
+  return typeof key === "string" && CUSTOM_BIB_RE.test(key);
+}
+
+function hexToRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+// Mixes a hex color with white; amount 0..1.
+function lightenHex(hex, amount) {
+  const c = hexToRgb(hex);
+  const mix = function (v) { return Math.round(v + (255 - v) * amount).toString(16).padStart(2, "0"); };
+  return "#" + mix(c.r) + mix(c.g) + mix(c.b);
+}
+
+// Approximate Portuguese name for any color, so custom bibs need no typing.
+function approxColorName(hex) {
+  const c = hexToRgb(hex);
+  const r = c.r / 255;
+  const g = c.g / 255;
+  const b = c.b / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  const d = max - min;
+  const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  let h = 0;
+  if (d !== 0) {
+    if (max === r) h = 60 * (((g - b) / d) % 6);
+    else if (max === g) h = 60 * ((b - r) / d + 2);
+    else h = 60 * ((r - g) / d + 4);
+  }
+  if (h < 0) h += 360;
+
+  if (l < 0.12) return "Preto";
+  if (l > 0.93) return "Branco";
+  if (s < 0.15) return l < 0.36 ? "Grafite" : "Cinza";
+
+  if (h < 15 || h >= 345) {
+    if (l < 0.3) return "Vinho";
+    return l > 0.75 ? "Rosa" : "Vermelho";
+  }
+  if (h < 45) {
+    if (l > 0.75 && s < 0.85) return "Bege";
+    if (l < 0.42) return h < 35 ? "Marrom" : "Mostarda";
+    return h < 20 && l > 0.65 ? "Salmão" : "Laranja";
+  }
+  if (h < 66) {
+    if (l < 0.4) return h < 50 ? "Mostarda" : "Verde-oliva";
+    return l > 0.75 && s < 0.6 ? "Bege" : "Amarelo";
+  }
+  if (h < 90) return l < 0.35 ? "Verde-oliva" : "Verde-limão";
+  if (h < 160) return l < 0.3 ? "Verde-escuro" : "Verde";
+  if (h < 180) return l < 0.35 ? "Verde-petróleo" : "Verde-água";
+  if (h < 250) {
+    if (l < 0.36) return "Azul-marinho";
+    return l > 0.7 || h < 205 ? "Azul-claro" : "Azul";
+  }
+  if (h < 290) return l > 0.72 ? "Lilás" : "Roxo";
+  if (h < 330) return l < 0.3 ? "Roxo" : l > 0.65 ? "Lilás" : "Magenta";
+  return l < 0.3 ? "Vinho" : "Rosa";
+}
+
 function getBibColor(key) {
+  if (isCustomBibColor(key)) {
+    const hex = key.toLowerCase();
+    return { key: hex, label: approxColorName(hex), light: lightenHex(hex, 0.3), dark: hex, custom: true };
+  }
   return BIB_COLORS.find(function (c) { return c.key === key; }) || BIB_COLORS[0];
 }
 
@@ -233,6 +305,7 @@ function buildBibEl(colorKey, small) {
   return bibEl;
 }
 
+// Preset swatches plus a multicolor one that opens the device color picker.
 function renderSwatches(container, selectedKey, onSelect) {
   if (!container) return;
   container.innerHTML = "";
@@ -251,6 +324,30 @@ function renderSwatches(container, selectedKey, onSelect) {
     swatch.addEventListener("click", function () { onSelect(c.key); });
     container.appendChild(swatch);
   });
+
+  const custom = isCustomBibColor(selectedKey) ? getBibColor(selectedKey) : null;
+  const swatch = document.createElement("label");
+  swatch.className = "swatch swatch-custom" + (custom ? " on" : "");
+  swatch.title = custom ? custom.label : "Outra cor";
+  // A chosen custom color keeps a rainbow ring so it still reads as "any color".
+  if (custom) swatch.style.background = CUSTOM_SWATCH_RING;
+
+  const inner = document.createElement("span");
+  inner.className = "inner";
+  inner.style.background = custom
+    ? "linear-gradient(180deg, " + custom.light + " 0%, " + custom.dark + " 100%)"
+    : CUSTOM_SWATCH_RING;
+
+  const input = document.createElement("input");
+  input.type = "color";
+  input.value = custom ? custom.key : "#7c3aed";
+  input.setAttribute("aria-label", custom ? "Cor escolhida: " + custom.label : "Escolher outra cor");
+  // "change" fires once the picker closes, so a drag does not save every step.
+  input.addEventListener("change", function () { onSelect(input.value.toLowerCase()); });
+
+  swatch.appendChild(inner);
+  swatch.appendChild(input);
+  container.appendChild(swatch);
 }
 
 // ============================================================
@@ -620,6 +717,8 @@ const HELP_ITEMS = [
     tag: false,
     body:
       "Cada pelada escolhe as <b>cores dos coletes</b> e o <b>dia</b> do jogo. " +
+      "A bolinha colorida abre o seletor do celular pra usar <b>qualquer cor</b>; " +
+      "o app d\u00e1 o nome aproximado sozinho. " +
       "O admin muda isso quando quiser nos <b>ajustes</b>."
   },
   {
