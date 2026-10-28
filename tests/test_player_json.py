@@ -20,7 +20,7 @@ def _player():
 def test_admin_receives_full_player():
     player = _player()
     data = app._player_json(player, True)
-    assert data == player.to_dict()
+    assert data == {**player.to_dict(), "panelinha": False}
     assert data["rating"] == 4.5
 
 

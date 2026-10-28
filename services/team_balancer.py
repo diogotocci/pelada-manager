@@ -1,6 +1,6 @@
 import random
 from dataclasses import replace
-from typing import Dict, List, Optional
+from typing import Dict, Iterable, List, Optional, Tuple
 
 from models import Player
 
@@ -16,6 +16,12 @@ POSITION_WEIGHT = 15.0
 # Field peladas: penalty per star of difference between teams within one
 # position (e.g. two 5-star fullbacks on one side and two 3-star on the other).
 POSITION_RATING_WEIGHT = 8.0
+# Panelinha (a group the admin wants on the same team): extra star difference
+# between teams accepted to keep the group together, compared with the same
+# draw without the group. Past it, the fewest possible members are split.
+GROUP_TOLERANCE = 0.5
+# Draws tried for each group size kept together (different members/teams).
+GROUP_ATTEMPTS = 16
 
 
 def _gk_advantage(player: Player) -> float:
@@ -24,7 +30,12 @@ def _gk_advantage(player: Player) -> float:
     return max(0.0, effective - GK_BASELINE)
 
 
-def balance_teams(players: List[Player], team_size: int, spread_positions: bool = False) -> List[Dict]:
+def balance_teams(
+    players: List[Player],
+    team_size: int,
+    spread_positions: bool = False,
+    locked: Optional[Tuple[int, List[int]]] = None,
+) -> List[Dict]:
     """
     Build balanced teams considering:
     - total rating balance;
@@ -37,7 +48,9 @@ def balance_teams(players: List[Player], team_size: int, spread_positions: bool 
       compensate a weaker/absent keeper on the other side);
     - controlled random swaps for redraw variation;
     - with spread_positions (field peladas), each outfield position spread as
-      evenly as possible across the full-size teams, in count and in stars.
+      evenly as possible across the full-size teams, in count and in stars;
+    - locked = (team index, outfielder ids): those players are placed on that
+      team first and never swapped out (see balance_teams_with_group).
     """
     if team_size <= 0:
         raise ValueError("team_size must be > 0")
@@ -63,6 +76,18 @@ def balance_teams(players: List[Player], team_size: int, spread_positions: bool 
         if index < len(teams):
             teams[index]["players"].append(keeper)
             teams[index]["seed"] = _gk_advantage(keeper)
+
+    locked_ids = set()
+    if locked is not None and 0 <= locked[0] < len(teams):
+        lock_index, wanted_ids = locked
+        wanted = set(wanted_ids)
+        team = teams[lock_index]
+        for p in outfielders:
+            if p.id in wanted and _outfield_count(team) < team["capacity"]:
+                team["players"].append(p)
+                team["total_rating"] += p.rating
+                locked_ids.add(p.id)
+        outfielders = [p for p in outfielders if p.id not in locked_ids]
 
     if spread_positions:
         # Place one position group at a time (largest group first, players
@@ -98,10 +123,91 @@ def balance_teams(players: List[Player], team_size: int, spread_positions: bool 
         best_team["players"].append(player)
         best_team["total_rating"] += player.rating
 
-    _apply_attribute_aware_swaps(teams, max_attempts=180 if spread_positions else 90, spread_positions=spread_positions)
+    _apply_attribute_aware_swaps(
+        teams,
+        max_attempts=180 if spread_positions else 90,
+        spread_positions=spread_positions,
+        locked_ids=locked_ids,
+    )
     _recalculate_totals(teams)
 
     return teams
+
+
+def balance_teams_with_group(
+    players: List[Player],
+    team_size: int,
+    group_ids: Iterable[int],
+    spread_positions: bool = False,
+) -> Tuple[List[Dict], Optional[Dict]]:
+    """
+    Balanced draw that keeps a group of players (the admin's "panelinha") on
+    one team as far as balance allows. The plain draw sets the reference star
+    difference; the largest group share whose best attempt stays within
+    GROUP_TOLERANCE of it wins, so the fewest possible members are split.
+    Within a size, the attempts vary which members stay and which team takes
+    them, so the balance decides who leaves when the group does not fit.
+
+    Returns (teams, info); info is None without a group of 2+ present players,
+    else {"total", "together", "team_index"} where "together" counts members
+    on the group's team.
+    """
+    wanted = set(group_ids)
+    members = [p for p in players if p.id in wanted]
+    baseline = balance_teams(players, team_size, spread_positions)
+    if len(members) < 2 or len(baseline) < 2:
+        return baseline, None
+
+    baseline_spread = _strength_spread(baseline)
+    keeper_ids = [p.id for p in players if getattr(p, "is_goalkeeper", False)][:2]
+    member_keepers = [i for i, k in enumerate(keeper_ids) if k in wanted]
+    outfield_members = [p for p in members if p.id not in keeper_ids]
+
+    for keep in range(len(members), 1, -1):
+        best = None
+        for _ in range(GROUP_ATTEMPTS):
+            if member_keepers:
+                # A keeper is tied to its team, so the group goes there.
+                team_index = random.choice(member_keepers)
+                outfield_keep = keep - 1
+            else:
+                team_index = None
+                outfield_keep = keep
+            if outfield_keep > len(outfield_members) or outfield_keep < 0:
+                break
+            chosen = random.sample(outfield_members, outfield_keep)
+            if team_index is None:
+                team_index = random.randrange(len(baseline))
+            teams = balance_teams(players, team_size, spread_positions, locked=(team_index, [p.id for p in chosen]))
+            if team_index >= len(teams) or _group_count(teams[team_index], wanted) < keep:
+                continue
+            spread = _strength_spread(teams)
+            if best is None or spread < best[0]:
+                best = (spread, teams, team_index)
+        if best is not None and best[0] <= baseline_spread + GROUP_TOLERANCE + 1e-9:
+            _, teams, team_index = best
+            return teams, {
+                "total": len(members),
+                "together": _group_count(teams[team_index], wanted),
+                "team_index": team_index,
+            }
+
+    # Not even two members fit: the plain draw, reporting its largest cluster.
+    index = max(range(len(baseline)), key=lambda i: _group_count(baseline[i], wanted))
+    return baseline, {
+        "total": len(members),
+        "together": _group_count(baseline[index], wanted),
+        "team_index": index,
+    }
+
+
+def _group_count(team: Dict, ids: set) -> int:
+    return sum(1 for p in team["players"] if p.id in ids)
+
+
+def _strength_spread(teams: List[Dict]) -> float:
+    totals = [_strength(t, teams) for t in teams]
+    return max(totals) - min(totals)
 
 
 def pick_kickoff_team(teams: List) -> Optional[int]:
@@ -308,7 +414,12 @@ def _team_score_if_added(team: Dict, player: Player, all_teams: List[Dict], spre
     )
 
 
-def _apply_attribute_aware_swaps(teams: List[Dict], max_attempts: int = 90, spread_positions: bool = False) -> None:
+def _apply_attribute_aware_swaps(
+    teams: List[Dict],
+    max_attempts: int = 90,
+    spread_positions: bool = False,
+    locked_ids: Optional[set] = None,
+) -> None:
     """
     Try small swaps between players with the same rating or a rating difference up to 0.5.
     A swap is kept only if it improves or preserves the overall team score.
@@ -323,9 +434,11 @@ def _apply_attribute_aware_swaps(teams: List[Dict], max_attempts: int = 90, spre
         t1 = teams[team_indices[0]]
         t2 = teams[team_indices[1]]
 
-        # Only outfielders may be swapped; keepers are locked to their team.
-        i1 = [k for k, p in enumerate(t1["players"]) if not getattr(p, "is_goalkeeper", False)]
-        i2 = [k for k, p in enumerate(t2["players"]) if not getattr(p, "is_goalkeeper", False)]
+        # Only outfielders may be swapped; keepers and locked group members
+        # stay on their team.
+        locked_ids = locked_ids or set()
+        i1 = [k for k, p in enumerate(t1["players"]) if not getattr(p, "is_goalkeeper", False) and p.id not in locked_ids]
+        i2 = [k for k, p in enumerate(t2["players"]) if not getattr(p, "is_goalkeeper", False) and p.id not in locked_ids]
 
         if not i1 or not i2:
             continue

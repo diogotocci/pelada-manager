@@ -12,6 +12,7 @@ function goHome() {
   checkinState = {};
   lastDrawnTeams = [];
   lastKickoffTeam = null;
+  lastPanelinha = null;
   currentPeladaRole = null;
   setAdminMode(false);
   localStorage.removeItem("pelada-current-id");
@@ -146,6 +147,7 @@ function enterPelada(pelada) {
   checkinState = {};
   lastDrawnTeams = [];
   lastKickoffTeam = null;
+  lastPanelinha = null;
 
   $("ci-title").textContent = pelada.name;
   $("sq-title").textContent = pelada.name;
@@ -161,6 +163,8 @@ async function loadPlayers() {
     players = await fetchJSON("/api/players");
     checkinState = {};
     players.forEach(function (p) { checkinState[p.id] = false; });
+    panelinhaMode = false;
+    loadPanelinhaFromPlayers();
     renderCheckin();
     renderSquad();
   } catch (err) {
@@ -175,6 +179,7 @@ async function loadPlayers() {
 
 function setTab(tab) {
   closeSheets();
+  panelinhaMode = false;
   if (tab === "hoje") {
     showScreen("s-checkin");
     renderCheckin();
@@ -203,8 +208,10 @@ function renderCheckin() {
 
   const presentCount = getPresentIds().length;
   const total = players.length;
+  const picking = panelinhaMode && isAdminMode;
 
   $("ci-empty").classList.toggle("hidden", total > 0);
+  renderPanelinhaControls(picking);
 
   const sorted = players.slice().sort(function (a, b) {
     return a.name.trim().localeCompare(b.name.trim(), "pt-BR", { sensitivity: "base" });
@@ -212,6 +219,11 @@ function renderCheckin() {
 
   sorted.forEach(function (p) {
     const isPresent = !!checkinState[p.id];
+
+    if (picking) {
+      if (isPresent) listEl.appendChild(buildPanelinhaPickRow(p));
+      return;
+    }
 
     if (isFieldPelada()) {
       listEl.appendChild(buildFieldCheckinRow(p, isPresent));
@@ -229,7 +241,8 @@ function renderCheckin() {
 
     const main = document.createElement("div");
     main.className = "r-main";
-    main.innerHTML = '<span class="r-name">' + escapeHTML(p.name) + gkGloveHTML(p) + "</span>";
+    main.innerHTML = '<span class="r-name">' + escapeHTML(p.name) + gkGloveHTML(p) + "</span>" +
+      panelinhaTagHTML(p, isPresent);
 
     const check = document.createElement("span");
     check.className = "check";
@@ -241,6 +254,7 @@ function renderCheckin() {
 
     row.addEventListener("click", function () {
       checkinState[p.id] = !checkinState[p.id];
+      dropAbsentFromPanelinha();
       renderCheckin();
     });
 
@@ -274,7 +288,8 @@ function buildFieldCheckinRow(p, isPresent) {
 
   const main = document.createElement("div");
   main.className = "r-main";
-  main.innerHTML = '<span class="r-name">' + escapeHTML(p.name) + gkGloveHTML(p) + "</span>";
+  main.innerHTML = '<span class="r-name">' + escapeHTML(p.name) + gkGloveHTML(p) + "</span>" +
+    panelinhaTagHTML(p, isPresent);
 
   toggle.appendChild(avatar);
   toggle.appendChild(main);
@@ -298,6 +313,7 @@ function buildFieldCheckinRow(p, isPresent) {
 
   function togglePresence() {
     checkinState[p.id] = !checkinState[p.id];
+    dropAbsentFromPanelinha();
     renderCheckin();
   }
   toggle.addEventListener("click", togglePresence);
@@ -361,7 +377,141 @@ async function saveDayPosition(position) {
 
 function checkAll(value) {
   players.forEach(function (p) { checkinState[p.id] = value; });
+  dropAbsentFromPanelinha();
   renderCheckin();
+}
+
+// ============================================================
+// Panelinha (admins only): players kept on the same team when an admin draws
+// ============================================================
+
+const PANELINHA_ICON =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="12" r="6"/><circle cx="15" cy="12" r="6"/></svg>';
+
+// Saved panelinha (id -> true) and, while picking, the draft being edited.
+let panelinhaIds = {};
+let panelinhaMode = false;
+let panelinhaDraft = {};
+
+function loadPanelinhaFromPlayers() {
+  panelinhaIds = {};
+  players.forEach(function (p) { if (p.panelinha) panelinhaIds[p.id] = true; });
+}
+
+function panelinhaIdList(map) {
+  return Object.keys(map)
+    .filter(function (id) { return map[id]; })
+    .map(function (id) { return parseInt(id, 10); });
+}
+
+function presentPanelinhaCount() {
+  return panelinhaIdList(panelinhaIds).filter(function (id) { return checkinState[id]; }).length;
+}
+
+function panelinhaTagHTML(p, isPresent) {
+  if (!isAdminMode || !isPresent || !panelinhaIds[p.id]) return "";
+  return '<span class="r-meta"><span class="pan-tag">' + PANELINHA_ICON + "Panelinha</span></span>";
+}
+
+function renderPanelinhaControls(picking) {
+  const btn = $("ci-panelinha");
+  const count = presentPanelinhaCount();
+  btn.classList.toggle("hidden", !isAdminMode);
+  btn.classList.toggle("on", count > 0);
+  btn.setAttribute("aria-pressed", String(picking));
+  $("ci-panelinha-count").textContent = String(count);
+  $("ci-panelinha-count").classList.toggle("hidden", count === 0);
+
+  btn.parentElement.classList.toggle("hidden", picking);
+  $("ci-pan-banner").classList.toggle("hidden", !picking);
+  $("ci-cta-bar").classList.toggle("hidden", picking);
+  $("ci-pan-bar").classList.toggle("hidden", !picking);
+  $("ci-eyebrow").textContent = picking
+    ? "Confirmados hoje · " + panelinhaIdList(panelinhaDraft).length + " na panelinha"
+    : "Quem está aí?";
+}
+
+function buildPanelinhaPickRow(p) {
+  const on = !!panelinhaDraft[p.id];
+  const row = document.createElement("button");
+  row.type = "button";
+  row.className = "row" + (on ? " pan-on" : "");
+  row.setAttribute("aria-pressed", String(on));
+
+  const avatar = document.createElement("div");
+  avatar.className = "avatar";
+  avatar.textContent = buildPlayerInitials(p.name);
+
+  const main = document.createElement("div");
+  main.className = "r-main";
+  const position = isFieldPelada() ? getPosition(currentPosition(p)) : null;
+  main.innerHTML = '<span class="r-name">' + escapeHTML(p.name) + gkGloveHTML(p) + "</span>" +
+    (position ? '<span class="r-meta">' + escapeHTML(position.label) + "</span>" : "");
+
+  const sel = document.createElement("span");
+  sel.className = "pan-sel";
+  sel.innerHTML = '<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>';
+
+  row.appendChild(avatar);
+  row.appendChild(main);
+  row.appendChild(sel);
+  row.addEventListener("click", function () {
+    panelinhaDraft[p.id] = !panelinhaDraft[p.id];
+    renderCheckin();
+  });
+  return row;
+}
+
+function openPanelinhaMode() {
+  if (getPresentIds().length < 2) {
+    showToast("Marque quem está aí antes de montar a panelinha.");
+    return;
+  }
+  panelinhaDraft = {};
+  panelinhaIdList(panelinhaIds).forEach(function (id) {
+    if (checkinState[id]) panelinhaDraft[id] = true;
+  });
+  panelinhaMode = true;
+  renderCheckin();
+}
+
+function closePanelinhaMode() {
+  panelinhaMode = false;
+  renderCheckin();
+}
+
+async function savePanelinha(ids) {
+  players = await fetchJSON("/api/panelinha", {
+    method: "PUT",
+    body: JSON.stringify({ player_ids: ids }),
+  });
+  loadPanelinhaFromPlayers();
+}
+
+async function finishPanelinha() {
+  const ids = panelinhaIdList(panelinhaDraft);
+  try {
+    await savePanelinha(ids);
+    closePanelinhaMode();
+    showToast(ids.length ? "Panelinha com " + ids.length + " jogador" + (ids.length === 1 ? "" : "es") : "Panelinha desfeita");
+  } catch (err) {
+    console.error(err);
+    showToast("Erro ao salvar a panelinha.");
+  }
+}
+
+// Unchecking a player takes them out of the panelinha (so "Limpar" empties it).
+function dropAbsentFromPanelinha() {
+  if (!isAdminMode) return;
+  const saved = panelinhaIdList(panelinhaIds);
+  const kept = saved.filter(function (id) { return checkinState[id]; });
+  if (kept.length === saved.length) return;
+  panelinhaIds = {};
+  kept.forEach(function (id) { panelinhaIds[id] = true; });
+  savePanelinha(kept).catch(function (err) {
+    console.error(err);
+    showToast("Erro ao atualizar a panelinha.");
+  });
 }
 
 // ============================================================
@@ -1122,10 +1272,19 @@ document.addEventListener("DOMContentLoaded", function () {
   $("fb-send").addEventListener("click", submitFeedback);
 
   // Check-in
-  $("ci-back").addEventListener("click", goHome);
+  $("ci-back").addEventListener("click", function () {
+    if (panelinhaMode) closePanelinhaMode();
+    else goHome();
+  });
   $("ci-menu-btn").addEventListener("click", function () { renderMenuSheet(); openSheet("menu"); });
   $("ci-mark-all").addEventListener("click", function () { checkAll(true); });
   $("ci-clear").addEventListener("click", function () { checkAll(false); });
+  $("ci-panelinha").addEventListener("click", openPanelinhaMode);
+  $("ci-pan-undo").addEventListener("click", function () {
+    panelinhaDraft = {};
+    renderCheckin();
+  });
+  $("ci-pan-done").addEventListener("click", finishPanelinha);
 
   // Tabs
   document.querySelectorAll(".tab").forEach(function (tab) {

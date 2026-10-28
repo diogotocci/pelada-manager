@@ -190,6 +190,12 @@ def ensure_schema() -> None:
                     ) THEN
                         ALTER TABLE players ADD COLUMN dominant_foot TEXT;
                     END IF;
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'players' AND column_name = 'panelinha_until'
+                    ) THEN
+                        ALTER TABLE players ADD COLUMN panelinha_until DATE;
+                    END IF;
                 END
                 $$;
             """)
@@ -367,6 +373,7 @@ def _row_to_player(row) -> Player:
         day_position=row.get("day_position"),
         day_position_until=row.get("day_position_until"),
         dominant_foot=row.get("dominant_foot"),
+        panelinha_until=row.get("panelinha_until"),
     )
 
 
@@ -993,6 +1000,31 @@ class PlayerStorage:
                 row = cur.fetchone()
                 return _row_to_player(row) if row else None
 
+    def set_panelinha(self, pelada_id: int, player_ids: List[int], until) -> List[Player]:
+        """Make exactly these players the pelada's panelinha, valid up to and
+        including `until`. An empty list clears it."""
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                if player_ids:
+                    cur.execute(
+                        """
+                        UPDATE players
+                        SET panelinha_until = CASE WHEN id = ANY(%s) THEN %s::date ELSE NULL END
+                        WHERE pelada_id = %s
+                        """,
+                        (list(player_ids), until, pelada_id),
+                    )
+                else:
+                    cur.execute(
+                        "UPDATE players SET panelinha_until = NULL WHERE pelada_id = %s",
+                        (pelada_id,),
+                    )
+                cur.execute(
+                    "SELECT * FROM players WHERE pelada_id = %s ORDER BY id",
+                    (pelada_id,),
+                )
+                return [_row_to_player(r) for r in cur.fetchall()]
+
     def delete_player(self, pelada_id: int, player_id: int) -> bool:
         with _get_connection() as conn:
             with conn.cursor() as cur:
@@ -1008,7 +1040,8 @@ class PlayerStorage:
                 cur.execute(
                     """
                     UPDATE players
-                    SET active = NOT active
+                    SET active = NOT active,
+                        panelinha_until = CASE WHEN active THEN NULL ELSE panelinha_until END
                     WHERE id = %s AND pelada_id = %s
                     RETURNING *
                     """,
@@ -1021,7 +1054,7 @@ class PlayerStorage:
         with _get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "UPDATE players SET active = FALSE WHERE pelada_id = %s",
+                    "UPDATE players SET active = FALSE, panelinha_until = NULL WHERE pelada_id = %s",
                     (pelada_id,),
                 )
 
@@ -1032,10 +1065,11 @@ class PlayerStorage:
                     cur.execute(
                         """
                         UPDATE players
-                        SET active = (id = ANY(%s))
+                        SET active = (id = ANY(%s)),
+                            panelinha_until = CASE WHEN id = ANY(%s) THEN panelinha_until ELSE NULL END
                         WHERE pelada_id = %s
                         """,
-                        (active_ids, pelada_id),
+                        (active_ids, active_ids, pelada_id),
                     )
                 else:
                     cur.execute(

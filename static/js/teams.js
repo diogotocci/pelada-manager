@@ -84,6 +84,7 @@ async function confirmDraw() {
       method: "PATCH",
       body: JSON.stringify({ active_ids: presentIds }),
     });
+    loadPanelinhaFromPlayers();
 
     await performDraw(lastTeamSize);
     closeSheets();
@@ -103,6 +104,7 @@ async function performDraw(teamSize) {
     lastTeamSize = teamSize;
     lastDrawnTeams = data.teams;
     lastKickoffTeam = typeof data.kickoff_team === "number" ? data.kickoff_team : null;
+    lastPanelinha = data.panelinha || null;
 
     renderTeams(lastDrawnTeams);
     showScreen("s-teams");
@@ -186,6 +188,7 @@ function renderTeams(teams) {
   } else {
     balanceEl.classList.add("hidden");
   }
+  renderPanelinhaNote(teams);
 
   // Pitch view: the two playing teams are drawn on the field/court and only
   // the bench teams keep their cards below it.
@@ -251,7 +254,7 @@ function renderTeams(teams) {
       rowEl.className = "tp";
 
       const avatar = document.createElement("div");
-      avatar.className = "avatar sm hl";
+      avatar.className = "avatar sm " + (starsVisible() && panelinhaIds[keeper.id] ? "pan" : "hl");
       avatar.textContent = buildPlayerInitials(keeper.name);
 
       const nm = document.createElement("span");
@@ -283,7 +286,7 @@ function renderTeams(teams) {
       rowEl.className = "tp";
 
       const avatar = document.createElement("div");
-      avatar.className = "avatar sm";
+      avatar.className = "avatar sm" + (starsVisible() && panelinhaIds[p.id] ? " pan" : "");
       avatar.textContent = buildPlayerInitials(p.name);
 
       const nm = document.createElement("span");
@@ -315,6 +318,33 @@ function renderTeams(teams) {
     card.appendChild(body);
     cardsEl.appendChild(card);
   });
+}
+
+// Panelinha result: admins only, hidden with the stars like the balance card.
+function renderPanelinhaNote(teams) {
+  const el = $("tm-panelinha");
+  const info = lastPanelinha;
+  if (!info || !starsVisible() || !info.total) {
+    el.classList.add("hidden");
+    el.innerHTML = "";
+    return;
+  }
+  const team = teams[info.team_index];
+  const teamNumber = info.team_index + 1;
+  const colorKey = getTeamColorKey(teamNumber);
+  const teamLabel = colorKey == null
+    ? "no time de fora"
+    : "no " + (team ? team.name : "Time " + teamNumber) + " · " + getBibColor(colorKey).label;
+  const apart = info.total - info.together;
+  const detail = (apart === 0 ? "Todos " : "Juntos ") + teamLabel + ". " +
+    (apart === 0
+      ? "Só admins veem este aviso."
+      : apart + (apart === 1 ? " ficou separado" : " ficaram separados") + " para manter o equilíbrio.");
+  el.classList.remove("hidden");
+  el.innerHTML =
+    PANELINHA_ICON +
+    '<div><div class="pan-title">Panelinha: ' + info.together + " de " + info.total + " juntos</div>" +
+    '<div class="pan-text">' + escapeHTML(detail) + "</div></div>";
 }
 
 // ============================================================

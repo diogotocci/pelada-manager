@@ -4,6 +4,10 @@
    ============================================================ */
 
 :root {
+  --pan: #5b37b5;
+  --pan-soft: #efe9fb;
+  --pan-line: #d9cdf5;
+  --pan-ink: #3d2a78;
   --bg: #f7f8f6;
   --surface: #ffffff;
   --surface2: #eff2ef;
@@ -25,6 +29,10 @@
 }
 
 [data-theme="dark"] {
+  --pan: #b49cf0;
+  --pan-soft: #241d38;
+  --pan-line: #3a2f5c;
+  --pan-ink: #d6cbf7;
   --bg: #101312;
   --surface: #171b19;
   --surface2: #1e2320;
@@ -366,7 +374,75 @@ input { font: inherit; }
   color: var(--accent);
 }
 .count-hero .lbl { font-size: .86rem; color: var(--muted); }
-.quick-actions { display: flex; gap: 8px; margin: 10px 0 4px; }
+.quick-actions { display: flex; gap: 8px; margin: 10px 0 4px; flex-wrap: wrap; }
+
+/* Panelinha (admin only): players kept on the same team in the draw */
+.pan-btn { display: inline-flex; align-items: center; gap: 6px; }
+.pan-btn svg { width: 16px; height: 16px; stroke: currentColor; stroke-width: 2.2; fill: none; }
+.pan-btn.on { background: var(--pan-soft); border-color: var(--pan); color: var(--pan); font-weight: 700; }
+.pan-count {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--pan);
+  color: var(--surface);
+  font-size: .7rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.pan-banner {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--pan-soft);
+  border: 1px solid var(--pan-line);
+}
+.pan-banner svg { width: 22px; height: 22px; flex: none; stroke: var(--pan); stroke-width: 2.2; fill: none; }
+.pan-banner .pan-title { font-size: .86rem; font-weight: 800; color: var(--pan); }
+.pan-banner .pan-text { font-size: .8rem; color: var(--pan-ink); margin-top: 2px; line-height: 1.4; }
+.pan-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px 1px 5px;
+  border-radius: 999px;
+  background: var(--pan-soft);
+  color: var(--pan);
+  font-weight: 700;
+  font-size: .68rem;
+}
+.pan-tag svg { width: 11px; height: 11px; stroke: currentColor; stroke-width: 3; fill: none; }
+.pan-sel {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  flex: none;
+  border: 1.5px dashed var(--pan-line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: transparent;
+}
+.row.pan-on .pan-sel { background: var(--pan); border: 1px solid var(--pan); color: var(--surface); }
+.row.pan-on .avatar { background: var(--pan-soft); color: var(--pan); }
+.pan-sel svg { width: 14px; height: 14px; stroke: currentColor; stroke-width: 3; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.btn-pan { background: var(--pan); color: var(--surface); }
+.avatar.pan { background: var(--pan-soft); color: var(--pan); box-shadow: 0 0 0 2px var(--pan); }
+.pan-note {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 10px;
+  padding: 12px 14px;
+}
+.pan-note svg { width: 20px; height: 20px; flex: none; stroke: var(--pan); stroke-width: 2.2; fill: none; }
+.pan-note .pan-title { font-size: .84rem; font-weight: 800; color: var(--pan); }
+.pan-note .pan-text { font-size: .78rem; color: var(--pan-ink); margin-top: 2px; line-height: 1.4; }
 
 .check {
   width: 26px;
