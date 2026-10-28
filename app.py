@@ -18,6 +18,7 @@ from storage.postgres_storage import (
     MatchStatsStorage,
     ensure_schema,
 )
+from services.bot_filter import is_scanner_probe
 from services.team_balancer import balance_teams_with_group, pick_kickoff_team
 from services.positions import (
     DOMINANT_FEET,
@@ -43,7 +44,7 @@ from services.match_stats import (
 
 app = Flask(__name__)
 
-APP_VERSION = os.getenv("APP_VERSION", "3.4.27")
+APP_VERSION = os.getenv("APP_VERSION", "3.4.28")
 
 VALID_BIB_COLORS = {"blue", "yellow", "green", "red", "orange", "black", "white", "gray", "pink"}
 # Custom bib colors (picked with the color picker) are stored as "#rrggbb".
@@ -106,6 +107,13 @@ SESSION_MAX_AGE = 60 * 60 * 24 * 30  # 30 days
 # Keeps `import app` side-effect-free for tests/CI that run without a DB.
 if os.getenv("DATABASE_URL"):
     ensure_schema()
+
+
+@app.before_request
+def _reject_scanner_probes():
+    """Answer bot probes (WordPress, PHP, .env...) with a bare 404, skipping all app work."""
+    if is_scanner_probe(request.path):
+        return Response("Not Found", status=404, mimetype="text/plain")
 
 
 def _require_membership():
